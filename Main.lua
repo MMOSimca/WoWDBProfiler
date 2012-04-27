@@ -67,7 +67,7 @@ local EVENT_MAPPING = {
     --    PLAYER_ENTERING_WORLD = HandleZoneChange,
     --    PLAYER_LOGIN = true,
     --    PLAYER_LOGOUT = true,
-    --    PLAYER_TARGET_CHANGED = true,
+    PLAYER_TARGET_CHANGED = true,
     --    QUEST_COMPLETE = true,
     --    QUEST_DETAIL = true,
     --    QUEST_LOG_UPDATE = true,
@@ -93,6 +93,7 @@ local AF = private.ACTION_TYPE_FLAGS
 -----------------------------------------------------------------------
 local db
 local durability_timer_handle
+local target_location_timer_handle
 local action_data = {}
 
 do
@@ -137,8 +138,7 @@ local function CurrentLocationData()
     if _G.DungeonUsesTerrainMap() then
         map_level = map_level - 1
     end
-
-    return _G.GetRealZoneText(), math.floor(x * 1000 + 0.5), math.floor(y * 1000 + 0.5), map_level or 0
+    return _G.GetRealZoneText(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level or 0
 end
 
 
@@ -163,6 +163,7 @@ function WDP:OnEnable()
         self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
     end
     durability_timer_handle = self:ScheduleRepeatingTimer("ProcessDurability", 30)
+    target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.2)
 end
 
 
@@ -198,6 +199,36 @@ function WDP:ProcessDurability()
             end
         end
     end
+end
+
+
+function WDP:UpdateTargetLocation()
+    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or _G.UnitIsTapped("target") then
+        return
+    end
+
+    for index = 1, 4 do
+        if not _G.CheckInteractDistance("target", index) then
+            return
+        end
+    end
+
+    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+
+    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+        return
+    end
+    local zone_name, x, y, map_level = CurrentLocationData()
+    local npc_data = db.npcs[unit_idnum].stats[("level_%d"):format(_G.UnitLevel("target"))]
+
+    if not npc_data.locations then
+        npc_data.locations = {}
+    end
+
+    if not npc_data.locations[zone_name] then
+        npc_data.locations[zone_name] = {}
+    end
+    npc_data.locations[zone_name][("%s:%s:%s"):format(map_level, x, y)] = true
 end
 
 
@@ -264,7 +295,7 @@ function WDP:LOOT_OPENED()
         action_data.type = AF.NPC
     end
     local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
-    local update_func =  LOOT_UPDATE_FUNCS[action_data.type]
+    local update_func = LOOT_UPDATE_FUNCS[action_data.type]
 
     if not verify_func or not update_func or not verify_func() then
         return
@@ -289,6 +320,72 @@ function WDP:LOOT_OPENED()
         table.insert(action_data.drops, ("%d:%d"):format(item_id, quantity))
     end
     update_func()
+end
+
+
+local GENDER_NAMES = {
+    "UNKNOWN",
+    "MALE",
+    "FEMALE",
+}
+
+
+local REACTION_NAMES = {
+    "HATED",
+    "HOSTILE",
+    "UNFRIENDLY",
+    "NEUTRAL",
+    "FRIENDLY",
+    "HONORED",
+    "REVERED",
+    "EXALTED",
+}
+
+
+local POWER_TYPE_NAMES = {
+    ["0"] = "MANA",
+    ["1"] = "RAGE",
+    ["2"] = "FOCUS",
+    ["3"] = "ENERGY",
+    ["6"] = "RUNIC_POWER",
+}
+
+
+function WDP:PLAYER_TARGET_CHANGED()
+    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") then
+        return
+    end
+    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+
+    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+        return
+    end
+
+    local npc = db.npcs[unit_idnum]
+
+    if not npc then
+        db.npcs[unit_idnum] = {}
+        npc = db.npcs[unit_idnum]
+    end
+    local _, class_token = _G.UnitClass("target")
+    npc.class = class_token
+    -- TODO: Add faction here
+    npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
+    npc.is_pvp = _G.UnitIsPVP("target") and true or false
+    npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
+    npc.stats = npc.stats or {}
+
+    local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
+
+    if not npc.stats[npc_level] then
+        local power_type = _G.UnitPowerType("target")
+
+        npc.stats[npc_level] = {
+            max_health = _G.UnitHealthMax("target"),
+            max_power = _G.UnitManaMax("target"),
+            power_type = POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type,
+        }
+    end
 end
 
 
@@ -326,7 +423,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.x = x
             action_data.y = y
             action_data.zone = zone_name
-            print("Found spell flagged for OBJECT")
+            print(("Found spell flagged for OBJECT: %s (%s, %s)"):format(zone_name, x, y))
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             print("Found spell flagged for ZONE")
         end
