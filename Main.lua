@@ -371,20 +371,23 @@ function WDP:PLAYER_TARGET_CHANGED()
     npc.class = class_token
     -- TODO: Add faction here
     npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
-    npc.is_pvp = _G.UnitIsPVP("target") and true or false
+    npc.is_pvp = _G.UnitIsPVP("target") and true or nil
     npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
     npc.stats = npc.stats or {}
 
     local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
 
     if not npc.stats[npc_level] then
-        local power_type = _G.UnitPowerType("target")
-
         npc.stats[npc_level] = {
             max_health = _G.UnitHealthMax("target"),
-            max_power = _G.UnitManaMax("target"),
-            power_type = POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type,
         }
+
+        local max_power = _G.UnitManaMax("target")
+
+        if max_power > 0 then
+            local power_type = _G.UnitPowerType("target")
+            npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+        end
     end
 end
 
