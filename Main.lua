@@ -19,6 +19,7 @@ local ADDON_NAME, private = ...
 local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
 
+local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 
 -----------------------------------------------------------------------
 -- Local constants.
@@ -34,59 +35,20 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
-    --    ARTIFACT_COMPLETE = true,
-    --    ARTIFACT_HISTORY_READY = true,
-    --    AUCTION_HOUSE_SHOW = true,
-    --    BANKFRAME_OPENED = true,
-    --    BATTLEFIELDS_SHOW = true,
-    --    CHAT_MSG_ADDON = true,
-    --    CHAT_MSG_MONSTER_EMOTE = true,
-    --    CHAT_MSG_MONSTER_SAY = true,
-    --    CHAT_MSG_MONSTER_WHISPER = true,
-    --    CHAT_MSG_MONSTER_YELL = true,
-    --    CHAT_MSG_SYSTEM = true,
-    --    COMBAT_LOG_EVENT_UNFILTERED = true,
-    --    COMBAT_TEXT_UPDATE = true,
-    --    CONFIRM_BINDER = true,
-    --    CONFIRM_PET_UNLEARN = true,
-    --    CONFIRM_TALENT_WIPE = true,
-    --    CURRENCY_DISPLAY_UPDATE = true,
-    --    GOSSIP_ENTER_CODE = true,
-    --    GOSSIP_SHOW = true,
-    --    ITEM_TEXT_BEGIN = true,
-    --    LOCALPLAYER_PET_RENAMED = true,
-    --    LOOT_CLOSED = true,
     LOOT_OPENED = true,
-    --    MAIL_SHOW = true,
-    --    MERCHANT_SHOW = true,
-    --    MERCHANT_UPDATE = true,
-    --    OPEN_TABARD_FRAME = true,
-    --    PET_BAR_UPDATE = true,
-    --    PET_STABLE_SHOW = true,
-    --    PLAYER_ALIVE = true,
-    --    PLAYER_ENTERING_WORLD = HandleZoneChange,
-    --    PLAYER_LOGIN = true,
-    --    PLAYER_LOGOUT = true,
+    MERCHANT_UPDATE = true,
     PLAYER_TARGET_CHANGED = true,
-    --    QUEST_COMPLETE = true,
-    --    QUEST_DETAIL = true,
-    --    QUEST_LOG_UPDATE = true,
-    --    QUEST_PROGRESS = true,
-    --    TAXIMAP_OPENED = true,
-    --    TRADE_SKILL_SHOW = true,
-    --    TRADE_SKILL_UPDATE = true,
-    --    TRAINER_SHOW = true,
-    --    UNIT_QUEST_LOG_CHANGED = true,
+    UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
     UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
     UNIT_SPELLCAST_INTERRUPTED = "HandleSpellFailure",
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
-    --    ZONE_CHANGED = HandleZoneChange,
-    --    ZONE_CHANGED_NEW_AREA = HandleZoneChange,
 }
 
+
 local AF = private.ACTION_TYPE_FLAGS
+
 
 -----------------------------------------------------------------------
 -- Local variables.
@@ -95,21 +57,6 @@ local db
 local durability_timer_handle
 local target_location_timer_handle
 local action_data = {}
-
-do
-    local UNIT_TYPE_BITMASK = 0x007
-
-    function WDP:ParseGUID(guid)
-        local types = private.UNIT_TYPES
-        local unit_type = _G.bit.band(tonumber(guid:sub(1, 5)), UNIT_TYPE_BITMASK)
-
-        if unit_type ~= types.PLAYER or unit_type ~= types.OBJECT or unit_type ~= types.PET then
-            return unit_type, tonumber(guid:sub(-12, -9), 16)
-        end
-
-        return unit_type
-    end
-end -- do-block
 
 
 -----------------------------------------------------------------------
@@ -149,6 +96,23 @@ local function ItemLinkToID(item_link)
     local id = item_link:match("item:(%d+)")
     return id and tonumber(id) or nil
 end
+
+
+do
+    local UNIT_TYPE_BITMASK = 0x007
+
+    function WDP:ParseGUID(guid)
+        local types = private.UNIT_TYPES
+        local unit_type = _G.bit.band(tonumber(guid:sub(1, 5)), UNIT_TYPE_BITMASK)
+
+        if unit_type ~= types.PLAYER or unit_type ~= types.OBJECT or unit_type ~= types.PET then
+            return unit_type, tonumber(guid:sub(-12, -9), 16)
+        end
+
+        return unit_type
+    end
+end -- do-block
+
 
 -----------------------------------------------------------------------
 -- Methods.
@@ -235,10 +199,6 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
-function WDP:CHAT_MSG_SYSTEM(event_name, message, sender_name, language)
-end
-
-
 local re_gold = _G.GOLD_AMOUNT:gsub("%%d", "(%%d+)")
 local re_silver = _G.SILVER_AMOUNT:gsub("%%d", "(%%d+)")
 local re_copper = _G.COPPER_AMOUNT:gsub("%%d", "(%%d+)")
@@ -272,6 +232,7 @@ local LOOT_VERIFY_FUNCS = {
         return true
     end,
 }
+
 
 local LOOT_UPDATE_FUNCS = {
     [AF.NPC] = function()
@@ -320,6 +281,19 @@ function WDP:LOOT_OPENED()
         table.insert(action_data.drops, ("%d:%d"):format(item_id, quantity))
     end
     update_func()
+end
+
+
+function WDP:MERCHANT_UPDATE()
+    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+
+    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+        return
+    end
+
+    for index = 1, _G.GetMerchantNumItems() do
+        local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(index)
+    end
 end
 
 
@@ -389,6 +363,19 @@ function WDP:PLAYER_TARGET_CHANGED()
             npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
         end
     end
+end
+
+
+function WDP:QUEST_LOG_UPDATE()
+    self:UnregisterEvent("QUEST_LOG_UPDATE")
+end
+
+
+function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
+    if unit_id ~= "player" then
+        return
+    end
+    self:RegisterEvent("QUEST_LOG_UPDATE")
 end
 
 
