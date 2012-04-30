@@ -41,6 +41,10 @@ local EVENT_MAPPING = {
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PLAYER_TARGET_CHANGED = true,
+    QUEST_COMPLETE = true,
+    QUEST_DETAIL = true,
+    QUEST_LOG_UPDATE = true,
+    QUEST_PROGRESS = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
     UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
@@ -278,14 +282,15 @@ function WDP:LOOT_OPENED()
     action_data.drops = {}
 
     for loot_slot = 1, _G.GetNumLootItems() do
-        local texture, item, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+        local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
 
         if _G.LootSlotIsItem(loot_slot) then
             local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
             loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
         elseif _G.LootSlotIsCoin(loot_slot) then
-            table.insert(action_data.drops, ("money:%d"):format(_toCopper(item)))
+            table.insert(action_data.drops, ("money:%d"):format(_toCopper(item_text)))
         elseif _G.LootSlotIsCurrency(loot_slot) then
+            table.insert(action_data.drops, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
         end
     end
 
@@ -441,10 +446,21 @@ function WDP:PLAYER_TARGET_CHANGED()
 end
 
 
+function WDP:QUEST_COMPLETE()
+end
+
+
+function WDP:QUEST_DETAIL()
+end
+
+
 function WDP:QUEST_LOG_UPDATE()
     self:UnregisterEvent("QUEST_LOG_UPDATE")
 end
 
+
+function WDP:QUEST_PROGRESS()
+end
 
 function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
     if unit_id ~= "player" then
