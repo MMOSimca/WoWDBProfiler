@@ -65,6 +65,20 @@ local action_data = {}
 -----------------------------------------------------------------------
 -- Helper Functions.
 -----------------------------------------------------------------------
+local function NPCEntry(id_num)
+    if not id_num then
+        return
+    end
+    local npc = db.npcs[id_num]
+
+    if not npc then
+        db.npcs[id_num] = {}
+        npc = db.npcs[id_num]
+    end
+    return npc
+end
+
+
 local function CurrentLocationData()
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
@@ -189,11 +203,8 @@ function WDP:UpdateTargetLocation()
         return
     end
     local zone_name, x, y, map_level = CurrentLocationData()
-    local npc_data = db.npcs[unit_idnum].stats[("level_%d"):format(_G.UnitLevel("target"))]
-
-    if not npc_data.locations then
-        npc_data.locations = {}
-    end
+    local npc_data = NPCEntry(unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
+    npc_data.locations = npc_data.locations or {}
 
     if not npc_data.locations[zone_name] then
         npc_data.locations[zone_name] = {}
@@ -242,12 +253,7 @@ local LOOT_VERIFY_FUNCS = {
 
 local LOOT_UPDATE_FUNCS = {
     [AF.NPC] = function()
-        local npc = db.npcs[action_data.id_num]
-
-        if not npc then
-            db.npcs[action_data.id_num] = {}
-            npc = db.npcs[action_data.id_num]
-        end
+        local npc = NPCEntry(action_data.id_num)
         npc.drops = npc.drops or {}
 
         for index = 1, #action_data.drops do
@@ -305,13 +311,8 @@ function WDP:MERCHANT_UPDATE()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local npc = db.npcs[unit_idnum]
-
-    if not npc then
-        db.npcs[unit_idnum] = {}
-        npc = db.npcs[unit_idnum]
-    end
-    npc.sells = npc.sells or {}
+    local merchant = NPCEntry(unit_idnum)
+    merchant.sells = merchant.sells or {}
 
     for item_index = 1, _G.GetMerchantNumItems() do
         local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
@@ -371,7 +372,7 @@ function WDP:MERCHANT_UPDATE()
                     price_string = ("%s:%s"):format(price_string, currency_list[currency_index])
                 end
             end
-            npc.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
+            merchant.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
         end
     end
 end
@@ -414,13 +415,7 @@ function WDP:PLAYER_TARGET_CHANGED()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-
-    local npc = db.npcs[unit_idnum]
-
-    if not npc then
-        db.npcs[unit_idnum] = {}
-        npc = db.npcs[unit_idnum]
-    end
+    local npc = NPCEntry(unit_idnum)
     local _, class_token = _G.UnitClass("target")
     npc.class = class_token
     -- TODO: Add faction here
