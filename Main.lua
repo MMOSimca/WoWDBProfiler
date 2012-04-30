@@ -20,6 +20,8 @@ local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
+DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
+
 
 -----------------------------------------------------------------------
 -- Local constants.
@@ -36,6 +38,7 @@ local DATABASE_DEFAULTS = {
 
 local EVENT_MAPPING = {
     LOOT_OPENED = true,
+    MERCHANT_SHOW = "MERCHANT_UPDATE",
     MERCHANT_UPDATE = true,
     PLAYER_TARGET_CHANGED = true,
     UNIT_QUEST_LOG_CHANGED = true,
@@ -102,6 +105,9 @@ do
     local UNIT_TYPE_BITMASK = 0x007
 
     function WDP:ParseGUID(guid)
+        if not guid then
+            return
+        end
         local types = private.UNIT_TYPES
         local unit_type = _G.bit.band(tonumber(guid:sub(1, 5)), UNIT_TYPE_BITMASK)
 
@@ -284,15 +290,89 @@ function WDP:LOOT_OPENED()
 end
 
 
+local POINT_MATCH_PATTERNS = {
+    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING:gsub("%%d", "(%%d+)")), -- May no longer be necessary
+    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3:gsub("%%d", "(%%d+)")), -- May no longer be necessary
+    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_5V5:gsub("%%d", "(%%d+)")), -- May no longer be necessary
+    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_BG:gsub("%%d", "(%%d+)")),
+    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3_BG:gsub("%%d", "(%%d+)")),
+}
+
+
 function WDP:MERCHANT_UPDATE()
     local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
+    local npc = db.npcs[unit_idnum]
 
-    for index = 1, _G.GetMerchantNumItems() do
-        local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(index)
+    if not npc then
+        db.npcs[unit_idnum] = {}
+        npc = db.npcs[unit_idnum]
+    end
+    npc.sells = npc.sells or {}
+
+    for item_index = 1, _G.GetMerchantNumItems() do
+        local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
+        local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
+
+        if item_id and item_id > 0 then
+            local price_string = copper_price
+
+            if extended_cost then
+                local bg_points = 0
+                local personal_points = 0
+
+                DatamineTT:ClearLines()
+                DatamineTT:SetMerchantItem(item_index)
+
+                for line_index = 1, DatamineTT:NumLines() do
+                    local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
+
+                    if not current_line then
+                        break
+                    end
+                    local breakout
+
+                    for match_index = 1, #POINT_MATCH_PATTERNS do
+                        local match1, match2 = current_line:GetText():match(POINT_MATCH_PATTERNS[match_index])
+                        personal_points = personal_points + (match1 or 0)
+                        bg_points = bg_points + (match2 or 0)
+
+                        if match1 or match2 then
+                            breakout = true
+                            break
+                        end
+                    end
+
+                    if breakout then
+                        break
+                    end
+                end
+                local currency_list = {}
+
+                price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
+
+                for cost_index = 1, _G.GetMerchantItemCostInfo(item_index) do
+                    local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
+                    local currency_id = currency_link and ItemLinkToID(currency_link) or nil
+
+                    if not currency_id or currency_id < 1 then
+                        if not icon_texture then
+                            return
+                        end
+                        currency_id = icon_texture:match("[^\\]+$"):lower()
+                    end
+                    currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_id)
+                end
+
+                for currency_index = 1, #currency_list do
+                    price_string = ("%s:%s"):format(price_string, currency_list[currency_index])
+                end
+            end
+            npc.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
+        end
     end
 end
 
