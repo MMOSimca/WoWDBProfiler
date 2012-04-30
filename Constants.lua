@@ -20,9 +20,20 @@ local LibStub = _G.LibStub
 private.UNIT_TYPES = {
     PLAYER = 0,
     OBJECT = 1,
+    UNKNOWN = 2,
     NPC = 3,
     PET = 4,
     VEHICLE = 5,
+}
+
+
+private.UNIT_TYPE_NAMES = {
+    "PLAYER",
+    "OBJECT",
+    "UNKNOWN",
+    "NPC",
+    "PET",
+    "VEHICLE",
 }
 
 

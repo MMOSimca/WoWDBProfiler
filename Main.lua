@@ -69,17 +69,17 @@ local action_data = {}
 -----------------------------------------------------------------------
 -- Helper Functions.
 -----------------------------------------------------------------------
-local function NPCEntry(id_num)
-    if not id_num then
+local function UnitEntry(unit_type, unit_id)
+    if not unit_type or not unit_id then
         return
     end
-    local npc = db.npcs[id_num]
+    local unit = db[unit_type][unit_id]
 
-    if not npc then
-        db.npcs[id_num] = {}
-        npc = db.npcs[id_num]
+    if not unit then
+        db[unit_type][unit_id] = {}
+        unit = db[unit_type][unit_id]
     end
-    return npc
+    return unit
 end
 
 
@@ -129,13 +129,27 @@ do
         local types = private.UNIT_TYPES
         local unit_type = _G.bit.band(tonumber(guid:sub(1, 5)), UNIT_TYPE_BITMASK)
 
-        if unit_type ~= types.PLAYER or unit_type ~= types.OBJECT or unit_type ~= types.PET then
+        if unit_type ~= types.PLAYER and unit_type ~= types.PET then
             return unit_type, tonumber(guid:sub(-12, -9), 16)
         end
 
         return unit_type
     end
 end -- do-block
+
+
+local function UpdateObjectLocation(identifier)
+    if not identifier then
+        return
+    end
+    local zone_name, x, y, map_level, instance_type = CurrentLocationData()
+    local object = UnitEntry("objects", identifier)
+
+    if not object[zone_name] then
+        object[zone_name] = {}
+    end
+    object[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
+end
 
 
 -----------------------------------------------------------------------
@@ -207,7 +221,7 @@ function WDP:UpdateTargetLocation()
         return
     end
     local zone_name, x, y, map_level, instance_type = CurrentLocationData()
-    local npc_data = NPCEntry(unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
+    local npc_data = UnitEntry("npcs", unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
     npc_data.locations = npc_data.locations or {}
 
     if not npc_data.locations[zone_name] then
@@ -257,7 +271,7 @@ local LOOT_VERIFY_FUNCS = {
 
 local LOOT_UPDATE_FUNCS = {
     [AF.NPC] = function()
-        local npc = NPCEntry(action_data.id_num)
+        local npc = UnitEntry("npcs", action_data.id_num)
         npc.drops = npc.drops or {}
 
         for index = 1, #action_data.drops do
@@ -316,7 +330,7 @@ function WDP:UpdateMerchantItems()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local merchant = NPCEntry(unit_idnum)
+    local merchant = UnitEntry("npcs", unit_idnum)
     merchant.sells = merchant.sells or {}
 
     for item_index = 1, _G.GetMerchantNumItems() do
@@ -420,7 +434,7 @@ function WDP:PLAYER_TARGET_CHANGED()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local npc = NPCEntry(unit_idnum)
+    local npc = UnitEntry("npcs", unit_idnum)
     local _, class_token = _G.UnitClass("target")
     npc.class = class_token
     -- TODO: Add faction here
@@ -451,6 +465,19 @@ end
 
 
 function WDP:QUEST_DETAIL()
+    local unit_name = _G.UnitName("questnpc")
+
+    if not unit_name then
+        return
+    end
+    local unit_type, unit_id = self:ParseGUID(_G.UnitGUID("questnpc"))
+
+    if unit_type == private.UNIT_TYPES.OBJECT then
+        UpdateObjectLocation(unit_id)
+    end
+    local quest = UnitEntry("quests", _G.GetQuestID())
+    quest.begin = quest.begin or {}
+    quest.begin[("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
 end
 
 
