@@ -38,8 +38,8 @@ local DATABASE_DEFAULTS = {
 
 local EVENT_MAPPING = {
     LOOT_OPENED = true,
-    MERCHANT_SHOW = "MERCHANT_UPDATE",
-    MERCHANT_UPDATE = true,
+    MERCHANT_SHOW = "UpdateMerchantItems",
+    MERCHANT_UPDATE = "UpdateMerchantItems",
     PLAYER_TARGET_CHANGED = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
@@ -110,8 +110,7 @@ local function ItemLinkToID(item_link)
     if not item_link then
         return
     end
-    local id = item_link:match("item:(%d+)")
-    return id and tonumber(id) or nil
+    return tonumber(item_link:match("item:(%d+)"))
 end
 
 
@@ -305,7 +304,7 @@ local POINT_MATCH_PATTERNS = {
 }
 
 
-function WDP:MERCHANT_UPDATE()
+function WDP:UpdateMerchantItems()
     local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
