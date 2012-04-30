@@ -102,7 +102,8 @@ local function CurrentLocationData()
     if _G.DungeonUsesTerrainMap() then
         map_level = map_level - 1
     end
-    return _G.GetRealZoneText(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level or 0
+    local _, instance_type = _G.IsInInstance()
+    return _G.GetRealZoneText(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level or 0, instance_type:upper()
 end
 
 
@@ -201,14 +202,14 @@ function WDP:UpdateTargetLocation()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local zone_name, x, y, map_level = CurrentLocationData()
+    local zone_name, x, y, map_level, instance_type = CurrentLocationData()
     local npc_data = NPCEntry(unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
     npc_data.locations = npc_data.locations or {}
 
     if not npc_data.locations[zone_name] then
         npc_data.locations[zone_name] = {}
     end
-    npc_data.locations[zone_name][("%s:%s:%s"):format(map_level, x, y)] = true
+    npc_data.locations[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
 end
 
 
@@ -478,9 +479,10 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             return
         end
 
-        local zone_name, x, y, map_level = CurrentLocationData()
+        local zone_name, x, y, map_level, instance_type = CurrentLocationData()
 
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
+            action_data.instance_type = instance_type
             action_data.map_level = map_level
             action_data.name = target_name
             action_data.type = AF.OBJECT
