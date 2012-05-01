@@ -37,6 +37,7 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    LOOT_CLOSED = true,
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
@@ -235,96 +236,104 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
-local re_gold = _G.GOLD_AMOUNT:gsub("%%d", "(%%d+)")
-local re_silver = _G.SILVER_AMOUNT:gsub("%%d", "(%%d+)")
-local re_copper = _G.COPPER_AMOUNT:gsub("%%d", "(%%d+)")
-
-
-local function _moneyMatch(money, re)
-    return money:match(re) or 0
+function WDP:LOOT_CLOSED()
+    table.wipe(action_data)
 end
 
 
-local function _toCopper(money)
-    if not money then
-        return 0
+do
+    local re_gold = _G.GOLD_AMOUNT:gsub("%%d", "(%%d+)")
+    local re_silver = _G.SILVER_AMOUNT:gsub("%%d", "(%%d+)")
+    local re_copper = _G.COPPER_AMOUNT:gsub("%%d", "(%%d+)")
+
+
+    local function _moneyMatch(money, re)
+        return money:match(re) or 0
     end
 
-    return _moneyMatch(money, re_gold) * 10000 + _moneyMatch(money, re_silver) * 100 + _moneyMatch(money, re_copper)
-end
+
+    local function _toCopper(money)
+        if not money then
+            return 0
+        end
+
+        return _moneyMatch(money, re_gold) * 10000 + _moneyMatch(money, re_silver) * 100 + _moneyMatch(money, re_copper)
+    end
 
 
-local LOOT_VERIFY_FUNCS = {
-    [AF.NPC] = function()
-        local fishing_loot = _G.IsFishingLoot()
+    local LOOT_VERIFY_FUNCS = {
+        [AF.NPC] = function()
+            local fishing_loot = _G.IsFishingLoot()
 
-        if not fishing_loot and _G.UnitExists("target") and not _G.UnitIsFriend("player", "target") and _G.UnitIsDead("target") then
-            if _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
-                return false
+            if not fishing_loot and _G.UnitExists("target") and not _G.UnitIsFriend("player", "target") and _G.UnitIsDead("target") then
+                if _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
+                    return false
+                end
+                local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
+                action_data.id_num = id_num
             end
-            local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
-            action_data.id_num = id_num
+            return true
+        end,
+        [AF.OBJECT] = function()
+            return true
+        end,
+    }
+
+
+    local LOOT_UPDATE_FUNCS = {
+        [AF.NPC] = function()
+            local npc = UnitEntry("npcs", action_data.id_num)
+            local loot_type = action_data.loot_type or "drops"
+            npc[loot_type] = npc[loot_type] or {}
+
+            for index = 1, #action_data.drops do
+                table.insert(npc[loot_type], action_data.drops[index])
+            end
+        end,
+        [AF.OBJECT] = function()
+            local object = UnitEntry("objects", action_data.identifier)
+            object.drops = object.drops or {}
+
+            for index = 1, #action_data.drops do
+                table.insert(object.drops, action_data.drops[index])
+            end
+        end,
+    }
+
+
+    function WDP:LOOT_OPENED()
+        if not action_data.type then
+            action_data.type = AF.NPC
         end
-        return true
-    end,
-    [AF.OBJECT] = function()
-        return true
-    end,
-}
+        local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
+        local update_func = LOOT_UPDATE_FUNCS[action_data.type]
 
-
-local LOOT_UPDATE_FUNCS = {
-    [AF.NPC] = function()
-        local npc = UnitEntry("npcs", action_data.id_num)
-        npc.drops = npc.drops or {}
-
-        for index = 1, #action_data.drops do
-            table.insert(npc.drops, action_data.drops[index])
+        if not verify_func or not update_func or not verify_func() then
+            return
         end
-    end,
-    [AF.OBJECT] = function()
-        local object = UnitEntry("objects", action_data.identifier)
-        object.drops = object.drops or {}
 
-        for index = 1, #action_data.drops do
-            table.insert(object.drops, action_data.drops[index])
+        local loot_registry = {}
+        action_data.drops = {}
+
+        for loot_slot = 1, _G.GetNumLootItems() do
+            local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+
+            if _G.LootSlotIsItem(loot_slot) then
+                local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
+            elseif _G.LootSlotIsCoin(loot_slot) then
+                table.insert(action_data.drops, ("money:%d"):format(_toCopper(item_text)))
+            elseif _G.LootSlotIsCurrency(loot_slot) then
+                table.insert(action_data.drops, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+            end
         end
-    end,
-}
 
-
-function WDP:LOOT_OPENED()
-    if not action_data.type then
-        action_data.type = AF.NPC
-    end
-    local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
-    local update_func = LOOT_UPDATE_FUNCS[action_data.type]
-
-    if not verify_func or not update_func or not verify_func() then
-        return
-    end
-
-    local loot_registry = {}
-    action_data.drops = {}
-
-    for loot_slot = 1, _G.GetNumLootItems() do
-        local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
-
-        if _G.LootSlotIsItem(loot_slot) then
-            local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-            loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
-        elseif _G.LootSlotIsCoin(loot_slot) then
-            table.insert(action_data.drops, ("money:%d"):format(_toCopper(item_text)))
-        elseif _G.LootSlotIsCurrency(loot_slot) then
-            table.insert(action_data.drops, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+        for item_id, quantity in pairs(loot_registry) do
+            table.insert(action_data.drops, ("%d:%d"):format(item_id, quantity))
         end
+        update_func()
     end
-
-    for item_id, quantity in pairs(loot_registry) do
-        table.insert(action_data.drops, ("%d:%d"):format(item_id, quantity))
-    end
-    update_func()
-end
+end -- do-block
 
 
 local POINT_MATCH_PATTERNS = {
@@ -469,7 +478,6 @@ function WDP:PLAYER_TARGET_CHANGED()
             npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
         end
     end
-    action_data.type = AF.NPC -- This will be set as appropriate below
 end
 
 
@@ -557,13 +565,16 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.y = y
             action_data.zone = zone_name
             action_data.identifier = identifier
-            print(("Found spell flagged for OBJECT: %s (%s, %s)"):format(zone_name, x, y))
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             print("Found spell flagged for ZONE")
         end
     elseif tt_unit_name and not tt_item_name then
         if bit.band(spell_flags, AF.NPC) == AF.NPC then
-            print("Found spell flagged for NPC")
+            if not tt_unit_id or tt_unit_name ~= target_name then
+                return
+            end
+            action_data.type = AF.NPC
+            action_data.loot_type = spell_label:lower()
         end
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         print("Found spell flagged for ITEM")
@@ -579,9 +590,6 @@ end
 function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
     if unit_id ~= "player" then
         return
-    end
-
-    if action_data.type == AF.OBJECT then
     end
 
     if private.SPELL_LABELS_BY_NAME[spell_name] then
