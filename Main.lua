@@ -473,25 +473,33 @@ function WDP:PLAYER_TARGET_CHANGED()
 end
 
 
-function WDP:QUEST_COMPLETE()
-end
+do
+    local function UpdateQuestJuncture(point)
+        local unit_name = _G.UnitName("questnpc")
 
+        if not unit_name then
+            return
+        end
+        local unit_type, unit_id = WDP:ParseGUID(_G.UnitGUID("questnpc"))
 
-function WDP:QUEST_DETAIL()
-    local unit_name = _G.UnitName("questnpc")
-
-    if not unit_name then
-        return
+        if unit_type == private.UNIT_TYPES.OBJECT then
+            UpdateObjectLocation(unit_id)
+        end
+        local quest = UnitEntry("quests", _G.GetQuestID())
+        quest[point] = quest[point] or {}
+        quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
     end
-    local unit_type, unit_id = self:ParseGUID(_G.UnitGUID("questnpc"))
 
-    if unit_type == private.UNIT_TYPES.OBJECT then
-        UpdateObjectLocation(unit_id)
+
+    function WDP:QUEST_COMPLETE()
+        UpdateQuestJuncture("end")
     end
-    local quest = UnitEntry("quests", _G.GetQuestID())
-    quest.begin = quest.begin or {}
-    quest.begin[("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
-end
+
+
+    function WDP:QUEST_DETAIL()
+        UpdateQuestJuncture("begin")
+    end
+end -- do-block
 
 
 function WDP:QUEST_LOG_UPDATE()
