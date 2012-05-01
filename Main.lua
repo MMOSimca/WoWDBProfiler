@@ -144,11 +144,12 @@ local function UpdateObjectLocation(identifier)
     end
     local zone_name, x, y, map_level, instance_type = CurrentLocationData()
     local object = UnitEntry("objects", identifier)
+    object.locations = object.locations or {}
 
-    if not object[zone_name] then
-        object[zone_name] = {}
+    if not object.locations[zone_name] then
+        object.locations[zone_name] = {}
     end
-    object[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
+    object.locations[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
 end
 
 
@@ -266,6 +267,9 @@ local LOOT_VERIFY_FUNCS = {
         end
         return true
     end,
+    [AF.OBJECT] = function()
+        return true
+    end,
 }
 
 
@@ -276,6 +280,14 @@ local LOOT_UPDATE_FUNCS = {
 
         for index = 1, #action_data.drops do
             table.insert(npc.drops, action_data.drops[index])
+        end
+    end,
+    [AF.OBJECT] = function()
+        local object = UnitEntry("objects", action_data.identifier)
+        object.drops = object.drops or {}
+
+        for index = 1, #action_data.drops do
+            table.insert(object.drops, action_data.drops[index])
         end
     end,
 }
@@ -457,6 +469,7 @@ function WDP:PLAYER_TARGET_CHANGED()
             npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
         end
     end
+    action_data.type = AF.NPC -- This will be set as appropriate below
 end
 
 
@@ -525,6 +538,9 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         local zone_name, x, y, map_level, instance_type = CurrentLocationData()
 
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
+            local identifier = ("%s:%s"):format(spell_label, target_name)
+            UpdateObjectLocation(identifier)
+
             action_data.instance_type = instance_type
             action_data.map_level = map_level
             action_data.name = target_name
@@ -532,6 +548,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.x = x
             action_data.y = y
             action_data.zone = zone_name
+            action_data.identifier = identifier
             print(("Found spell flagged for OBJECT: %s (%s, %s)"):format(zone_name, x, y))
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             print("Found spell flagged for ZONE")
