@@ -277,15 +277,11 @@ do
 
     local LOOT_VERIFY_FUNCS = {
         [AF.NPC] = function()
-            local fishing_loot = _G.IsFishingLoot()
-
-            if not fishing_loot and _G.UnitExists("target") and not _G.UnitIsFriend("player", "target") and _G.UnitIsDead("target") then
-                if _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
-                    return false
-                end
-                local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
-                action_data.id_num = id_num
+            if _G.IsFishingLoot() or not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
+                return false
             end
+            local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
+            action_data.id_num = id_num
             return true
         end,
         [AF.OBJECT] = true,
@@ -295,6 +291,10 @@ do
     local LOOT_UPDATE_FUNCS = {
         [AF.NPC] = function()
             local npc = UnitEntry("npcs", action_data.id_num)
+
+            if not npc then
+                return
+            end
             local loot_type = action_data.loot_type or "drops"
             npc[loot_type] = npc[loot_type] or {}
 
