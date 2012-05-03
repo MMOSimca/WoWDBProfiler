@@ -159,6 +159,20 @@ end
 -----------------------------------------------------------------------
 function WDP:OnInitialize()
     db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default").global
+
+    local wow_version, build_num = _G.GetBuildInfo()
+    local raw_db = _G["WoWDBProfilerData"]
+
+    build_num = tonumber(build_num)
+
+    if raw_db.build_num and raw_db.build_num < build_num then
+        for entry in pairs(DATABASE_DEFAULTS.global) do
+            db[entry] = {}
+        end
+        raw_db.build_num = build_num
+    elseif not raw_db.build_num then
+        raw_db.build_num = build_num
+    end
 end
 
 
@@ -274,9 +288,7 @@ do
             end
             return true
         end,
-        [AF.OBJECT] = function()
-            return true
-        end,
+        [AF.OBJECT] = true,
     }
 
 
@@ -308,10 +320,13 @@ do
         local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
         local update_func = LOOT_UPDATE_FUNCS[action_data.type]
 
-        if not verify_func or not update_func or not verify_func() then
+        if not verify_func or not update_func then
             return
         end
 
+        if _G.type(verify_func) == "function" and not verify_func() then
+            return
+        end
         local loot_registry = {}
         action_data.drops = {}
 
@@ -414,6 +429,10 @@ function WDP:UpdateMerchantItems()
             end
             merchant.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
         end
+    end
+
+    if _G.CanMerchantRepair() then
+        merchant.can_repair = true
     end
 end
 
