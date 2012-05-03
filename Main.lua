@@ -276,6 +276,25 @@ do
 
 
     local LOOT_VERIFY_FUNCS = {
+        [AF.ITEM] = function()
+            local locked_item_id
+
+            for bag_index = 0, _G.NUM_BAG_FRAMES do
+                for slot_index = 1, _G.GetContainerNumSlots(bag_index) do
+                    local _, _, is_locked = _G.GetContainerItemInfo(bag_index, slot_index)
+
+                    if is_locked then
+                        locked_item_id = ItemLinkToID(_G.GetContainerItemLink(bag_index, slot_index))
+                    end
+                end
+            end
+
+            if not locked_item_id or (action_data.item_id and action_data.item_id ~= locked_item_id) then
+                return false
+            end
+            action_data.item_id = locked_item_id
+            return true
+        end,
         [AF.NPC] = function()
             if _G.IsFishingLoot() or not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
                 return false
@@ -289,6 +308,15 @@ do
 
 
     local LOOT_UPDATE_FUNCS = {
+        [AF.ITEM] = function()
+            local item = UnitEntry("items", action_data.item_id)
+            local loot_type = action_data.loot_type or "drops"
+            item[loot_type] = item[loot_type] or {}
+
+            for index = 1, #action_data.drops do
+                table.insert(item[loot_type], action_data.drops[index])
+            end
+        end,
         [AF.NPC] = function()
             local npc = UnitEntry("npcs", action_data.id_num)
 
@@ -565,7 +593,25 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
     local spell_flags = private.SPELL_FLAGS_BY_LABEL[spell_label]
 
-    if not tt_item_name and not tt_unit_name then
+    if tt_unit_name and not tt_item_name then
+        if bit.band(spell_flags, AF.NPC) == AF.NPC then
+            if not tt_unit_id or tt_unit_name ~= target_name then
+                return
+            end
+            action_data.type = AF.NPC
+            action_data.loot_type = spell_label:lower()
+        end
+    elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
+        action_data.type = AF.ITEM
+        action_data.loot_type = spell_label:lower()
+
+        if tt_item_name and tt_item_name == target_name then
+            action_data.item_id = ItemLinkToID(tt_item_link)
+        elseif target_name and target_name ~= "" then
+            local _, target_item_link = _G.GetItemInfo(target_name)
+            action_data.item_id = ItemLinkToID(target_item_link)
+        end
+    elseif not tt_item_name and not tt_unit_name then
         if target_name == "" then
             return
         end
@@ -587,16 +633,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             print("Found spell flagged for ZONE")
         end
-    elseif tt_unit_name and not tt_item_name then
-        if bit.band(spell_flags, AF.NPC) == AF.NPC then
-            if not tt_unit_id or tt_unit_name ~= target_name then
-                return
-            end
-            action_data.type = AF.NPC
-            action_data.loot_type = spell_label:lower()
-        end
-    elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
-        print("Found spell flagged for ITEM")
     else
         print(("%s: We have an issue with types and flags."), event_name)
     end
