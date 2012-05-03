@@ -32,6 +32,7 @@ local DATABASE_DEFAULTS = {
         npcs = {},
         objects = {},
         quests = {},
+        zones = {},
     }
 }
 
@@ -296,7 +297,7 @@ do
             return true
         end,
         [AF.NPC] = function()
-            if _G.IsFishingLoot() or not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
+            if not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
                 return false
             end
             local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
@@ -304,17 +305,20 @@ do
             return true
         end,
         [AF.OBJECT] = true,
+        [AF.ZONE] = function()
+            return action_data.loot_type and _G.IsFishingLoot()
+        end,
     }
 
 
     local LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function()
             local item = UnitEntry("items", action_data.item_id)
-            local loot_type = action_data.loot_type or "drops"
+            local loot_type = action_data.loot_type
             item[loot_type] = item[loot_type] or {}
 
-            for index = 1, #action_data.drops do
-                table.insert(item[loot_type], action_data.drops[index])
+            for index = 1, #action_data.loot_list do
+                table.insert(item[loot_type], action_data.loot_list[index])
             end
         end,
         [AF.NPC] = function()
@@ -326,16 +330,33 @@ do
             local loot_type = action_data.loot_type or "drops"
             npc[loot_type] = npc[loot_type] or {}
 
-            for index = 1, #action_data.drops do
-                table.insert(npc[loot_type], action_data.drops[index])
+            for index = 1, #action_data.loot_list do
+                table.insert(npc[loot_type], action_data.loot_list[index])
             end
         end,
         [AF.OBJECT] = function()
             local object = UnitEntry("objects", action_data.identifier)
             object.drops = object.drops or {}
 
-            for index = 1, #action_data.drops do
-                table.insert(object.drops, action_data.drops[index])
+            for index = 1, #action_data.loot_list do
+                table.insert(object.drops, action_data.loot_list[index])
+            end
+        end,
+        [AF.ZONE] = function()
+            local loot_type = action_data.loot_type or "drops"
+            local zone = UnitEntry("zones", action_data.zone)
+            zone[loot_type] = zone[loot_type] or {}
+
+            local location_data = ("%s:%s:%s:%s"):format(action_data.instance_type, action_data.map_level, action_data.x, action_data.y)
+            local loot_data = zone[loot_type][location_data]
+
+            if not loot_data then
+                zone[loot_type][location_data] = {}
+                loot_data = zone[loot_type][location_data]
+            end
+
+            for index = 1, #action_data.loot_list do
+                table.insert(loot_data, action_data.loot_list[index])
             end
         end,
     }
@@ -345,6 +366,7 @@ do
         if not action_data.type then
             action_data.type = AF.NPC
         end
+
         local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
         local update_func = LOOT_UPDATE_FUNCS[action_data.type]
 
@@ -356,7 +378,7 @@ do
             return
         end
         local loot_registry = {}
-        action_data.drops = {}
+        action_data.loot_list = {}
 
         for loot_slot = 1, _G.GetNumLootItems() do
             local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
@@ -365,14 +387,14 @@ do
                 local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                 loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
             elseif _G.LootSlotIsCoin(loot_slot) then
-                table.insert(action_data.drops, ("money:%d"):format(_toCopper(item_text)))
+                table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
             elseif _G.LootSlotIsCurrency(loot_slot) then
-                table.insert(action_data.drops, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+                table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
         end
 
         for item_id, quantity in pairs(loot_registry) do
-            table.insert(action_data.drops, ("%d:%d"):format(item_id, quantity))
+            table.insert(action_data.loot_list, ("%d:%d"):format(item_id, quantity))
         end
         update_func()
     end
@@ -612,32 +634,31 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.item_id = ItemLinkToID(target_item_link)
         end
     elseif not tt_item_name and not tt_unit_name then
-        if target_name == "" then
-            return
-        end
-
         local zone_name, x, y, map_level, instance_type = CurrentLocationData()
 
+        action_data.instance_type = instance_type
+        action_data.map_level = map_level
+        action_data.name = target_name
+        action_data.x = x
+        action_data.y = y
+        action_data.zone = zone_name
+
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
+            if target_name == "" then
+                return
+            end
             local identifier = ("%s:%s"):format(spell_label, target_name)
             UpdateObjectLocation(identifier)
 
-            action_data.instance_type = instance_type
-            action_data.map_level = map_level
-            action_data.name = target_name
             action_data.type = AF.OBJECT
-            action_data.x = x
-            action_data.y = y
-            action_data.zone = zone_name
             action_data.identifier = identifier
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
-            print("Found spell flagged for ZONE")
+            action_data.type = AF.ZONE
+            action_data.loot_type = spell_label:lower()
         end
-    else
-        print(("%s: We have an issue with types and flags."), event_name)
     end
 
-    print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, target_name, spell_line))
+--    print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, target_name, spell_line))
     private.tracked_line = spell_line
 end
 
@@ -647,9 +668,9 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         return
     end
 
-    if private.SPELL_LABELS_BY_NAME[spell_name] then
-        print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id))
-    end
+--    if private.SPELL_LABELS_BY_NAME[spell_name] then
+--        print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id))
+--    end
     private.tracked_line = nil
 end
 
