@@ -17,6 +17,8 @@ local LibStub = _G.LibStub
 -----------------------------------------------------------------------
 -- Constants.
 -----------------------------------------------------------------------
+private.wow_version, private.build_num = _G.GetBuildInfo()
+
 private.UNIT_TYPES = {
     PLAYER = 0,
     OBJECT = 1,

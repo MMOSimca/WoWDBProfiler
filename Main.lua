@@ -38,6 +38,7 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    COMBAT_TEXT_UPDATE = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
@@ -46,7 +47,6 @@ local EVENT_MAPPING = {
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
     QUEST_LOG_UPDATE = true,
-    QUEST_PROGRESS = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
     UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
@@ -161,10 +161,9 @@ end
 function WDP:OnInitialize()
     db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default").global
 
-    local wow_version, build_num = _G.GetBuildInfo()
     local raw_db = _G["WoWDBProfilerData"]
 
-    build_num = tonumber(build_num)
+    local build_num = tonumber(private.build_num)
 
     if raw_db.build_num and raw_db.build_num < build_num then
         for entry in pairs(DATABASE_DEFAULTS.global) do
@@ -251,8 +250,25 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
+function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
+--    if message_type ~= "FACTION" or _G.UnitIsUnit("target", "questnpc") then
+--        return
+--    end
+--    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+--    local npc = UnitEntry("npcs", unit_idnum)
+--
+--    if not npc then
+--        return
+--    end
+--    npc.reputations = npc.reputations or {}
+--    npc.reputations[faction_name] = amount
+--
+    --    print(("%s: %s, %s, %s"):format(event, message_type, faction_name, amount))
+end
+
+
 function WDP:LOOT_CLOSED()
-    table.wipe(action_data)
+    --    table.wipe(action_data)
 end
 
 
@@ -363,10 +379,13 @@ do
 
 
     function WDP:LOOT_OPENED()
+        if action_data.looting then
+            return
+        end
+
         if not action_data.type then
             action_data.type = AF.NPC
         end
-
         local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
         local update_func = LOOT_UPDATE_FUNCS[action_data.type]
 
@@ -377,19 +396,38 @@ do
         if _G.type(verify_func) == "function" and not verify_func() then
             return
         end
+        -- TODO: Remove this check once the MoP client goes live
+        local wow_version = private.wow_version
         local loot_registry = {}
         action_data.loot_list = {}
+        action_data.looting = true
 
-        for loot_slot = 1, _G.GetNumLootItems() do
-            local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+        if wow_version == "5.0.1" then
+            for loot_slot = 1, _G.GetNumLootItems() do
+                local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
 
-            if _G.LootSlotIsItem(loot_slot) then
-                local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
-            elseif _G.LootSlotIsCoin(loot_slot) then
-                table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
-            elseif _G.LootSlotIsCurrency(loot_slot) then
-                table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+                local slot_type = _G.GetLootSlotType(loot_slot)
+
+                if slot_type == _G.LOOT_SLOT_ITEM then
+                    local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                    loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
+                elseif slot_type == _G.LOOT_SLOT_MONEY then
+                    table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
+                elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                    table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+                end
+            end
+        else
+            for loot_slot = 1, _G.GetNumLootItems() do
+                local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+                if _G.LootSlotIsItem(loot_slot) then
+                    local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                    loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
+                elseif _G.LootSlotIsCoin(loot_slot) then
+                    table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
+                elseif _G.LootSlotIsCurrency(loot_slot) then
+                    table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+                end
             end
         end
 
@@ -487,68 +525,71 @@ function WDP:UpdateMerchantItems()
 end
 
 
-local GENDER_NAMES = {
-    "UNKNOWN",
-    "MALE",
-    "FEMALE",
-}
+do
+    local GENDER_NAMES = {
+        "UNKNOWN",
+        "MALE",
+        "FEMALE",
+    }
 
 
-local REACTION_NAMES = {
-    "HATED",
-    "HOSTILE",
-    "UNFRIENDLY",
-    "NEUTRAL",
-    "FRIENDLY",
-    "HONORED",
-    "REVERED",
-    "EXALTED",
-}
+    local REACTION_NAMES = {
+        "HATED",
+        "HOSTILE",
+        "UNFRIENDLY",
+        "NEUTRAL",
+        "FRIENDLY",
+        "HONORED",
+        "REVERED",
+        "EXALTED",
+    }
 
 
-local POWER_TYPE_NAMES = {
-    ["0"] = "MANA",
-    ["1"] = "RAGE",
-    ["2"] = "FOCUS",
-    ["3"] = "ENERGY",
-    ["6"] = "RUNIC_POWER",
-}
+    local POWER_TYPE_NAMES = {
+        ["0"] = "MANA",
+        ["1"] = "RAGE",
+        ["2"] = "FOCUS",
+        ["3"] = "ENERGY",
+        ["6"] = "RUNIC_POWER",
+    }
 
 
-function WDP:PLAYER_TARGET_CHANGED()
-    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") then
-        return
-    end
-    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+    function WDP:PLAYER_TARGET_CHANGED()
+        if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") then
+            return
+        end
+        local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
 
-    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
-        return
-    end
-    local npc = UnitEntry("npcs", unit_idnum)
-    local _, class_token = _G.UnitClass("target")
-    npc.class = class_token
-    -- TODO: Add faction here
-    npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
-    npc.is_pvp = _G.UnitIsPVP("target") and true or nil
-    npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
-    npc.stats = npc.stats or {}
+        if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+            return
+        end
+        table.wipe(action_data)
 
-    local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
+        local npc = UnitEntry("npcs", unit_idnum)
+        local _, class_token = _G.UnitClass("target")
+        npc.class = class_token
+        -- TODO: Add faction here
+        npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
+        npc.is_pvp = _G.UnitIsPVP("target") and true or nil
+        npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
+        npc.stats = npc.stats or {}
 
-    if not npc.stats[npc_level] then
-        npc.stats[npc_level] = {
-            max_health = _G.UnitHealthMax("target"),
-        }
+        local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
 
-        local max_power = _G.UnitManaMax("target")
+        if not npc.stats[npc_level] then
+            npc.stats[npc_level] = {
+                max_health = _G.UnitHealthMax("target"),
+            }
 
-        if max_power > 0 then
-            local power_type = _G.UnitPowerType("target")
-            npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+            local max_power = _G.UnitManaMax("target")
+
+            if max_power > 0 then
+                local power_type = _G.UnitPowerType("target")
+                npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+            end
         end
     end
-end
-
+end -- do-block
 
 do
     local function UpdateQuestJuncture(point)
@@ -584,9 +625,6 @@ function WDP:QUEST_LOG_UPDATE()
 end
 
 
-function WDP:QUEST_PROGRESS()
-end
-
 function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
     if unit_id ~= "player" then
         return
@@ -604,7 +642,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     if not spell_label then
         return
     end
-    action_data.type = nil -- This will be set as appropriate below
+    table.wipe(action_data)
 
     local tt_item_name, tt_item_link = _G.GameTooltip:GetItem()
     local tt_unit_name, tt_unit_id = _G.GameTooltip:GetUnit()
@@ -658,7 +696,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         end
     end
 
---    print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, target_name, spell_line))
+    --    print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, target_name, spell_line))
     private.tracked_line = spell_line
 end
 
@@ -668,9 +706,9 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         return
     end
 
---    if private.SPELL_LABELS_BY_NAME[spell_name] then
---        print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id))
---    end
+    --    if private.SPELL_LABELS_BY_NAME[spell_name] then
+    --        print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id))
+    --    end
     private.tracked_line = nil
 end
 
