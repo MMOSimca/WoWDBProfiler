@@ -66,6 +66,7 @@ local db
 local durability_timer_handle
 local target_location_timer_handle
 local action_data = {}
+local faction_names = {}
 
 
 -----------------------------------------------------------------------
@@ -202,6 +203,19 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 end
 
 
+local function UpdateFactionNames()
+    for faction_index = 1, 1000 do
+        local faction_name, _, _, _, _, _, _, _, is_header = _G.GetFactionInfo(faction_index)
+
+        if faction_name and not is_header then
+            faction_names[faction_name] = true
+        elseif not faction_name then
+            break
+        end
+    end
+end
+
+
 -----------------------------------------------------------------------
 -- Methods.
 -----------------------------------------------------------------------
@@ -235,7 +249,6 @@ function WDP:OnEnable()
             return
         end
         HandleItemUse(_G.GetContainerItemLink(bag_index, slot_index), bag_index, slot_index)
-
     end)
 
     _G.hooksecurefunc("UseItemByName", function(identifier, target_unit)
@@ -631,7 +644,24 @@ do
         local npc = DBEntry("npcs", unit_idnum)
         local _, class_token = _G.UnitClass("target")
         npc.class = class_token
-        -- TODO: Add faction here
+
+        UpdateFactionNames()
+        DatamineTT:ClearLines()
+        DatamineTT:SetUnit("target")
+
+        for line_index = 1, DatamineTT:NumLines() do
+            local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
+
+            if not current_line then
+                break
+            end
+            local line_text = current_line:GetText()
+
+            if faction_names[line_text] then
+                npc.faction = line_text
+                break
+            end
+        end
         npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
