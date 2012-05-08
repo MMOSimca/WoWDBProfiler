@@ -71,15 +71,15 @@ local action_data = {}
 -----------------------------------------------------------------------
 -- Helper Functions.
 -----------------------------------------------------------------------
-local function UnitEntry(unit_type, unit_id)
-    if not unit_type or not unit_id then
+local function DBEntry(data_type, unit_id)
+    if not data_type or not unit_id then
         return
     end
-    local unit = db[unit_type][unit_id]
+    local unit = db[data_type][unit_id]
 
     if not unit then
-        db[unit_type][unit_id] = {}
-        unit = db[unit_type][unit_id]
+        db[data_type][unit_id] = {}
+        unit = db[data_type][unit_id]
     end
     return unit
 end
@@ -145,13 +145,60 @@ local function UpdateObjectLocation(identifier)
         return
     end
     local zone_name, x, y, map_level, instance_type = CurrentLocationData()
-    local object = UnitEntry("objects", identifier)
+    local object = DBEntry("objects", identifier)
     object.locations = object.locations or {}
 
     if not object.locations[zone_name] then
         object.locations[zone_name] = {}
     end
     object.locations[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
+end
+
+
+local function HandleItemUse(item_link, bag_index, slot_index)
+    if not item_link then
+        return
+    end
+    local item_id = ItemLinkToID(item_link)
+
+    if not bag_index or not slot_index then
+        for new_bag_index = 0, _G.NUM_BAG_FRAMES do
+            for new_slot_index = 1, _G.GetContainerNumSlots(new_bag_index) do
+                if item_id == ItemLinkToID(_G.GetContainerItemLink(new_bag_index, new_slot_index)) then
+                    bag_index = new_bag_index
+                    slot_index = new_slot_index
+                    break
+                end
+            end
+        end
+    end
+
+    if not bag_index or not slot_index then
+        return
+    end
+    local _, _, _, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
+
+    if not is_lootable then
+        return
+    end
+    DatamineTT:ClearLines()
+    DatamineTT:SetBagItem(bag_index, slot_index)
+
+    for line_index = 1, DatamineTT:NumLines() do
+        local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
+
+        if not current_line then
+            break
+        end
+
+        if current_line:GetText() == _G.ITEM_OPENABLE then
+            table.wipe(action_data)
+            action_data.type = AF.ITEM
+            action_data.item_id = item_id
+            action_data.loot_type = "contains"
+            break
+        end
+    end
 end
 
 
@@ -182,6 +229,22 @@ function WDP:OnEnable()
     end
     durability_timer_handle = self:ScheduleRepeatingTimer("ProcessDurability", 30)
     target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.2)
+
+    _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
+        if target_unit then
+            return
+        end
+        HandleItemUse(_G.GetContainerItemLink(bag_index, slot_index), bag_index, slot_index)
+
+    end)
+
+    _G.hooksecurefunc("UseItemByName", function(identifier, target_unit)
+        if target_unit then
+            return
+        end
+        local _, item_link = _G.GetItemInfo(identifier)
+        HandleItemUse(item_link)
+    end)
 end
 
 
@@ -237,7 +300,7 @@ function WDP:UpdateTargetLocation()
         return
     end
     local zone_name, x, y, map_level, instance_type = CurrentLocationData()
-    local npc_data = UnitEntry("npcs", unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
+    local npc_data = DBEntry("npcs", unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
     npc_data.locations = npc_data.locations or {}
 
     if not npc_data.locations[zone_name] then
@@ -251,18 +314,18 @@ end
 -- Event handlers.
 -----------------------------------------------------------------------
 function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
---    if message_type ~= "FACTION" or _G.UnitIsUnit("target", "questnpc") then
---        return
---    end
---    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
---    local npc = UnitEntry("npcs", unit_idnum)
---
---    if not npc then
---        return
---    end
---    npc.reputations = npc.reputations or {}
---    npc.reputations[faction_name] = amount
---
+    --    if message_type ~= "FACTION" or _G.UnitIsUnit("target", "questnpc") then
+    --        return
+    --    end
+    --    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+    --    local npc = DBEntry("npcs", unit_idnum)
+    --
+    --    if not npc then
+    --        return
+    --    end
+    --    npc.reputations = npc.reputations or {}
+    --    npc.reputations[faction_name] = amount
+    --
     --    print(("%s: %s, %s, %s"):format(event, message_type, faction_name, amount))
 end
 
@@ -329,8 +392,8 @@ do
 
     local LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function()
-            local item = UnitEntry("items", action_data.item_id)
-            local loot_type = action_data.loot_type
+            local item = DBEntry("items", action_data.item_id)
+            local loot_type = action_data.loot_type or "drops"
             item[loot_type] = item[loot_type] or {}
 
             for index = 1, #action_data.loot_list do
@@ -338,7 +401,7 @@ do
             end
         end,
         [AF.NPC] = function()
-            local npc = UnitEntry("npcs", action_data.id_num)
+            local npc = DBEntry("npcs", action_data.id_num)
 
             if not npc then
                 return
@@ -351,7 +414,7 @@ do
             end
         end,
         [AF.OBJECT] = function()
-            local object = UnitEntry("objects", action_data.identifier)
+            local object = DBEntry("objects", action_data.identifier)
             object.drops = object.drops or {}
 
             for index = 1, #action_data.loot_list do
@@ -360,7 +423,7 @@ do
         end,
         [AF.ZONE] = function()
             local loot_type = action_data.loot_type or "drops"
-            local zone = UnitEntry("zones", action_data.zone)
+            local zone = DBEntry("zones", action_data.zone)
             zone[loot_type] = zone[loot_type] or {}
 
             local location_data = ("%s:%s:%s:%s"):format(action_data.instance_type, action_data.map_level, action_data.x, action_data.y)
@@ -454,7 +517,7 @@ function WDP:UpdateMerchantItems()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local merchant = UnitEntry("npcs", unit_idnum)
+    local merchant = DBEntry("npcs", unit_idnum)
     merchant.sells = merchant.sells or {}
 
     for item_index = 1, _G.GetMerchantNumItems() do
@@ -565,7 +628,7 @@ do
         end
         table.wipe(action_data)
 
-        local npc = UnitEntry("npcs", unit_idnum)
+        local npc = DBEntry("npcs", unit_idnum)
         local _, class_token = _G.UnitClass("target")
         npc.class = class_token
         -- TODO: Add faction here
@@ -603,7 +666,7 @@ do
         if unit_type == private.UNIT_TYPES.OBJECT then
             UpdateObjectLocation(unit_id)
         end
-        local quest = UnitEntry("quests", _G.GetQuestID())
+        local quest = DBEntry("quests", _G.GetQuestID())
         quest[point] = quest[point] or {}
         quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
     end
