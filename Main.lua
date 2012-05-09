@@ -327,19 +327,13 @@ end
 -- Event handlers.
 -----------------------------------------------------------------------
 function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
-    --    if message_type ~= "FACTION" or _G.UnitIsUnit("target", "questnpc") then
-    --        return
-    --    end
-    --    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
-    --    local npc = DBEntry("npcs", unit_idnum)
-    --
-    --    if not npc then
-    --        return
-    --    end
-    --    npc.reputations = npc.reputations or {}
-    --    npc.reputations[faction_name] = amount
-    --
-    --    print(("%s: %s, %s, %s"):format(event, message_type, faction_name, amount))
+    local npc = DBEntry("npcs", action_data.id_num)
+
+    if not npc then
+        return
+    end
+    npc.stats[action_data.npc_level].reputations = npc.stats[action_data.npc_level].reputations or {}
+    npc.stats[action_data.npc_level].reputations[faction_name] = amount
 end
 
 
@@ -639,8 +633,6 @@ do
         if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
             return
         end
-        table.wipe(action_data)
-
         local npc = DBEntry("npcs", unit_idnum)
         local _, class_token = _G.UnitClass("target")
         npc.class = class_token
@@ -681,6 +673,10 @@ do
                 npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
             end
         end
+        table.wipe(action_data)
+        action_data.type = AF.NPC
+        action_data.id_num = unit_idnum
+        action_data.npc_level = npc_level
     end
 end -- do-block
 
