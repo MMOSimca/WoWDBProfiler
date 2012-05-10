@@ -86,6 +86,15 @@ local function DBEntry(data_type, unit_id)
 end
 
 
+local function InstanceDifficultyToken()
+    local _, instance_type, instance_difficulty, difficulty_name, _, _, is_dynamic = _G.GetInstanceInfo()
+    if difficulty_name == "" then
+        difficulty_name = "NONE"
+    end
+    return ("%s:%s:%s"):format(instance_type:upper(), difficulty_name:upper():gsub(" ", "_"), _G.tostring(is_dynamic))
+end
+
+
 local function CurrentLocationData()
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
@@ -109,8 +118,7 @@ local function CurrentLocationData()
     if _G.DungeonUsesTerrainMap() then
         map_level = map_level - 1
     end
-    local _, instance_type = _G.IsInInstance()
-    return _G.GetRealZoneText(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level or 0, instance_type:upper()
+    return _G.GetRealZoneText(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level or 0, InstanceDifficultyToken()
 end
 
 
@@ -145,14 +153,14 @@ local function UpdateObjectLocation(identifier)
     if not identifier then
         return
     end
-    local zone_name, x, y, map_level, instance_type = CurrentLocationData()
+    local zone_name, x, y, map_level, instance_token = CurrentLocationData()
     local object = DBEntry("objects", identifier)
     object.locations = object.locations or {}
 
     if not object.locations[zone_name] then
         object.locations[zone_name] = {}
     end
-    object.locations[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
+    object.locations[zone_name][("%s:%s:%s:%s"):format(instance_token, map_level, x, y)] = true
 end
 
 
@@ -297,7 +305,9 @@ end
 
 
 function WDP:UpdateTargetLocation()
-    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or _G.UnitIsTapped("target") then
+    local is_dead = _G.UnitIsDead("target")
+
+    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not is_dead) then
         return
     end
 
@@ -306,20 +316,25 @@ function WDP:UpdateTargetLocation()
             return
         end
     end
-
-    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+    local target_guid = _G.UnitGUID("target")
+    local unit_type, unit_idnum = self:ParseGUID(target_guid)
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local zone_name, x, y, map_level, instance_type = CurrentLocationData()
-    local npc_data = DBEntry("npcs", unit_idnum).stats[("level_%d"):format(_G.UnitLevel("target"))]
+    local zone_name, x, y, map_level, instance_token = CurrentLocationData()
+    local npc_data = DBEntry("npcs", unit_idnum).encounter_data[("level_%d"):format(_G.UnitLevel("target"))]
     npc_data.locations = npc_data.locations or {}
 
     if not npc_data.locations[zone_name] then
         npc_data.locations[zone_name] = {}
     end
-    npc_data.locations[zone_name][("%s:%s:%s:%s"):format(instance_type, map_level, x, y)] = true
+
+    -- Only record corpse location if there is no entry for this GUID.
+    if is_dead and npc_data.locations[zone_name][target_guid] then
+        return
+    end
+    npc_data.locations[zone_name][target_guid] = ("%s:%s:%s:%s"):format(instance_token, map_level, x, y)
 end
 
 
@@ -332,8 +347,8 @@ function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
     if not npc then
         return
     end
-    npc.stats[action_data.npc_level].reputations = npc.stats[action_data.npc_level].reputations or {}
-    npc.stats[action_data.npc_level].reputations[faction_name] = amount
+    npc.encounter_data[action_data.npc_level].reputations = npc.encounter_data[action_data.npc_level].reputations or {}
+    npc.encounter_data[action_data.npc_level].reputations[faction_name] = amount
 end
 
 
@@ -397,6 +412,21 @@ do
     }
 
 
+    local function GenericLootUpdate(data_type)
+        local entry = DBEntry(data_type, action_data.id_num)
+
+        if not entry then
+            return
+        end
+        local loot_type = action_data.loot_type or "drops"
+        entry[loot_type] = entry[loot_type] or {}
+
+        for index = 1, #action_data.loot_list do
+            table.insert(entry[loot_type], action_data.loot_list[index])
+        end
+    end
+
+
     local LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function()
             local item = DBEntry("items", action_data.item_id)
@@ -408,32 +438,17 @@ do
             end
         end,
         [AF.NPC] = function()
-            local npc = DBEntry("npcs", action_data.id_num)
-
-            if not npc then
-                return
-            end
-            local loot_type = action_data.loot_type or "drops"
-            npc[loot_type] = npc[loot_type] or {}
-
-            for index = 1, #action_data.loot_list do
-                table.insert(npc[loot_type], action_data.loot_list[index])
-            end
+            GenericLootUpdate("npcs")
         end,
         [AF.OBJECT] = function()
-            local object = DBEntry("objects", action_data.identifier)
-            object.drops = object.drops or {}
-
-            for index = 1, #action_data.loot_list do
-                table.insert(object.drops, action_data.loot_list[index])
-            end
+            GenericLootUpdate("objects")
         end,
         [AF.ZONE] = function()
             local loot_type = action_data.loot_type or "drops"
             local zone = DBEntry("zones", action_data.zone)
             zone[loot_type] = zone[loot_type] or {}
 
-            local location_data = ("%s:%s:%s:%s"):format(action_data.instance_type, action_data.map_level, action_data.x, action_data.y)
+            local location_data = ("%s:%s:%s:%s"):format(action_data.instance_token, action_data.map_level, action_data.x, action_data.y)
             local loot_data = zone[loot_type][location_data]
 
             if not loot_data then
@@ -657,12 +672,12 @@ do
         npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
-        npc.stats = npc.stats or {}
+        npc.encounter_data = npc.encounter_data or {}
 
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
 
-        if not npc.stats[npc_level] then
-            npc.stats[npc_level] = {
+        if not npc.encounter_data[npc_level] then
+            npc.encounter_data[npc_level] = {
                 max_health = _G.UnitHealthMax("target"),
             }
 
@@ -670,7 +685,7 @@ do
 
             if max_power > 0 then
                 local power_type = _G.UnitPowerType("target")
-                npc.stats[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+                npc.encounter_data[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
             end
         end
         table.wipe(action_data)
@@ -761,9 +776,9 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.item_id = ItemLinkToID(target_item_link)
         end
     elseif not tt_item_name and not tt_unit_name then
-        local zone_name, x, y, map_level, instance_type = CurrentLocationData()
+        local zone_name, x, y, map_level, instance_token = CurrentLocationData()
 
-        action_data.instance_type = instance_type
+        action_data.instance_token = instance_token
         action_data.map_level = map_level
         action_data.name = target_name
         action_data.x = x
