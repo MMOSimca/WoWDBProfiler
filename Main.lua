@@ -119,7 +119,7 @@ local function CurrentLocationData()
     if _G.DungeonUsesTerrainMap() then
         map_level = map_level - 1
     end
-    return _G.GetRealZoneText(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level or 0, InstanceDifficultyToken()
+    return _G.GetRealZoneText(), _G.GetCurrentMapAreaID(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level, InstanceDifficultyToken()
 end
 
 
@@ -154,14 +154,16 @@ local function UpdateObjectLocation(identifier)
     if not identifier then
         return
     end
-    local zone_name, x, y, map_level, instance_token = CurrentLocationData()
+    local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
     local object = DBEntry("objects", identifier)
     object.locations = object.locations or {}
 
-    if not object.locations[zone_name] then
-        object.locations[zone_name] = {}
+    local location_token = ("%s:%d"):format(zone_name, area_id)
+
+    if not object.locations[location_token] then
+        object.locations[location_token] = {}
     end
-    object.locations[zone_name][("%s:%s:%s:%s"):format(instance_token, map_level, x, y)] = true
+    object.locations[location_token][("%s:%s:%s:%s"):format(instance_token, map_level, x, y)] = true
 end
 
 
@@ -323,19 +325,21 @@ function WDP:UpdateTargetLocation()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local zone_name, x, y, map_level, instance_token = CurrentLocationData()
+    local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
     local npc_data = DBEntry("npcs", unit_idnum).encounter_data[("level_%d"):format(_G.UnitLevel("target"))]
     npc_data.locations = npc_data.locations or {}
 
-    if not npc_data.locations[zone_name] then
-        npc_data.locations[zone_name] = {}
+    local location_token = ("%s:%d"):format(zone_name, area_id)
+
+    if not npc_data.locations[location_token] then
+        npc_data.locations[location_token] = {}
     end
 
     -- Only record corpse location if there is no entry for this GUID.
-    if is_dead and npc_data.locations[zone_name][target_guid] then
+    if is_dead and npc_data.locations[location_token][target_guid] then
         return
     end
-    npc_data.locations[zone_name][target_guid] = ("%s:%s:%s:%s"):format(instance_token, map_level, x, y)
+    npc_data.locations[location_token][target_guid] = ("%s:%s:%s:%s"):format(instance_token, map_level, x, y)
 end
 
 
@@ -758,6 +762,8 @@ do
         local quest = DBEntry("quests", _G.GetQuestID())
         quest[point] = quest[point] or {}
         quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
+
+        return quest
     end
 
 
@@ -767,7 +773,15 @@ do
 
 
     function WDP:QUEST_DETAIL()
-        UpdateQuestJuncture("begin")
+        local quest = UpdateQuestJuncture("begin")
+
+        local _, class = _G.UnitClass("player")
+        quest.classes = quest.classes or {}
+        quest.classes[class] = true
+
+        local _, race = _G.UnitRace("player")
+        quest.races = quest.races or {}
+        quest.races[race] = true
     end
 end -- do-block
 
@@ -824,14 +838,14 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.item_id = ItemLinkToID(target_item_link)
         end
     elseif not tt_item_name and not tt_unit_name then
-        local zone_name, x, y, map_level, instance_token = CurrentLocationData()
+        local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
 
         action_data.instance_token = instance_token
         action_data.map_level = map_level
         action_data.name = target_name
         action_data.x = x
         action_data.y = y
-        action_data.zone = zone_name
+        action_data.zone = ("%s:%d"):format(zone_name, area_id)
 
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
             if target_name == "" then
