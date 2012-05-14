@@ -38,6 +38,7 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
@@ -341,6 +342,53 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
+do
+    local EXTRACT_GAS_SPELL_ID = 30427
+    local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
+    local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
+
+
+    local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+        if not spell_id then
+            return
+        end
+        local source_type, source_id = WDP:ParseGUID(source_guid)
+
+        if not source_id or source_type ~= private.UNIT_TYPES.NPC then
+            return
+        end
+
+        if bit.band(FLAGS_NPC_CONTROL, source_flags) == FLAGS_NPC_CONTROL and bit.band(FLAGS_NPC, source_flags) ~= 0 then
+            local npc = DBEntry("npcs", source_id)
+            local instance_token = InstanceDifficultyToken()
+            npc.spells = npc.spells or {}
+            npc.spells[instance_token] = npc.spells[instance_token] or {}
+            npc.spells[instance_token][spell_id] = true
+        end
+    end
+
+
+    local COMBAT_LOG_FUNCS = {
+        SPELL_AURA_APPLIED = RecordNPCSpell,
+        SPELL_CAST_START = RecordNPCSpell,
+        SPELL_CAST_SUCCESS = RecordNPCSpell,
+        UNIT_DISSIPATES = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags)
+        -- TODO: Write this.
+        end,
+    }
+
+
+    function WDP:COMBAT_LOG_EVENT_UNFILTERED(event, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, ...)
+        local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
+
+        if not combat_log_func then
+            return
+        end
+        combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, ...)
+    end
+end -- do-block
+
+
 function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
     local npc = DBEntry("npcs", action_data.id_num)
 
