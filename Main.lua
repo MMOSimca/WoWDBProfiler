@@ -736,7 +736,8 @@ do
                 break
             end
         end
-        npc.gender = GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"
+        npc.genders = npc.genders or {}
+        npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
         npc.encounter_data = npc.encounter_data or {}
