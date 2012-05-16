@@ -44,6 +44,7 @@ local EVENT_MAPPING = {
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
+    PET_BAR_UPDATE = true,
     PLAYER_TARGET_CHANGED = true,
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
@@ -207,7 +208,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             table.wipe(action_data)
             action_data.type = AF.ITEM
             action_data.item_id = item_id
-            action_data.loot_type = "contains"
+            action_data.label = "contains"
             break
         end
     end
@@ -459,7 +460,7 @@ do
         end,
         [AF.OBJECT] = true,
         [AF.ZONE] = function()
-            return action_data.loot_type and _G.IsFishingLoot()
+            return action_data.label and _G.IsFishingLoot()
         end,
     }
 
@@ -470,7 +471,7 @@ do
         if not entry then
             return
         end
-        local loot_type = action_data.loot_type or "drops"
+        local loot_type = action_data.label or "drops"
         entry[loot_type] = entry[loot_type] or {}
 
         for index = 1, #action_data.loot_list do
@@ -482,7 +483,7 @@ do
     local LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function()
             local item = DBEntry("items", action_data.item_id)
-            local loot_type = action_data.loot_type or "drops"
+            local loot_type = action_data.label or "drops"
             item[loot_type] = item[loot_type] or {}
 
             for index = 1, #action_data.loot_list do
@@ -496,7 +497,7 @@ do
             GenericLootUpdate("objects")
         end,
         [AF.ZONE] = function()
-            local loot_type = action_data.loot_type or "drops"
+            local loot_type = action_data.label or "drops"
             local zone = DBEntry("zones", action_data.zone)
             zone[loot_type] = zone[loot_type] or {}
 
@@ -659,6 +660,20 @@ function WDP:UpdateMerchantItems()
     if _G.CanMerchantRepair() then
         merchant.can_repair = true
     end
+end
+
+
+function WDP:PET_BAR_UPDATE()
+    if not action_data.label or not action_data.label == "mind_control" then
+        return
+    end
+    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("pet"))
+
+    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+        return
+    end
+    DBEntry("npcs", unit_idnum).mind_control = true
+    table.wipe(action_data)
 end
 
 
@@ -825,11 +840,12 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
                 return
             end
             action_data.type = AF.NPC
-            action_data.loot_type = spell_label:lower()
+            action_data.label = spell_label:lower()
+            action_data.unit_name = tt_unit_name
         end
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         action_data.type = AF.ITEM
-        action_data.loot_type = spell_label:lower()
+        action_data.label = spell_label:lower()
 
         if tt_item_name and tt_item_name == target_name then
             action_data.item_id = ItemLinkToID(tt_item_link)
@@ -858,7 +874,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.identifier = identifier
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             action_data.type = AF.ZONE
-            action_data.loot_type = spell_label:lower()
+            action_data.label = spell_label:lower()
         end
     end
 
