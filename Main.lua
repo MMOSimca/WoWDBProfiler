@@ -40,7 +40,6 @@ local DATABASE_DEFAULTS = {
 local EVENT_MAPPING = {
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
-    LOOT_CLOSED = true,
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
@@ -49,6 +48,7 @@ local EVENT_MAPPING = {
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
     QUEST_LOG_UPDATE = true,
+    TRAINER_SHOW = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
     UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
@@ -59,6 +59,9 @@ local EVENT_MAPPING = {
 
 
 local AF = private.ACTION_TYPE_FLAGS
+
+
+local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
 
 
 -----------------------------------------------------------------------
@@ -395,18 +398,13 @@ end -- do-block
 
 
 function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
-    local npc = DBEntry("npcs", action_data.id_num)
+    local npc = DBEntry("npcs", action_data.identifier)
 
     if not npc then
         return
     end
     npc.encounter_data[action_data.npc_level].reputations = npc.encounter_data[action_data.npc_level].reputations or {}
     npc.encounter_data[action_data.npc_level].reputations[faction_name] = amount
-end
-
-
-function WDP:LOOT_CLOSED()
-    --    table.wipe(action_data)
 end
 
 
@@ -455,7 +453,7 @@ do
                 return false
             end
             local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
-            action_data.id_num = id_num
+            action_data.identifier = id_num
             return true
         end,
         [AF.OBJECT] = true,
@@ -466,9 +464,11 @@ do
 
 
     local function GenericLootUpdate(data_type)
-        local entry = DBEntry(data_type, action_data.id_num)
+        local entry = DBEntry(data_type, action_data.identifier)
 
+        print("GenericLootUpdate")
         if not entry then
+            print(("Missing DB entry for %s (%s)"):format(data_type, tostring(action_data.identifier)))
             return
         end
         local loot_type = action_data.label or "drops"
@@ -673,6 +673,7 @@ function WDP:PET_BAR_UPDATE()
         return
     end
     DBEntry("npcs", unit_idnum).mind_control = true
+    print("Wiping action_data")
     table.wipe(action_data)
 end
 
@@ -758,7 +759,7 @@ do
         end
         table.wipe(action_data)
         action_data.type = AF.NPC
-        action_data.id_num = unit_idnum
+        action_data.identifier = unit_idnum
         action_data.npc_level = npc_level
     end
 end -- do-block
@@ -791,9 +792,8 @@ do
     function WDP:QUEST_DETAIL()
         local quest = UpdateQuestJuncture("begin")
 
-        local _, class = _G.UnitClass("player")
         quest.classes = quest.classes or {}
-        quest.classes[class] = true
+        quest.classes[PLAYER_CLASS] = true
 
         local _, race = _G.UnitRace("player")
         quest.races = quest.races or {}
@@ -812,6 +812,57 @@ function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
         return
     end
     self:RegisterEvent("QUEST_LOG_UPDATE")
+end
+
+
+function WDP:TRAINER_SHOW()
+    if not _G.IsTradeskillTrainer() then
+        return
+    end
+    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+    local npc = DBEntry("npcs", unit_idnum)
+    npc.teaches = npc.teaches or {}
+
+    -- Get the initial trainer filters
+    local available = _G.GetTrainerServiceTypeFilter("available")
+    local unavailable = _G.GetTrainerServiceTypeFilter("unavailable")
+    local used = _G.GetTrainerServiceTypeFilter("used")
+
+    -- Clear the trainer filters
+    _G.SetTrainerServiceTypeFilter("available", 1)
+    _G.SetTrainerServiceTypeFilter("unavailable", 1)
+    _G.SetTrainerServiceTypeFilter("used", 1)
+
+    for index = 1, _G.GetNumTrainerServices(), 1 do
+        local spell_name, rank_name, _, _, required_level = _G.GetTrainerServiceInfo(index)
+
+        if spell_name then
+            DatamineTT:ClearLines()
+            DatamineTT:SetTrainerService(index)
+
+            local _, _, spell_id = DatamineTT:GetSpell()
+            local profession, min_skill = _G.GetTrainerServiceSkillReq(index)
+            profession = profession or "General"
+
+            local class_professions = npc.teaches[PLAYER_CLASS]
+            if not class_professions then
+                npc.teaches[PLAYER_CLASS] = {}
+                class_professions = npc.teaches[PLAYER_CLASS]
+            end
+
+            local profession_skills = class_professions[profession]
+            if not profession_skills then
+                class_professions[profession] = {}
+                profession_skills = class_professions[profession]
+            end
+            profession_skills[spell_id] = ("%d:%d"):format(required_level, min_skill)
+        end
+    end
+
+    -- Reset the filters to what they were before
+    _G.SetTrainerServiceTypeFilter("available", available or 0)
+    _G.SetTrainerServiceTypeFilter("unavailable", unavailable or 0)
+    _G.SetTrainerServiceTypeFilter("used", used or 0)
 end
 
 
