@@ -109,6 +109,7 @@ local function NPCEntry(identifier)
     local instance_token = InstanceDifficultyToken()
     npc.encounter_data = npc.encounter_data or {}
     npc.encounter_data[instance_token] = npc.encounter_data[instance_token] or {}
+    npc.encounter_data[instance_token].stats = npc.encounter_data[instance_token].stats or {}
     return npc
 end
 
@@ -356,7 +357,7 @@ function WDP:UpdateTargetLocation()
         return
     end
     local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
-    local npc_data = NPCEntry(unit_idnum).encounter_data[instance_token][("level_%d"):format(_G.UnitLevel("target"))]
+    local npc_data = NPCEntry(unit_idnum).encounter_data[instance_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
     local location_token = ("%s:%d"):format(zone_name, area_id)
     npc_data.locations = npc_data.locations or {}
     npc_data.locations[location_token] = npc_data.locations[location_token] or {}
@@ -423,7 +424,7 @@ function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
     if not npc then
         return
     end
-    local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
+    local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
     encounter_data[action_data.npc_level].reputations = encounter_data[action_data.npc_level].reputations or {}
     encounter_data[action_data.npc_level].reputations[faction_name] = amount
 end
@@ -777,7 +778,7 @@ do
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
 
-        local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
+        local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
 
         if not encounter_data[npc_level] then
