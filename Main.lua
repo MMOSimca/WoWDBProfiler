@@ -137,19 +137,17 @@ local function CurrentLocationData()
     if _G.DungeonUsesTerrainMap() then
         map_level = map_level - 1
     end
-    local x_floor = floor(x * 1000)
-    local y_floor = floor(y * 1000)
+    local x = _G.floor(x * 1000)
+    local y = _G.floor(y * 1000)
 
-    if x_floor % 2 ~= 0 then
-        x_floor = x_floor + 1
+    if x % 2 ~= 0 then
+        x = x + 1
     end
 
-    if y_floor % 2 ~= 0 then
-        y_floor = y_floor + 1
+    if y % 2 ~= 0 then
+        y = y + 1
     end
-    --    print(("x: %d - y: %d"):format(x_floor, y_floor))
-
-    return _G.GetRealZoneText(), _G.GetCurrentMapAreaID(), ("%.2f"):format(x * 100), ("%.2f"):format(y * 100), map_level, InstanceDifficultyToken()
+    return _G.GetRealZoneText(), _G.GetCurrentMapAreaID(), x, y, map_level, InstanceDifficultyToken()
 end
 
 
@@ -184,17 +182,19 @@ local function UpdateObjectLocation(identifier)
     if not identifier then
         return
     end
-    local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
+    local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
     local object = DBEntry("objects", identifier)
-    object[instance_token] = object[instance_token] or {}
-    object[instance_token].locations = object[instance_token].locations or {}
+    object[difficulty_token] = object[difficulty_token] or {}
+    object[difficulty_token].locations = object[difficulty_token].locations or {}
 
-    local location_token = ("%s:%d"):format(zone_name, area_id)
+    local zone_token = ("%s:%d"):format(zone_name, area_id)
+    local zone_data = object[difficulty_token].locations[zone_token]
 
-    if not object[instance_token].locations[location_token] then
-        object[instance_token].locations[location_token] = {}
+    if not zone_data then
+        zone_data = {}
+        object[difficulty_token].locations[zone_token] = zone_data
     end
-    object[instance_token].locations[location_token][("%s:%s:%s"):format(map_level, x, y)] = true
+    zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
 end
 
 
@@ -284,7 +284,7 @@ function WDP:OnEnable()
         self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
     end
     durability_timer_handle = self:ScheduleRepeatingTimer("ProcessDurability", 30)
-    target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.2)
+    target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.5)
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
@@ -338,10 +338,10 @@ function WDP:ProcessDurability()
 end
 
 
-function WDP:UpdateTargetLocation()
-    local is_dead = _G.UnitIsDead("target")
+local COORD_MAX = 5
 
-    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not is_dead) then
+function WDP:UpdateTargetLocation()
+    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
         return
     end
 
@@ -356,17 +356,27 @@ function WDP:UpdateTargetLocation()
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
-    local npc_data = NPCEntry(unit_idnum).encounter_data[instance_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
-    local location_token = ("%s:%d"):format(zone_name, area_id)
+    local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+    local npc_data = NPCEntry(unit_idnum).encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
+    local zone_token = ("%s:%d"):format(zone_name, area_id)
     npc_data.locations = npc_data.locations or {}
-    npc_data.locations[location_token] = npc_data.locations[location_token] or {}
 
-    -- Only record corpse location if there is no entry for this GUID.
-    if is_dead and npc_data.locations[location_token][target_guid] then
-        return
+    local zone_data = npc_data.locations[zone_token]
+
+    if not zone_data then
+        zone_data = {}
+        npc_data.locations[zone_token] = zone_data
     end
-    npc_data.locations[location_token][target_guid] = ("%s:%s:%s"):format(map_level, x, y)
+
+    for location_token in pairs(zone_data) do
+        local loc_level, loc_x, loc_y = (":"):split(location_token)
+        loc_level = tonumber(loc_level)
+
+        if map_level == loc_level and math.abs(x - loc_x) <= COORD_MAX and math.abs(y - loc_y) <= COORD_MAX then
+            return
+        end
+    end
+    zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
 end
 
 
@@ -497,11 +507,9 @@ do
         if top_field then
             entry[top_field] = entry[top_field] or {}
             entry[top_field][loot_type] = entry[top_field][loot_type] or {}
-
             loot_data = entry[top_field][loot_type]
         else
             entry[loot_type] = entry[loot_type] or {}
-
             loot_data = entry[loot_type]
         end
 
@@ -797,6 +805,8 @@ do
         action_data.type = AF.NPC
         action_data.identifier = unit_idnum
         action_data.npc_level = npc_level
+
+        self:UpdateTargetLocation()
     end
 end -- do-block
 
