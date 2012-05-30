@@ -71,7 +71,7 @@ local db
 local durability_timer_handle
 local target_location_timer_handle
 local action_data = {}
-local faction_names = {}
+local faction_standings = {}
 
 
 -----------------------------------------------------------------------
@@ -245,18 +245,33 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 end
 
 
-local function UpdateFactionNames()
-    for faction_index = 1, 1000 do
-        local faction_name, _, _, _, _, _, _, _, is_header = _G.GetFactionInfo(faction_index)
+local UpdateFactionData
+do
+    local MAX_FACTION_INDEX = 1000
 
-        if faction_name and not is_header then
-            faction_names[faction_name] = true
-        elseif not faction_name then
-            break
+    local STANDING_NAMES = {
+        "HATED",
+        "HOSTILE",
+        "UNFRIENDLY",
+        "NEUTRAL",
+        "FRIENDLY",
+        "HONORED",
+        "REVERED",
+        "EXALTED",
+    }
+
+    function UpdateFactionData()
+        for faction_index = 1, MAX_FACTION_INDEX do
+            local faction_name, _, current_standing, _, _, _, _, _, is_header = _G.GetFactionInfo(faction_index)
+
+            if faction_name and not is_header then
+                faction_standings[faction_name] = STANDING_NAMES[current_standing]
+            elseif not faction_name then
+                break
+            end
         end
     end
-end
-
+end -- do-block
 
 -----------------------------------------------------------------------
 -- Methods.
@@ -429,14 +444,23 @@ end -- do-block
 
 
 function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
+    if message_type ~= "FACTION" then
+        return
+    end
     local npc = NPCEntry(action_data.identifier)
 
     if not npc then
         return
     end
     local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
-    encounter_data[action_data.npc_level].reputations = encounter_data[action_data.npc_level].reputations or {}
-    encounter_data[action_data.npc_level].reputations[faction_name] = amount
+    local reputation_data = encounter_data[action_data.npc_level].reputations
+
+    if not reputation_data then
+        reputation_data = {}
+        encounter_data[action_data.npc_level].reputations = reputation_data
+    end
+    UpdateFactionData()
+    reputation_data[("%s:%s"):format(faction_name, faction_standings[faction_name])] = amount
 end
 
 
@@ -764,7 +788,7 @@ do
         local _, class_token = _G.UnitClass("target")
         npc.class = class_token
 
-        UpdateFactionNames()
+        UpdateFactionData()
         DatamineTT:ClearLines()
         DatamineTT:SetUnit("target")
 
@@ -776,7 +800,7 @@ do
             end
             local line_text = current_line:GetText()
 
-            if faction_names[line_text] then
+            if faction_standings[line_text] then
                 npc.faction = line_text
                 break
             end
@@ -983,10 +1007,6 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     if unit_id ~= "player" then
         return
     end
-
-    --    if private.SPELL_LABELS_BY_NAME[spell_name] then
-    --        print(("%s: '%s', '%s', '%s', '%s', '%s'"):format(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id))
-    --    end
     private.tracked_line = nil
 end
 
