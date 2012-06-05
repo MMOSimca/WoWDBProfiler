@@ -62,6 +62,7 @@ local AF = private.ACTION_TYPE_FLAGS
 
 
 local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
+local PLAYER_GUID = _G.UnitGUID("player")
 
 
 -----------------------------------------------------------------------
@@ -159,10 +160,11 @@ local function ItemLinkToID(item_link)
 end
 
 
+local ParseGUID
 do
     local UNIT_TYPE_BITMASK = 0x007
 
-    function WDP:ParseGUID(guid)
+    function ParseGUID(guid)
         if not guid then
             return
         end
@@ -174,6 +176,36 @@ do
         end
 
         return unit_type
+    end
+end -- do-block
+
+
+local UpdateNPCLocation
+do
+    local COORD_MAX = 5
+
+    function UpdateNPCLocation(unit_idnum)
+        local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+        local npc_data = NPCEntry(unit_idnum).encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
+        local zone_token = ("%s:%d"):format(zone_name, area_id)
+        npc_data.locations = npc_data.locations or {}
+
+        local zone_data = npc_data.locations[zone_token]
+
+        if not zone_data then
+            zone_data = {}
+            npc_data.locations[zone_token] = zone_data
+        end
+
+        for location_token in pairs(zone_data) do
+            local loc_level, loc_x, loc_y = (":"):split(location_token)
+            loc_level = tonumber(loc_level)
+
+            if map_level == loc_level and math.abs(x - loc_x) <= COORD_MAX and math.abs(y - loc_y) <= COORD_MAX then
+                return
+            end
+        end
+        zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
     end
 end -- do-block
 
@@ -353,8 +385,6 @@ function WDP:ProcessDurability()
 end
 
 
-local COORD_MAX = 5
-
 function WDP:UpdateTargetLocation()
     if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
         return
@@ -366,32 +396,12 @@ function WDP:UpdateTargetLocation()
         end
     end
     local target_guid = _G.UnitGUID("target")
-    local unit_type, unit_idnum = self:ParseGUID(target_guid)
+    local unit_type, unit_idnum = ParseGUID(target_guid)
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
-    local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-    local npc_data = NPCEntry(unit_idnum).encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
-    local zone_token = ("%s:%d"):format(zone_name, area_id)
-    npc_data.locations = npc_data.locations or {}
-
-    local zone_data = npc_data.locations[zone_token]
-
-    if not zone_data then
-        zone_data = {}
-        npc_data.locations[zone_token] = zone_data
-    end
-
-    for location_token in pairs(zone_data) do
-        local loc_level, loc_x, loc_y = (":"):split(location_token)
-        loc_level = tonumber(loc_level)
-
-        if map_level == loc_level and math.abs(x - loc_x) <= COORD_MAX and math.abs(y - loc_y) <= COORD_MAX then
-            return
-        end
-    end
-    zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
+    UpdateNPCLocation(unit_idnum)
 end
 
 
@@ -408,7 +418,7 @@ do
         if not spell_id then
             return
         end
-        local source_type, source_id = WDP:ParseGUID(source_guid)
+        local source_type, source_id = ParseGUID(source_guid)
 
         if not source_id or source_type ~= private.UNIT_TYPES.NPC then
             return
@@ -421,13 +431,23 @@ do
         end
     end
 
-
     local COMBAT_LOG_FUNCS = {
         SPELL_AURA_APPLIED = RecordNPCSpell,
         SPELL_CAST_START = RecordNPCSpell,
-        SPELL_CAST_SUCCESS = RecordNPCSpell,
+        SPELL_CAST_SUCCESS = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, ...)
+            if spell_id == EXTRACT_GAS_SPELL_ID and source_guid == PLAYER_GUID then
+                table.wipe(action_data)
+                action_data.extracting_gas = true
+                action_data.timestamp = _G.GetTime()
+            else
+                RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, ...)
+            end
+        end,
         UNIT_DISSIPATES = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags)
-        -- TODO: Write this.
+            if action_data.extracting_gas and _G.GetTime() - action_data.timestamp <= 3 then
+                local unit_type, unit_idnum = ParseGUID(dest_guid)
+                UpdateNPCLocation(unit_idnum)
+            end
         end,
     }
 
@@ -508,7 +528,7 @@ do
             if not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
                 return false
             end
-            local unit_type, id_num = WDP:ParseGUID(_G.UnitGUID("target"))
+            local unit_type, id_num = ParseGUID(_G.UnitGUID("target"))
             action_data.identifier = id_num
             return true
         end,
@@ -658,7 +678,7 @@ local POINT_MATCH_PATTERNS = {
 
 
 function WDP:UpdateMerchantItems()
-    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
@@ -738,7 +758,7 @@ function WDP:PET_BAR_UPDATE()
     if not action_data.label or not action_data.label == "mind_control" then
         return
     end
-    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("pet"))
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("pet"))
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
@@ -781,7 +801,7 @@ do
         if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") then
             return
         end
-        local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
         if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
             return
@@ -843,7 +863,7 @@ do
         if not unit_name then
             return
         end
-        local unit_type, unit_id = WDP:ParseGUID(_G.UnitGUID("questnpc"))
+        local unit_type, unit_id = ParseGUID(_G.UnitGUID("questnpc"))
 
         if unit_type == private.UNIT_TYPES.OBJECT then
             UpdateObjectLocation(unit_id)
@@ -891,7 +911,7 @@ function WDP:TRAINER_SHOW()
     if not _G.IsTradeskillTrainer() then
         return
     end
-    local unit_type, unit_idnum = self:ParseGUID(_G.UnitGUID("target"))
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
     local npc = NPCEntry(unit_idnum)
     npc.teaches = npc.teaches or {}
 
