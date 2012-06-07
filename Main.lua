@@ -703,7 +703,7 @@ function WDP:UpdateMerchantItems(event)
                 for line_index = 1, DatamineTT:NumLines() do
                     local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
-                    if not current_line then    
+                    if not current_line then
                         break
                     end
                     local breakout
@@ -895,6 +895,24 @@ end -- do-block
 
 
 function WDP:QUEST_LOG_UPDATE()
+    local selected_quest = _G.GetQuestLogSelection()    -- Save current selection to be restored when we're done.
+    local entry_index, processed_quests = 1, 0
+    local _, num_quests = _G.GetNumQuestLogEntries()
+
+    while processed_quests <= num_quests do
+        local _, _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
+
+        if not is_header then
+            _G.SelectQuestLogEntry(entry_index);
+
+            local quest = DBEntry("quests", quest_id)
+            quest.timer = _G.GetQuestLogTimeLeft()
+            quest.can_share = _G.GetQuestLogPushable()
+            processed_quests = processed_quests + 1
+        end
+        entry_index = entry_index + 1
+    end
+    _G.SelectQuestLogEntry(selected_quest)
     self:UnregisterEvent("QUEST_LOG_UPDATE")
 end
 
