@@ -42,7 +42,7 @@ local EVENT_MAPPING = {
     COMBAT_TEXT_UPDATE = true,
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
-    MERCHANT_UPDATE = "UpdateMerchantItems",
+    --    MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
     PLAYER_TARGET_CHANGED = true,
     QUEST_COMPLETE = true,
@@ -315,14 +315,13 @@ function WDP:OnInitialize()
 
     local build_num = tonumber(private.build_num)
 
-    if raw_db.build_num and raw_db.build_num < build_num then
-        for entry in pairs(DATABASE_DEFAULTS.global) do
-            db[entry] = {}
-        end
-        raw_db.build_num = build_num
-    elseif not raw_db.build_num then
-        raw_db.build_num = build_num
-    end
+    -- TODO: Un-comment this when MoP goes live.
+    --    if raw_db.build_num and raw_db.build_num < build_num then
+    --        for entry in pairs(DATABASE_DEFAULTS.global) do
+    --            db[entry] = {}
+    --        end
+    --    end
+    raw_db.build_num = build_num
 end
 
 
@@ -676,8 +675,7 @@ local POINT_MATCH_PATTERNS = {
     ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3_BG:gsub("%%d", "(%%d+)")),
 }
 
-
-function WDP:UpdateMerchantItems()
+function WDP:UpdateMerchantItems(event)
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
@@ -686,7 +684,9 @@ function WDP:UpdateMerchantItems()
     local merchant = NPCEntry(unit_idnum)
     merchant.sells = merchant.sells or {}
 
-    for item_index = 1, _G.GetMerchantNumItems() do
+    local num_items = _G.GetMerchantNumItems()
+
+    for item_index = 1, num_items do
         local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
         local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
 
@@ -703,7 +703,7 @@ function WDP:UpdateMerchantItems()
                 for line_index = 1, DatamineTT:NumLines() do
                     local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
-                    if not current_line then
+                    if not current_line then    
                         break
                     end
                     local breakout
@@ -724,20 +724,20 @@ function WDP:UpdateMerchantItems()
                     end
                 end
                 local currency_list = {}
-
+                local item_count = _G.GetMerchantItemCostInfo(item_index)
                 price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
 
-                for cost_index = 1, _G.GetMerchantItemCostInfo(item_index) do
+                for cost_index = 1, item_count do
                     local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
                     local currency_id = currency_link and ItemLinkToID(currency_link) or nil
 
-                    if not currency_id or currency_id < 1 then
-                        if not icon_texture then
-                            return
-                        end
+                    if (not currency_id or currency_id < 1) and icon_texture then
                         currency_id = icon_texture:match("[^\\]+$"):lower()
                     end
-                    currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_id)
+
+                    if currency_id then
+                        currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_id)
+                    end
                 end
 
                 for currency_index = 1, #currency_list do
