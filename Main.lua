@@ -907,7 +907,7 @@ function WDP:QUEST_LOG_UPDATE()
 
             local quest = DBEntry("quests", quest_id)
             quest.timer = _G.GetQuestLogTimeLeft()
-            quest.can_share = _G.GetQuestLogPushable()
+            quest.can_share = _G.GetQuestLogPushable() and true or nil
             processed_quests = processed_quests + 1
         end
         entry_index = entry_index + 1
