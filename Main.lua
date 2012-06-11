@@ -210,12 +210,12 @@ do
 end -- do-block
 
 
-local function UpdateObjectLocation(identifier)
+local function UpdateDBEntryLocation(entry_type, identifier)
     if not identifier then
         return
     end
     local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-    local object = DBEntry("objects", identifier)
+    local object = DBEntry(entry_type, identifier)
     object[difficulty_token] = object[difficulty_token] or {}
     object[difficulty_token].locations = object[difficulty_token].locations or {}
 
@@ -533,7 +533,7 @@ do
         end,
         [AF.OBJECT] = true,
         [AF.ZONE] = function()
-            return action_data.label and _G.IsFishingLoot()
+            return _G.IsFishingLoot()
         end,
     }
 
@@ -586,22 +586,7 @@ do
             GenericLootUpdate("objects", InstanceDifficultyToken())
         end,
         [AF.ZONE] = function()
-            local loot_type = action_data.label or "drops"
-            local zone = DBEntry("zones", action_data.zone)
-            zone[action_data.instance_token] = zone[action_data.instance_token] or {}
-            zone[action_data.instance_token][loot_type] = zone[action_data.instance_token][loot_type] or {}
-
-            local location_data = ("%s:%s:%s"):format(action_data.map_level, action_data.x, action_data.y)
-            local loot_data = zone[action_data.instance_token][loot_type][location_data]
-
-            if not loot_data then
-                zone[action_data.instance_token][loot_type][location_data] = {}
-                loot_data = zone[action_data.instance_token][loot_type][location_data]
-            end
-
-            for index = 1, #action_data.loot_list do
-                table.insert(loot_data, action_data.loot_list[index])
-            end
+            GenericLootUpdate("zones", InstanceDifficultyToken())
         end,
     }
 
@@ -866,7 +851,7 @@ do
         local unit_type, unit_id = ParseGUID(_G.UnitGUID("questnpc"))
 
         if unit_type == private.UNIT_TYPES.OBJECT then
-            UpdateObjectLocation(unit_id)
+            UpdateDBEntryLocation("objects", unit_id)
         end
         local quest = DBEntry("quests", _G.GetQuestID())
         quest[point] = quest[point] or {}
@@ -895,7 +880,7 @@ end -- do-block
 
 
 function WDP:QUEST_LOG_UPDATE()
-    local selected_quest = _G.GetQuestLogSelection()    -- Save current selection to be restored when we're done.
+    local selected_quest = _G.GetQuestLogSelection() -- Save current selection to be restored when we're done.
     local entry_index, processed_quests = 1, 0
     local _, num_quests = _G.GetNumQuestLogEntries()
 
@@ -1030,13 +1015,16 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
                 return
             end
             local identifier = ("%s:%s"):format(spell_label, target_name)
-            UpdateObjectLocation(identifier)
+            UpdateDBEntryLocation("objects", identifier)
 
             action_data.type = AF.OBJECT
             action_data.identifier = identifier
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
+            local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
+            UpdateDBEntryLocation("zones", identifier)
+
             action_data.type = AF.ZONE
-            action_data.label = spell_label:lower()
+            action_data.identifier = identifier
         end
     end
     private.tracked_line = spell_line
