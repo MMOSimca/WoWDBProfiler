@@ -63,7 +63,7 @@ local AF = private.ACTION_TYPE_FLAGS
 
 local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
 local PLAYER_GUID = _G.UnitGUID("player")
-
+local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
 -----------------------------------------------------------------------
 -- Local variables.
@@ -78,6 +78,44 @@ local faction_standings = {}
 -----------------------------------------------------------------------
 -- Helper Functions.
 -----------------------------------------------------------------------
+local ActualCopperCost
+do
+    local BARTERING_SPELL_ID = 83964
+
+    local STANDING_DISCOUNTS = {
+        HATED = 0,
+        HOSTILE = 0,
+        UNFRIENDLY = 0,
+        NEUTRAL = 0,
+        FRIENDLY = 0.05,
+        HONORED = 0.1,
+        REVERED = 0.15,
+        EXALTED = 0.2,
+    }
+
+
+    function ActualCopperCost(copper_cost, rep_standing)
+        if not copper_cost or copper_cost == 0 then
+            return 0
+        end
+        local modifier = 1
+
+        if _G.IsSpellKnown(BARTERING_SPELL_ID) then
+            modifier = modifier - 0.1
+        end
+
+        if rep_standing then
+            if PLAYER_RACE == "Goblin" then
+                modifier = modifier - STANDING_DISCOUNTS["EXALTED"]
+            elseif STANDING_DISCOUNTS[rep_standing] then
+                modifier = modifier - STANDING_DISCOUNTS[rep_standing]
+            end
+        end
+        return math.floor(copper_cost / modifier)
+    end
+end -- do-block
+
+
 local function InstanceDifficultyToken()
     local _, instance_type, instance_difficulty, difficulty_name, _, _, is_dynamic = _G.GetInstanceInfo()
     if difficulty_name == "" then
@@ -277,6 +315,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 end
 
 
+local UnitFactionStanding
 local UpdateFactionData
 do
     local MAX_FACTION_INDEX = 1000
@@ -291,6 +330,22 @@ do
         "REVERED",
         "EXALTED",
     }
+
+
+    function UnitFactionStanding(unit)
+        UpdateFactionData()
+        DatamineTT:ClearLines()
+        DatamineTT:SetUnit(unit)
+
+        for line_index = 1, DatamineTT:NumLines() do
+            local faction_name = _G["WDPDatamineTTTextLeft" .. line_index]:GetText()
+
+            if faction_name and faction_standings[faction_name] then
+                return faction_name, faction_standings[faction_name]
+            end
+        end
+    end
+
 
     function UpdateFactionData()
         for faction_index = 1, MAX_FACTION_INDEX do
@@ -666,6 +721,7 @@ function WDP:UpdateMerchantItems(event)
     if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
         return
     end
+    local _, merchant_standing = UnitFactionStanding("target")
     local merchant = NPCEntry(unit_idnum)
     merchant.sells = merchant.sells or {}
 
@@ -676,7 +732,7 @@ function WDP:UpdateMerchantItems(event)
         local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
 
         if item_id and item_id > 0 then
-            local price_string = copper_price
+            local price_string = ActualCopperCost(copper_price, merchant_standing)
 
             if extended_cost then
                 local bg_points = 0
@@ -794,24 +850,7 @@ do
         local npc = NPCEntry(unit_idnum)
         local _, class_token = _G.UnitClass("target")
         npc.class = class_token
-
-        UpdateFactionData()
-        DatamineTT:ClearLines()
-        DatamineTT:SetUnit("target")
-
-        for line_index = 1, DatamineTT:NumLines() do
-            local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
-
-            if not current_line then
-                break
-            end
-            local line_text = current_line:GetText()
-
-            if faction_standings[line_text] then
-                npc.faction = line_text
-                break
-            end
-        end
+        npc.faction = UnitFactionStanding("target")
         npc.genders = npc.genders or {}
         npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
