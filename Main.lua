@@ -38,6 +38,7 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
     LOOT_OPENED = true,
@@ -72,6 +73,7 @@ local db
 local durability_timer_handle
 local target_location_timer_handle
 local action_data = {}
+local currently_drunk
 local faction_standings = {}
 
 
@@ -440,7 +442,7 @@ end
 
 
 function WDP:UpdateTargetLocation()
-    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
+    if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
         return
     end
 
@@ -449,10 +451,9 @@ function WDP:UpdateTargetLocation()
             return
         end
     end
-    local target_guid = _G.UnitGUID("target")
-    local unit_type, unit_idnum = ParseGUID(target_guid)
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+    if not unit_idnum or unit_type ~= private.UNIT_TYPES.NPC then
         return
     end
     UpdateNPCLocation(unit_idnum)
@@ -462,6 +463,40 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
+do
+    local SOBER_MATCH = _G.DRUNK_MESSAGE_ITEM_SELF1:gsub("%%s", ".+")
+
+    local DRUNK_COMPARES = {
+        _G.DRUNK_MESSAGE_SELF2,
+        _G.DRUNK_MESSAGE_SELF3,
+        _G.DRUNK_MESSAGE_SELF4,
+    }
+
+    local DRUNK_MATCHES = {
+        _G.DRUNK_MESSAGE_SELF2:gsub("%%s", ".+"),
+        _G.DRUNK_MESSAGE_SELF3:gsub("%%s", ".+"),
+        _G.DRUNK_MESSAGE_SELF4:gsub("%%s", ".+"),
+    }
+
+    function WDP:CHAT_MSG_SYSTEM(event, message)
+        if currently_drunk then
+            if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
+                currently_drunk = nil
+            end
+            return
+        end
+
+        for index = 1, #DRUNK_MATCHES do
+            if message == DRUNK_COMPARES[index] or message:match(DRUNK_MATCHES[index]) then
+                currently_drunk = true
+                break
+            end
+        end
+    end
+end
+
+-- do-block
+
 do
     local EXTRACT_GAS_SPELL_ID = 30427
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
@@ -539,9 +574,9 @@ end
 
 
 do
-    local re_gold = _G.GOLD_AMOUNT:gsub("%%d", "(%%d+)")
-    local re_silver = _G.SILVER_AMOUNT:gsub("%%d", "(%%d+)")
-    local re_copper = _G.COPPER_AMOUNT:gsub("%%d", "(%%d+)")
+    local RE_GOLD = _G.GOLD_AMOUNT:gsub("%%d", "(%%d+)")
+    local RE_SILVER = _G.SILVER_AMOUNT:gsub("%%d", "(%%d+)")
+    local RE_COPPER = _G.COPPER_AMOUNT:gsub("%%d", "(%%d+)")
 
 
     local function _moneyMatch(money, re)
@@ -553,8 +588,7 @@ do
         if not money then
             return 0
         end
-
-        return _moneyMatch(money, re_gold) * 10000 + _moneyMatch(money, re_silver) * 100 + _moneyMatch(money, re_copper)
+        return _moneyMatch(money, RE_GOLD) * 10000 + _moneyMatch(money, RE_SILVER) * 100 + _moneyMatch(money, RE_COPPER)
     end
 
 
@@ -839,7 +873,7 @@ do
 
 
     function WDP:PLAYER_TARGET_CHANGED()
-        if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") then
+        if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
             return
         end
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
