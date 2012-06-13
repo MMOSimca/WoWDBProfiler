@@ -255,18 +255,20 @@ local function UpdateDBEntryLocation(entry_type, identifier)
         return
     end
     local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-    local object = DBEntry(entry_type, identifier)
-    object[difficulty_token] = object[difficulty_token] or {}
-    object[difficulty_token].locations = object[difficulty_token].locations or {}
+    local entry = DBEntry(entry_type, identifier)
+    entry[difficulty_token] = entry[difficulty_token] or {}
+    entry[difficulty_token].locations = entry[difficulty_token].locations or {}
 
     local zone_token = ("%s:%d"):format(zone_name, area_id)
-    local zone_data = object[difficulty_token].locations[zone_token]
+    local zone_data = entry[difficulty_token].locations[zone_token]
 
     if not zone_data then
         zone_data = {}
-        object[difficulty_token].locations[zone_token] = zone_data
+        entry[difficulty_token].locations[zone_token] = zone_data
     end
-    zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
+    local location_token = ("%s:%s:%s"):format(map_level, x, y)
+    zone_data[location_token] = zone_data[location_token] or true
+    return zone_data
 end
 
 
@@ -627,7 +629,7 @@ do
     }
 
 
-    local function GenericLootUpdate(data_type, top_field)
+    local function GenericLootUpdate(data_type, top_field, inline_drops)
         local entry = DBEntry(data_type, action_data.identifier)
 
         if not entry then
@@ -653,6 +655,9 @@ do
 
     local LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function()
+            local item = DBEntry("items", action_data.identifier)
+            local loot_count = ("%s_count"):format(action_data.label or "drops")
+            item[loot_count] = (item[loot_count] or 0) + 1
             GenericLootUpdate("items")
         end,
         [AF.NPC] = function()
@@ -675,7 +680,20 @@ do
             GenericLootUpdate("objects", InstanceDifficultyToken())
         end,
         [AF.ZONE] = function()
-            GenericLootUpdate("zones", InstanceDifficultyToken())
+            local location_token = ("%s:%s:%s"):format(action_data.map_level, action_data.x, action_data.y)
+
+            -- This will start life as a boolean true.
+            if _G.type(action_data.zone_data[location_token]) ~= "table" then
+                action_data.zone_data[location_token] = {
+                    drops = {}
+                }
+            end
+            local loot_count = ("%s_count"):format(action_data.label or "drops")
+            action_data.zone_data[location_token][loot_count] = (action_data.zone_data[location_token][loot_count] or 0) + 1
+
+            for index = 1, #action_data.loot_list do
+                table.insert(action_data.zone_data[location_token].drops, action_data.loot_list[index])
+            end
         end,
     }
 
@@ -1094,8 +1112,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.identifier = identifier
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
-            UpdateDBEntryLocation("zones", identifier)
-
+            action_data.zone_data = UpdateDBEntryLocation("zones", identifier)
             action_data.type = AF.ZONE
             action_data.identifier = identifier
         end
