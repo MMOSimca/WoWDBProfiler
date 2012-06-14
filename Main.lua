@@ -555,25 +555,114 @@ do
 end -- do-block
 
 
-function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
-    if message_type ~= "FACTION" then
-        return
-    end
-    local npc = NPCEntry(action_data.identifier)
+do
+    local DIPLOMACY_SPELL_ID = 20599
+    local MR_POP_RANK1_SPELL_ID = 78634
+    local MR_POP_RANK2_SPELL_ID = 78635
 
-    if not npc then
-        return
-    end
-    local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
-    local reputation_data = encounter_data[action_data.npc_level].reputations
+    local REP_BUFFS = {
+        [_G.GetSpellInfo(30754)] = "CENARION_FAVOR",
+        [_G.GetSpellInfo(24705)] = "GRIM_VISAGE",
+        [_G.GetSpellInfo(32098)] = "HONOR_HOLD_FAVOR",
+        [_G.GetSpellInfo(39913)] = "NAZGRELS_FERVOR",
+        [_G.GetSpellInfo(39953)] = "SONG_OF_BATTLE",
+        [_G.GetSpellInfo(61849)] = "SPIRIT_OF_SHARING",
+        [_G.GetSpellInfo(32096)] = "THRALLMARS_FAVOR",
+        [_G.GetSpellInfo(39911)] = "TROLLBANES_COMMAND",
+        [_G.GetSpellInfo(95987)] = "UNBURDENED",
+        [_G.GetSpellInfo(100951)] = "WOW_ANNIVERSARY",
+    }
 
-    if not reputation_data then
-        reputation_data = {}
-        encounter_data[action_data.npc_level].reputations = reputation_data
+
+    local FACTION_NAMES = {
+        CENARION_CIRCLE = _G.GetFactionInfoByID(609),
+        HONOR_HOLD = _G.GetFactionInfoByID(946),
+        THE_SHATAR = _G.GetFactionInfoByID(935),
+        THRALLMAR = _G.GetFactionInfoByID(947),
+    }
+
+
+    local MODIFIERS = {
+        CENARION_FAVOR = {
+            faction = FACTION_NAMES.CENARION_CIRCLE,
+            modifier = 0.25,
+        },
+        GRIM_VISAGE = {
+            modifier = 0.1,
+        },
+        HONOR_HOLD_FAVOR = {
+            faction = FACTION_NAMES.HONOR_HOLD,
+            modifier = 0.25,
+        },
+        NAZGRELS_FERVOR = {
+            faction = FACTION_NAMES.THRALLMAR,
+            modifier = 0.1,
+        },
+        SONG_OF_BATTLE = {
+            faction = FACTION_NAMES.THE_SHATAR,
+            modifier = 0.1,
+        },
+        SPIRIT_OF_SHARING = {
+            modifier = 0.1,
+        },
+        THRALLMARS_FAVOR = {
+            faction = FACTION_NAMES.THRALLMAR,
+            modifier = 0.25,
+        },
+        TROLLBANES_COMMAND = {
+            faction = FACTION_NAMES.HONOR_HOLD,
+            modifier = 0.1,
+        },
+        UNBURDENED = {
+            modifier = 0.1,
+        },
+        WOW_ANNIVERSARY = {
+            modifier = 0.08,
+        }
+    }
+
+
+    function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
+        if message_type ~= "FACTION" then
+            return
+        end
+        UpdateFactionData()
+
+        local npc = NPCEntry(action_data.identifier)
+        if not npc then
+            return
+        end
+        local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
+        local reputation_data = encounter_data[action_data.npc_level].reputations
+
+        if not reputation_data then
+            reputation_data = {}
+            encounter_data[action_data.npc_level].reputations = reputation_data
+        end
+        local modifier = 1
+
+        if _G.IsSpellKnown(DIPLOMACY_SPELL_ID) then
+            modifier = modifier + 0.1
+        end
+
+        if _G.IsSpellKnown(MR_POP_RANK2_SPELL_ID) then
+            modifier = modifier + 0.1
+        elseif _G.IsSpellKnown(MR_POP_RANK1_SPELL_ID) then
+            modifier = modifier + 0.05
+        end
+
+        for buff_name, buff_label in pairs(REP_BUFFS) do
+            if _G.UnitBuff("player", buff_name) then
+                local modded_faction = MODIFIERS[buff_label].faction
+
+                if not modded_faction or faction_name == modded_faction then
+                    modifier = modifier + MODIFIERS[buff_label].modifier
+                end
+            end
+        end
+        reputation_data[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
-    UpdateFactionData()
-    reputation_data[("%s:%s"):format(faction_name, faction_standings[faction_name])] = amount
-end
+end -- do-block
 
 
 function WDP:ITEM_TEXT_BEGIN()
@@ -770,93 +859,94 @@ do
 end -- do-block
 
 
-local POINT_MATCH_PATTERNS = {
-    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING:gsub("%%d", "(%%d+)")), -- May no longer be necessary
-    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3:gsub("%%d", "(%%d+)")), -- May no longer be necessary
-    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_5V5:gsub("%%d", "(%%d+)")), -- May no longer be necessary
-    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_BG:gsub("%%d", "(%%d+)")),
-    ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3_BG:gsub("%%d", "(%%d+)")),
-}
+do
+    local POINT_MATCH_PATTERNS = {
+        ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING:gsub("%%d", "(%%d+)")), -- May no longer be necessary
+        ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3:gsub("%%d", "(%%d+)")), -- May no longer be necessary
+        ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_5V5:gsub("%%d", "(%%d+)")), -- May no longer be necessary
+        ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_BG:gsub("%%d", "(%%d+)")),
+        ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3_BG:gsub("%%d", "(%%d+)")),
+    }
 
-function WDP:UpdateMerchantItems(event)
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+    function WDP:UpdateMerchantItems(event)
+        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
-        return
-    end
-    local _, merchant_standing = UnitFactionStanding("target")
-    local merchant = NPCEntry(unit_idnum)
-    merchant.sells = merchant.sells or {}
+        if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+            return
+        end
+        local _, merchant_standing = UnitFactionStanding("target")
+        local merchant = NPCEntry(unit_idnum)
+        merchant.sells = merchant.sells or {}
 
-    local num_items = _G.GetMerchantNumItems()
+        local num_items = _G.GetMerchantNumItems()
 
-    for item_index = 1, num_items do
-        local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
-        local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
+        for item_index = 1, num_items do
+            local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
+            local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
 
-        if item_id and item_id > 0 then
-            local price_string = ActualCopperCost(copper_price, merchant_standing)
+            if item_id and item_id > 0 then
+                local price_string = ActualCopperCost(copper_price, merchant_standing)
 
-            if extended_cost then
-                local bg_points = 0
-                local personal_points = 0
+                if extended_cost then
+                    local bg_points = 0
+                    local personal_points = 0
 
-                DatamineTT:ClearLines()
-                DatamineTT:SetMerchantItem(item_index)
+                    DatamineTT:ClearLines()
+                    DatamineTT:SetMerchantItem(item_index)
 
-                for line_index = 1, DatamineTT:NumLines() do
-                    local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
+                    for line_index = 1, DatamineTT:NumLines() do
+                        local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
-                    if not current_line then
-                        break
-                    end
-                    local breakout
+                        if not current_line then
+                            break
+                        end
+                        local breakout
 
-                    for match_index = 1, #POINT_MATCH_PATTERNS do
-                        local match1, match2 = current_line:GetText():match(POINT_MATCH_PATTERNS[match_index])
-                        personal_points = personal_points + (match1 or 0)
-                        bg_points = bg_points + (match2 or 0)
+                        for match_index = 1, #POINT_MATCH_PATTERNS do
+                            local match1, match2 = current_line:GetText():match(POINT_MATCH_PATTERNS[match_index])
+                            personal_points = personal_points + (match1 or 0)
+                            bg_points = bg_points + (match2 or 0)
 
-                        if match1 or match2 then
-                            breakout = true
+                            if match1 or match2 then
+                                breakout = true
+                                break
+                            end
+                        end
+
+                        if breakout then
                             break
                         end
                     end
+                    local currency_list = {}
+                    local item_count = _G.GetMerchantItemCostInfo(item_index)
+                    price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
 
-                    if breakout then
-                        break
+                    for cost_index = 1, item_count do
+                        local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
+                        local currency_id = currency_link and ItemLinkToID(currency_link) or nil
+
+                        if (not currency_id or currency_id < 1) and icon_texture then
+                            currency_id = icon_texture:match("[^\\]+$"):lower()
+                        end
+
+                        if currency_id then
+                            currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_id)
+                        end
+                    end
+
+                    for currency_index = 1, #currency_list do
+                        price_string = ("%s:%s"):format(price_string, currency_list[currency_index])
                     end
                 end
-                local currency_list = {}
-                local item_count = _G.GetMerchantItemCostInfo(item_index)
-                price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
-
-                for cost_index = 1, item_count do
-                    local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
-                    local currency_id = currency_link and ItemLinkToID(currency_link) or nil
-
-                    if (not currency_id or currency_id < 1) and icon_texture then
-                        currency_id = icon_texture:match("[^\\]+$"):lower()
-                    end
-
-                    if currency_id then
-                        currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_id)
-                    end
-                end
-
-                for currency_index = 1, #currency_list do
-                    price_string = ("%s:%s"):format(price_string, currency_list[currency_index])
-                end
+                merchant.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
             end
-            merchant.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
+        end
+
+        if _G.CanMerchantRepair() then
+            merchant.can_repair = true
         end
     end
-
-    if _G.CanMerchantRepair() then
-        merchant.can_repair = true
-    end
-end
-
+end -- do-block
 
 function WDP:PET_BAR_UPDATE()
     if not action_data.label or not action_data.label == "mind_control" then
