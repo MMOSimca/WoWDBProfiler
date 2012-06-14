@@ -1038,21 +1038,24 @@ function WDP:TRAINER_SHOW()
             DatamineTT:SetTrainerService(index)
 
             local _, _, spell_id = DatamineTT:GetSpell()
-            local profession, min_skill = _G.GetTrainerServiceSkillReq(index)
-            profession = profession or "General"
 
-            local class_professions = npc.teaches[PLAYER_CLASS]
-            if not class_professions then
-                npc.teaches[PLAYER_CLASS] = {}
-                class_professions = npc.teaches[PLAYER_CLASS]
-            end
+            if spell_id then
+                local profession, min_skill = _G.GetTrainerServiceSkillReq(index)
+                profession = profession or "General"
 
-            local profession_skills = class_professions[profession]
-            if not profession_skills then
-                class_professions[profession] = {}
-                profession_skills = class_professions[profession]
+                local class_professions = npc.teaches[PLAYER_CLASS]
+                if not class_professions then
+                    npc.teaches[PLAYER_CLASS] = {}
+                    class_professions = npc.teaches[PLAYER_CLASS]
+                end
+
+                local profession_skills = class_professions[profession]
+                if not profession_skills then
+                    class_professions[profession] = {}
+                    profession_skills = class_professions[profession]
+                end
+                profession_skills[spell_id] = ("%d:%d"):format(required_level, min_skill)
             end
-            profession_skills[spell_id] = ("%d:%d"):format(required_level, min_skill)
         end
     end
 
