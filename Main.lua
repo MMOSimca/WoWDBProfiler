@@ -41,6 +41,7 @@ local EVENT_MAPPING = {
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
+    ITEM_TEXT_BEGIN = true,
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
     --    MERCHANT_UPDATE = "UpdateMerchantItems",
@@ -572,6 +573,16 @@ function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
     end
     UpdateFactionData()
     reputation_data[("%s:%s"):format(faction_name, faction_standings[faction_name])] = amount
+end
+
+
+function WDP:ITEM_TEXT_BEGIN()
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
+
+    if not unit_idnum or unit_type ~= private.UNIT_TYPES.OBJECT or _G.UnitName("npc") ~= _G.ItemTextGetItem() then
+        return
+    end
+    UpdateDBEntryLocation("objects", unit_idnum)
 end
 
 
