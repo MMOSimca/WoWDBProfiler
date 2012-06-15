@@ -736,13 +736,16 @@ do
             return
         end
         local loot_type = action_data.label or "drops"
+        local loot_count = ("%s_count"):format(loot_type)
         local loot_data
 
         if top_field then
+            entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
             entry[top_field] = entry[top_field] or {}
             entry[top_field][loot_type] = entry[top_field][loot_type] or {}
             loot_data = entry[top_field][loot_type]
         else
+            entry[loot_count] = (entry[loot_count] or 0) + 1
             entry[loot_type] = entry[loot_type] or {}
             loot_data = entry[loot_type]
         end
@@ -755,9 +758,6 @@ do
 
     local LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function()
-            local item = DBEntry("items", action_data.identifier)
-            local loot_count = ("%s_count"):format(action_data.label or "drops")
-            item[loot_count] = (item[loot_count] or 0) + 1
             GenericLootUpdate("items")
         end,
         [AF.NPC] = function()
