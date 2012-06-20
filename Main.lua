@@ -628,7 +628,11 @@ do
         end
         UpdateFactionData()
 
+        if not faction_name or not faction_standings[faction_name] then
+            return
+        end
         local npc = NPCEntry(action_data.identifier)
+
         if not npc then
             return
         end
@@ -1061,6 +1065,9 @@ do
     function WDP:QUEST_DETAIL()
         local quest = UpdateQuestJuncture("begin")
 
+        if not quest then
+            return
+        end
         quest.classes = quest.classes or {}
         quest.classes[PLAYER_CLASS] = true
 
