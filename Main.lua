@@ -19,6 +19,8 @@ local ADDON_NAME, private = ...
 local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
 
+local deformat = LibStub("LibDeformat-3.0")
+
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 
@@ -38,6 +40,7 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    CHAT_MSG_LOOT = true,
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
@@ -366,6 +369,34 @@ do
     end
 end -- do-block
 
+
+local function GenericLootUpdate(data_type, top_field, inline_drops)
+    local entry = DBEntry(data_type, action_data.identifier)
+
+    if not entry then
+        return
+    end
+    local loot_type = action_data.label or "drops"
+    local loot_count = ("%s_count"):format(loot_type)
+    local loot_data
+
+    if top_field then
+        entry[top_field] = entry[top_field] or {}
+        entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
+        entry[top_field][loot_type] = entry[top_field][loot_type] or {}
+        loot_data = entry[top_field][loot_type]
+    else
+        entry[loot_count] = (entry[loot_count] or 0) + 1
+        entry[loot_type] = entry[loot_type] or {}
+        loot_data = entry[loot_type]
+    end
+
+    for index = 1, #action_data.loot_list do
+        table.insert(loot_data, action_data.loot_list[index])
+    end
+end
+
+
 -----------------------------------------------------------------------
 -- Methods.
 -----------------------------------------------------------------------
@@ -467,6 +498,32 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
+function WDP:CHAT_MSG_LOOT(event, message)
+    if action_data.spell_label ~= "EXTRACT_GAS" then
+        return
+    end
+    local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
+
+    if not item_link then
+        quantity, item_link = 1, deformat(message, _G.LOOT_ITEM_PUSHED_SELF)
+    end
+
+    if not item_link then
+        return
+    end
+    local item_id = ItemLinkToID(item_link)
+
+    if not item_id then
+        return
+    end
+    action_data.loot_list = {
+        ("%d:%d"):format(item_id, quantity)
+    }
+    GenericLootUpdate("zones")
+    table.wipe(action_data)
+end
+
+
 do
     local SOBER_MATCH = _G.DRUNK_MESSAGE_ITEM_SELF1:gsub("%%s", ".+")
 
@@ -502,7 +559,6 @@ end
 -- do-block
 
 do
-    local EXTRACT_GAS_SPELL_ID = 30427
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
@@ -527,21 +583,7 @@ do
     local COMBAT_LOG_FUNCS = {
         SPELL_AURA_APPLIED = RecordNPCSpell,
         SPELL_CAST_START = RecordNPCSpell,
-        SPELL_CAST_SUCCESS = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, ...)
-            if spell_id == EXTRACT_GAS_SPELL_ID and source_guid == PLAYER_GUID then
-                table.wipe(action_data)
-                action_data.extracting_gas = true
-                action_data.timestamp = _G.GetTime()
-            else
-                RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, ...)
-            end
-        end,
-        UNIT_DISSIPATES = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags)
-            if action_data.extracting_gas and _G.GetTime() - action_data.timestamp <= 3 then
-                local unit_type, unit_idnum = ParseGUID(dest_guid)
-                UpdateNPCLocation(unit_idnum)
-            end
-        end,
+        SPELL_CAST_SUCCESS = RecordNPCSpell,
     }
 
 
@@ -732,33 +774,6 @@ do
             return _G.IsFishingLoot()
         end,
     }
-
-
-    local function GenericLootUpdate(data_type, top_field, inline_drops)
-        local entry = DBEntry(data_type, action_data.identifier)
-
-        if not entry then
-            return
-        end
-        local loot_type = action_data.label or "drops"
-        local loot_count = ("%s_count"):format(loot_type)
-        local loot_data
-
-        if top_field then
-            entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
-            entry[top_field] = entry[top_field] or {}
-            entry[top_field][loot_type] = entry[top_field][loot_type] or {}
-            loot_data = entry[top_field][loot_type]
-        else
-            entry[loot_count] = (entry[loot_count] or 0) + 1
-            entry[loot_type] = entry[loot_type] or {}
-            loot_data = entry[loot_type]
-        end
-
-        for index = 1, #action_data.loot_list do
-            table.insert(loot_data, action_data.loot_list[index])
-        end
-    end
 
 
     local LOOT_UPDATE_FUNCS = {
@@ -1224,9 +1239,10 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.identifier = identifier
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
-            action_data.zone_data = UpdateDBEntryLocation("zones", identifier, "fishing_locations")
+            action_data.zone_data = UpdateDBEntryLocation("zones", identifier, (spell_label == "FISHING") and "fishing_locations" or nil)
             action_data.type = AF.ZONE
             action_data.identifier = identifier
+            action_data.spell_label = spell_label
         end
     end
     private.tracked_line = spell_line
