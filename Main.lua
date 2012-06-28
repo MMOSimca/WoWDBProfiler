@@ -910,6 +910,7 @@ do
                 if extended_cost then
                     local bg_points = 0
                     local personal_points = 0
+                    local required_conquest
 
                     DatamineTT:ClearLines()
                     DatamineTT:SetMerchantItem(item_index)
@@ -920,7 +921,7 @@ do
                         if not current_line then
                             break
                         end
-                        local breakout
+                        required_conquest = current_line:GetText():match("Requires earning a total of (%d+)\nConquest Points for the season.")
 
                         for match_index = 1, #POINT_MATCH_PATTERNS do
                             local match1, match2 = current_line:GetText():match(POINT_MATCH_PATTERNS[match_index])
@@ -928,21 +929,16 @@ do
                             bg_points = bg_points + (match2 or 0)
 
                             if match1 or match2 then
-                                breakout = true
                                 break
                             end
-                        end
-
-                        if breakout then
-                            break
                         end
                     end
                     local currency_list = {}
                     local item_count = _G.GetMerchantItemCostInfo(item_index)
 
                     -- Keeping this around in case Blizzard makes the two points diverge at some point.
-                    --                    price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
-                    price_string = ("%s:%s"):format(price_string, personal_points)
+                    --                    price_string = ("%s:%s:%s:%s"):format(price_string, bg_points, personal_points, required_conquest or 0)
+                    price_string = ("%s:%s:%s"):format(price_string, personal_points, required_conquest or 0)
 
                     for cost_index = 1, item_count do
                         local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
