@@ -907,9 +907,9 @@ do
                 local price_string = ActualCopperCost(copper_price, merchant_standing)
 
                 if extended_cost then
-                    local bg_points = 0
-                    local personal_points = 0
-                    local required_conquest
+                    local battleground_rating = 0
+                    local personal_rating = 0
+                    local required_season_amount
 
                     DatamineTT:ClearLines()
                     DatamineTT:SetMerchantItem(item_index)
@@ -920,12 +920,13 @@ do
                         if not current_line then
                             break
                         end
-                        required_conquest = current_line:GetText():match("Requires earning a total of (%d+)\nConquest Points for the season.")
+                        local breakout
+                        required_season_amount = current_line:GetText():match("Requires earning a total of (%d+)\n(.-) for the season.")
 
                         for match_index = 1, #POINT_MATCH_PATTERNS do
                             local match1, match2 = current_line:GetText():match(POINT_MATCH_PATTERNS[match_index])
-                            personal_points = personal_points + (match1 or 0)
-                            bg_points = bg_points + (match2 or 0)
+                            personal_rating = personal_rating + (match1 or 0)
+                            battleground_rating = battleground_rating + (match2 or 0)
 
                             if match1 or match2 then
                                 break
@@ -936,8 +937,8 @@ do
                     local item_count = _G.GetMerchantItemCostInfo(item_index)
 
                     -- Keeping this around in case Blizzard makes the two points diverge at some point.
-                    --                    price_string = ("%s:%s:%s:%s"):format(price_string, bg_points, personal_points, required_conquest or 0)
-                    price_string = ("%s:%s:%s"):format(price_string, personal_points, required_conquest or 0)
+                    --                    price_string = ("%s:%s:%s:%s"):format(price_string, battleground_rating, personal_rating, required_season_amount or 0)
+                    price_string = ("%s:%s:%s"):format(price_string, personal_rating, required_season_amount or 0)
 
                     for cost_index = 1, item_count do
                         local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
