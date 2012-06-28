@@ -939,7 +939,10 @@ do
                     end
                     local currency_list = {}
                     local item_count = _G.GetMerchantItemCostInfo(item_index)
-                    price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
+
+                    -- Keeping this around in case Blizzard makes the two points diverge at some point.
+                    --                    price_string = ("%s:%s:%s"):format(price_string, bg_points, personal_points)
+                    price_string = ("%s:%s"):format(price_string, personal_points)
 
                     for cost_index = 1, item_count do
                         local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
