@@ -254,22 +254,21 @@ do
 end -- do-block
 
 
-local function UpdateDBEntryLocation(entry_type, identifier, location_label)
+local function UpdateDBEntryLocation(entry_type, identifier)
     if not identifier then
         return
     end
     local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
     local entry = DBEntry(entry_type, identifier)
-    local location_field = location_label or "locations"
     entry[difficulty_token] = entry[difficulty_token] or {}
-    entry[difficulty_token][location_field] = entry[difficulty_token][location_field] or {}
+    entry[difficulty_token].locations = entry[difficulty_token].locations or {}
 
     local zone_token = ("%s:%d"):format(zone_name, area_id)
-    local zone_data = entry[difficulty_token][location_field][zone_token]
+    local zone_data = entry[difficulty_token].locations[zone_token]
 
     if not zone_data then
         zone_data = {}
-        entry[difficulty_token][location_field][zone_token] = zone_data
+        entry[difficulty_token].locations[zone_token] = zone_data
     end
     local location_token = ("%s:%s:%s"):format(map_level, x, y)
     zone_data[location_token] = zone_data[location_token] or true
@@ -1238,7 +1237,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.identifier = identifier
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
-            action_data.zone_data = UpdateDBEntryLocation("zones", identifier, (spell_label == "FISHING") and "fishing_locations" or nil)
+            action_data.zone_data = UpdateDBEntryLocation("zones", identifier)
             action_data.type = AF.ZONE
             action_data.identifier = identifier
             action_data.spell_label = spell_label
