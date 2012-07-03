@@ -40,6 +40,7 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    BLACK_MARKET_ITEM_UPDATE = true,
     CHAT_MSG_LOOT = true,
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
@@ -497,6 +498,19 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
+function WDP:BLACK_MARKET_ITEM_UPDATE(event)
+    local num_items = _G.C_BlackMarket.GetNumItems()
+
+    for index = 1, num_items do
+        local name, texture, quantity, item_type, is_usable, level, level_type, seller_name, min_bid, min_increment, current_bid, has_high_bid, num_bids, time_left, item_link, market_id = _G.C_BlackMarket.GetItemInfoByIndex(index);
+
+        if item_link then
+            DBEntry("items", ItemLinkToID(item_link)).black_market = seller_name or "UNKNOWN"
+        end
+    end
+end
+
+
 function WDP:CHAT_MSG_LOOT(event, message)
     if action_data.spell_label ~= "EXTRACT_GAS" then
         return
