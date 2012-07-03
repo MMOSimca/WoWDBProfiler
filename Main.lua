@@ -835,38 +835,21 @@ do
         if _G.type(verify_func) == "function" and not verify_func() then
             return
         end
-        -- TODO: Remove this check once the MoP client goes live
-        local wow_version = private.wow_version
         local loot_registry = {}
         action_data.loot_list = {}
         action_data.looting = true
 
-        if wow_version == "5.0.1" then
-            for loot_slot = 1, _G.GetNumLootItems() do
-                local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+        for loot_slot = 1, _G.GetNumLootItems() do
+            local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+            local slot_type = _G.GetLootSlotType(loot_slot)
 
-                local slot_type = _G.GetLootSlotType(loot_slot)
-
-                if slot_type == _G.LOOT_SLOT_ITEM then
-                    local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                    loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
-                elseif slot_type == _G.LOOT_SLOT_MONEY then
-                    table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
-                elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                    table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
-                end
-            end
-        else
-            for loot_slot = 1, _G.GetNumLootItems() do
-                local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
-                if _G.LootSlotIsItem(loot_slot) then
-                    local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                    loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
-                elseif _G.LootSlotIsCoin(loot_slot) then
-                    table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
-                elseif _G.LootSlotIsCurrency(loot_slot) then
-                    table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
-                end
+            if slot_type == _G.LOOT_SLOT_ITEM then
+                local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                loot_registry[item_id] = (loot_registry[item_id]) or 0 + quantity
+            elseif slot_type == _G.LOOT_SLOT_MONEY then
+                table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
+            elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
         end
 
@@ -893,11 +876,13 @@ do
         if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
             return
         end
+        local num_items = _G.GetMerchantNumItems()
+        local current_filters = _G.GetMerchantFilter()
         local _, merchant_standing = UnitFactionStanding("target")
         local merchant = NPCEntry(unit_idnum)
         merchant.sells = merchant.sells or {}
 
-        local num_items = _G.GetMerchantNumItems()
+        _G.MerchantFrame_SetFilter(nil, _G.LE_LOOT_FILTER_ALL)
 
         for item_index = 1, num_items do
             local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
@@ -964,6 +949,7 @@ do
         if _G.CanMerchantRepair() then
             merchant.can_repair = true
         end
+        _G.MerchantFrame_SetFilter(nil, current_filters)
     end
 end -- do-block
 
