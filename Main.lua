@@ -1133,6 +1133,10 @@ function WDP:TRAINER_SHOW()
     end
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
     local npc = NPCEntry(unit_idnum)
+
+    if not npc then
+        return
+    end
     npc.teaches = npc.teaches or {}
 
     -- Get the initial trainer filters
