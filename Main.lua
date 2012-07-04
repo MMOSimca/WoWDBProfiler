@@ -890,13 +890,15 @@ do
         if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
             return
         end
-        local num_items = _G.GetMerchantNumItems()
         local current_filters = _G.GetMerchantFilter()
         local _, merchant_standing = UnitFactionStanding("target")
         local merchant = NPCEntry(unit_idnum)
         merchant.sells = merchant.sells or {}
 
-        _G.MerchantFrame_SetFilter(nil, _G.LE_LOOT_FILTER_ALL)
+        _G.SetMerchantFilter(_G.LE_LOOT_FILTER_ALL)
+        _G.MerchantFrame_Update()
+
+        local num_items = _G.GetMerchantNumItems()
 
         for item_index = 1, num_items do
             local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
@@ -963,7 +965,8 @@ do
         if _G.CanMerchantRepair() then
             merchant.can_repair = true
         end
-        _G.MerchantFrame_SetFilter(nil, current_filters)
+        _G.SetMerchantFilter(current_filters)
+        _G.MerchantFrame_Update()
     end
 end -- do-block
 
