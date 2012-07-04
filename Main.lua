@@ -125,8 +125,12 @@ end -- do-block
 
 local function InstanceDifficultyToken()
     local _, instance_type, instance_difficulty, difficulty_name, _, _, is_dynamic = _G.GetInstanceInfo()
-    if difficulty_name == "" then
+    if not difficulty_name or difficulty_name == "" then
         difficulty_name = "NONE"
+    end
+
+    if not instance_type or instance_type == "" then
+        instance_type = "NONE"
     end
     return ("%s:%s:%s"):format(instance_type:upper(), difficulty_name:upper():gsub(" ", "_"), _G.tostring(is_dynamic))
 end
