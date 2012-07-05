@@ -683,7 +683,7 @@ do
 
 
     function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
-        if message_type ~= "FACTION" then
+        if message_type ~= "FACTION" or not action_data.npc_level then
             return
         end
         UpdateFactionData()
