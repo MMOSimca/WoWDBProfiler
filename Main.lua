@@ -48,7 +48,7 @@ local EVENT_MAPPING = {
     ITEM_TEXT_BEGIN = true,
     LOOT_OPENED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
-    --    MERCHANT_UPDATE = "UpdateMerchantItems",
+    MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
     PLAYER_TARGET_CHANGED = true,
     QUEST_COMPLETE = true,
@@ -962,7 +962,7 @@ do
                         price_string = ("%s:%s"):format(price_string, currency_list[currency_index])
                     end
                 end
-                merchant.sells[("%s:%s:[%s]"):format(item_id, stack_size, price_string)] = num_available
+                merchant.sells[item_id] = ("%s:%s:[%s]"):format(num_available, stack_size, price_string)
             end
         end
 
