@@ -374,7 +374,7 @@ do
 end -- do-block
 
 
-local function GenericLootUpdate(data_type, top_field, inline_drops)
+local function GenericLootUpdate(data_type, top_field)
     local entry = DBEntry(data_type, action_data.identifier)
 
     if not entry then
@@ -805,8 +805,8 @@ do
             end
             local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
             local loot_type = action_data.label or "drops"
-            npc.loot_counts = npc.loot_counts or {}
-            npc.loot_counts[loot_type] = (npc.loot_counts[loot_type] or 0) + 1
+            encounter_data.loot_counts = encounter_data.loot_counts or {}
+            encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
             encounter_data[loot_type] = encounter_data[loot_type] or {}
 
             for index = 1, #action_data.loot_list do
