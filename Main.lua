@@ -28,6 +28,8 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
+local DB_VERSION = 1
+
 local DATABASE_DEFAULTS = {
     global = {
         items = {},
@@ -418,6 +420,7 @@ function WDP:OnInitialize()
     --        end
     --    end
     raw_db.build_num = build_num
+    raw_db.version = DB_VERSION
 end
 
 
@@ -696,12 +699,16 @@ do
         if not npc then
             return
         end
-        local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
-        local reputation_data = encounter_data[action_data.npc_level].reputations
+        local npc_stats = npc.encounter_data[InstanceDifficultyToken()].stats
+
+        if not npc_stats[action_data.npc_level] then
+            npc_stats[action_data.npc_level] = {}
+        end
+        local reputation_data = npc_stats[action_data.npc_level].reputations
 
         if not reputation_data then
             reputation_data = {}
-            encounter_data[action_data.npc_level].reputations = reputation_data
+            npc_stats[action_data.npc_level].reputations = reputation_data
         end
         local modifier = 1
 
