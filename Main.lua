@@ -353,7 +353,7 @@ do
         DatamineTT:SetUnit(unit)
 
         for line_index = 1, DatamineTT:NumLines() do
-            local faction_name = _G["WDPDatamineTTTextLeft" .. line_index]:GetText()
+            local faction_name = _G["WDPDatamineTTTextLeft" .. line_index]:GetText():trim()
 
             if faction_name and faction_standings[faction_name] then
                 return faction_name, faction_standings[faction_name]
