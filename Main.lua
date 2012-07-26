@@ -582,6 +582,8 @@ do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
+    -- This is used to record faction gains
+    local dead_npc_id
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
         if not spell_id then
@@ -604,6 +606,15 @@ do
         SPELL_AURA_APPLIED = RecordNPCSpell,
         SPELL_CAST_START = RecordNPCSpell,
         SPELL_CAST_SUCCESS = RecordNPCSpell,
+        UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+            local unit_type, unit_idnum = ParseGUID(dest_guid)
+
+            if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+                dead_npc_id = nil
+                return
+            end
+            dead_npc_id = unit_idnum
+        end,
     }
 
 
@@ -615,10 +626,7 @@ do
         end
         combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, ...)
     end
-end -- do-block
 
-
-do
     local DIPLOMACY_SPELL_ID = 20599
     local MR_POP_RANK1_SPELL_ID = 78634
     local MR_POP_RANK2_SPELL_ID = 78635
@@ -686,7 +694,7 @@ do
 
 
     function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
-        if message_type ~= "FACTION" or not action_data.npc_level then
+        if message_type ~= "FACTION" or not dead_npc_id then
             return
         end
         UpdateFactionData()
@@ -694,21 +702,10 @@ do
         if not faction_name or not faction_standings[faction_name] then
             return
         end
-        local npc = NPCEntry(action_data.identifier)
+        local npc = NPCEntry(dead_npc_id)
 
         if not npc then
             return
-        end
-        local npc_stats = npc.encounter_data[InstanceDifficultyToken()].stats
-
-        if not npc_stats[action_data.npc_level] then
-            npc_stats[action_data.npc_level] = {}
-        end
-        local reputation_data = npc_stats[action_data.npc_level].reputations
-
-        if not reputation_data then
-            reputation_data = {}
-            npc_stats[action_data.npc_level].reputations = reputation_data
         end
         local modifier = 1
 
@@ -731,7 +728,8 @@ do
                 end
             end
         end
-        reputation_data[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
+        npc.reputations = npc.reputations or {}
+        npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
 end -- do-block
 
