@@ -223,9 +223,8 @@ do
         local unit_type = _G.bit.band(tonumber(guid:sub(1, 5)), UNIT_TYPE_BITMASK)
 
         if unit_type ~= types.PLAYER and unit_type ~= types.PET then
-            return unit_type, tonumber(guid:sub(-12, -9), 16)
+            return unit_type, tonumber(guid:sub(6, 10), 16)
         end
-
         return unit_type
     end
 end -- do-block
