@@ -28,7 +28,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 1
+local DB_VERSION = 3
 
 local DATABASE_DEFAULTS = {
     global = {
@@ -82,6 +82,7 @@ local target_location_timer_handle
 local action_data = {}
 local currently_drunk
 local faction_standings = {}
+local reputation_npc_id
 
 
 -----------------------------------------------------------------------
@@ -581,9 +582,6 @@ do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
-    -- This is used to record faction gains
-    local dead_npc_id
-
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
         if not spell_id then
             return
@@ -609,10 +607,10 @@ do
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
-                dead_npc_id = nil
+                reputation_npc_id = nil
                 return
             end
-            dead_npc_id = unit_idnum
+            reputation_npc_id = unit_idnum
         end,
     }
 
@@ -693,7 +691,7 @@ do
 
 
     function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
-        if message_type ~= "FACTION" or not dead_npc_id then
+        if message_type ~= "FACTION" or not reputation_npc_id then
             return
         end
         UpdateFactionData()
@@ -701,7 +699,7 @@ do
         if not faction_name or not faction_standings[faction_name] then
             return
         end
-        local npc = NPCEntry(dead_npc_id)
+        local npc = NPCEntry(reputation_npc_id)
 
         if not npc then
             return
@@ -729,6 +727,7 @@ do
         end
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
+        reputation_npc_id = nil
     end
 end -- do-block
 
@@ -1084,6 +1083,8 @@ do
 
 
     function WDP:QUEST_COMPLETE()
+        -- Make sure the quest NPC isn't erroneously recorded as giving reputation for quests which award it.
+        reputation_npc_id = nil
         UpdateQuestJuncture("end")
     end
 
