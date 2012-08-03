@@ -891,6 +891,8 @@ do
         ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING_3V3_BG:gsub("%%d", "(%%d+)")),
     }
 
+    local ITEM_REQ_REPUTATION_MATCH = "Requires (.-) %- (.*)"
+
     function WDP:UpdateMerchantItems(event)
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
@@ -914,21 +916,36 @@ do
             if item_id and item_id > 0 then
                 local price_string = ActualCopperCost(copper_price, merchant_standing)
 
+                DatamineTT:ClearLines()
+                DatamineTT:SetMerchantItem(item_index)
+
+                local num_lines = DatamineTT:NumLines()
+
+                for line_index = 1, num_lines do
+                    local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
+
+                    if not current_line then
+                        break
+                    end
+                    local faction, reputation = current_line:GetText():match(ITEM_REQ_REPUTATION_MATCH)
+
+                    if faction or reputation then
+                        DBEntry("items", item_id).req_reputation = ("%s:%s"):format(faction:gsub("-", ""), reputation:upper())
+                        break
+                    end
+                end
+
                 if extended_cost then
                     local battleground_rating = 0
                     local personal_rating = 0
                     local required_season_amount
 
-                    DatamineTT:ClearLines()
-                    DatamineTT:SetMerchantItem(item_index)
-
-                    for line_index = 1, DatamineTT:NumLines() do
+                    for line_index = 1, num_lines do
                         local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
                         if not current_line then
                             break
                         end
-                        local breakout
                         required_season_amount = current_line:GetText():match("Requires earning a total of (%d+)\n(.-) for the season.")
 
                         for match_index = 1, #POINT_MATCH_PATTERNS do
