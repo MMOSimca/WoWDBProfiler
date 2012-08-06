@@ -1154,9 +1154,6 @@ end
 
 
 function WDP:TRAINER_SHOW()
-    if not _G.IsTradeskillTrainer() then
-        return
-    end
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
     local npc = NPCEntry(unit_idnum)
 
