@@ -407,10 +407,13 @@ end
 -- Methods.
 -----------------------------------------------------------------------
 function WDP:OnInitialize()
+    -- TODO: Remove this once 5.0.4 hits Live.
+    if private.wow_version == "4.3.4" then
+        return
+    end
     db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default").global
 
     local raw_db = _G["WoWDBProfilerData"]
-
     local build_num = tonumber(private.build_num)
 
     -- TODO: Un-comment this when MoP goes live.
@@ -425,6 +428,11 @@ end
 
 
 function WDP:OnEnable()
+    -- TODO: Remove this once 5.0.4 hits Live.
+    if private.wow_version == "4.3.4" then
+        return
+    end
+
     for event_name, mapping in pairs(EVENT_MAPPING) do
         self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
     end
