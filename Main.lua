@@ -16,6 +16,11 @@ local table = _G.table
 -----------------------------------------------------------------------
 local ADDON_NAME, private = ...
 
+-- TODO: Remove this once 5.0.4 hits Live.
+if private.wow_version == "4.3.4" then
+    return
+end
+
 local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
 
@@ -28,7 +33,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 3
+local DB_VERSION = 4
 
 local DATABASE_DEFAULTS = {
     global = {
@@ -407,32 +412,24 @@ end
 -- Methods.
 -----------------------------------------------------------------------
 function WDP:OnInitialize()
-    -- TODO: Remove this once 5.0.4 hits Live.
-    if private.wow_version == "4.3.4" then
-        return
-    end
     db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default").global
 
     local raw_db = _G["WoWDBProfilerData"]
     local build_num = tonumber(private.build_num)
 
-    -- TODO: Un-comment this when MoP goes live.
+    -- TODO: Merge this with the DB version check when MoP goes live.
     --    if raw_db.build_num and raw_db.build_num < build_num then
-    --        for entry in pairs(DATABASE_DEFAULTS.global) do
-    --            db[entry] = {}
-    --        end
-    --    end
+    if raw_db.version and raw_db.version < DB_VERSION then
+        for entry in pairs(DATABASE_DEFAULTS.global) do
+            db[entry] = {}
+        end
+    end
     raw_db.build_num = build_num
     raw_db.version = DB_VERSION
 end
 
 
 function WDP:OnEnable()
-    -- TODO: Remove this once 5.0.4 hits Live.
-    if private.wow_version == "4.3.4" then
-        return
-    end
-
     for event_name, mapping in pairs(EVENT_MAPPING) do
         self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
     end
