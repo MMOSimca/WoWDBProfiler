@@ -921,6 +921,8 @@ do
                 -- Items return the player as the source, so we need to replace the nil ID with the item's ID (disenchant, milling, etc)
                 if not source_id then
                     source_id = action_data.identifier
+                elseif action_data.type == AF.OBJECT then
+                    source_id = ("%s:%s"):format(action_data.spell_label, source_id)
                 end
                 action_data.loot_sources[source_id] = action_data.loot_sources[source_id] or {}
 
@@ -1291,6 +1293,8 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     action_data.x = x
     action_data.y = y
     action_data.zone = ("%s:%d"):format(zone_name, area_id)
+    action_data.spell_label = spell_label
+    action_data.label = spell_label:lower()
 
     if tt_unit_name and not tt_item_name then
         if bit.band(spell_flags, AF.NPC) == AF.NPC then
@@ -1298,12 +1302,10 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
                 return
             end
             action_data.type = AF.NPC
-            action_data.label = spell_label:lower()
             action_data.unit_name = tt_unit_name
         end
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         action_data.type = AF.ITEM
-        action_data.label = spell_label:lower()
 
         if tt_item_name and tt_item_name == target_name then
             action_data.identifier = ItemLinkToID(tt_item_link)
@@ -1324,7 +1326,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.zone_data = UpdateDBEntryLocation("zones", identifier)
             action_data.type = AF.ZONE
             action_data.identifier = identifier
-            action_data.spell_label = spell_label
         end
     end
     private.tracked_line = spell_line
