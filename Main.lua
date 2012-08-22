@@ -944,6 +944,7 @@ do
         if _G.type(verify_func) == "function" and not verify_func() then
             return
         end
+        local guids_used = {}
         action_data.loot_list = {}
         action_data.loot_sources = {}
         action_data.looting = true
@@ -975,7 +976,7 @@ do
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                         action_data.loot_sources[source_guid] = action_data.loot_sources[source_guid] or {}
                         action_data.loot_sources[source_guid][item_id] = action_data.loot_sources[source_guid][item_id] or 0 + loot_quantity
-                        loot_guid_registry[source_guid] = true
+                        guids_used[source_guid] = true
                     end
                 end
             elseif slot_type == _G.LOOT_SLOT_MONEY then
@@ -983,6 +984,10 @@ do
             elseif slot_type == _G.LOOT_SLOT_CURRENCY then
                 table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
+        end
+
+        for guid in guids_used do
+            loot_guid_registry[guid] = true
         end
         update_func()
     end
