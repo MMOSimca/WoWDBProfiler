@@ -10,6 +10,8 @@ local bit = _G.bit
 local math = _G.math
 local table = _G.table
 
+local select = _G.select
+
 
 -----------------------------------------------------------------------
 -- AddOn namespace.
@@ -398,19 +400,31 @@ do
         local loot_count = ("%s_count"):format(loot_type)
         local source_list = {}
 
-        for source_id, loot_data in pairs(action_data.loot_sources) do
-            local entry = DBEntry(data_type, source_id)
+        for source_guid, loot_data in pairs(action_data.loot_sources) do
+            local entry, source_id
+
+            if action_data.type == AF.ITEM then
+                -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
+                source_id = action_data.identifier
+                entry = DBEntry(data_type, source_id)
+            elseif action_data.type == AF.OBJECT then
+                source_id = ("%s:%s"):format(action_data.spell_label, select(2, ParseGUID(source_guid)))
+                entry = DBEntry(data_type, source_id)
+            else
+                source_id = select(2, ParseGUID(source_guid))
+                entry = DBEntry(data_type, source_id)
+            end
 
             if entry then
                 local loot_table = LootTable(entry, loot_type, top_field)
 
-                if not source_list[source_id] then
+                if not source_list[source_guid] then
                     if top_field then
                         entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
                     else
                         entry[loot_count] = (entry[loot_count] or 0) + 1
                     end
-                    source_list[source_id] = true
+                    source_list[source_guid] = true
                 end
                 UpdateDBEntryLocation(data_type, source_id)
 
@@ -420,6 +434,10 @@ do
             end
         end
         -- TODO: Remove this when GetLootSourceInfo() has values for money
+        if action_data.type == AF.OBJECT then
+            -- Unfortunately, this means we can't record money from chests...
+            return
+        end
         local entry = DBEntry(data_type, action_data.identifier)
 
         if not entry then
@@ -843,14 +861,15 @@ do
             local loot_type = action_data.label or "drops"
             local source_list = {}
 
-            for source_id, loot_data in pairs(action_data.loot_sources) do
+            for source_guid, loot_data in pairs(action_data.loot_sources) do
+                local source_id = select(2, ParseGUID(source_guid))
                 local npc = NPCEntry(source_id)
 
                 if npc then
                     local encounter_data = npc.encounter_data[difficulty_token]
                     encounter_data[loot_type] = encounter_data[loot_type] or {}
 
-                    if not source_list[source_id] then
+                    if not source_list[source_guid] then
                         encounter_data.loot_counts = encounter_data.loot_counts or {}
                         encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
                         source_list[source_id] = true
@@ -930,7 +949,7 @@ do
 
             -- TODO: Move LOOT_SLOT_X checks within loop when money is detectable via GetLootSourceInfo
             if slot_type == _G.LOOT_SLOT_ITEM then
-                local sources = {
+                local loot_info = {
                     _G.GetLootSourceInfo(loot_slot)
                 }
 
@@ -938,22 +957,17 @@ do
                 --            print(("Loot slot %d: Source count: %d"):format(loot_slot, floor((#sources / 2) + 0.5)))
 
                 -- Odd index is GUID, even is count.
-                for source_index = 1, #sources, 2 do
-                    local source_type, source_id = ParseGUID(sources[source_index])
-                    local source_count = sources[source_index + 1]
-                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                for loot_index = 1, #loot_info, 2 do
+                    local source_guid = loot_info[loot_index]
+                    local loot_quantity = loot_info[loot_index + 1]
+                    local source_type, source_id = ParseGUID(source_guid)
                     -- TODO: Remove debugging
-                    --                print(("GUID: %s - Type:ID: %s - Amount: %d"):format(sources[source_index], source_key, source_count))
+                    --                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                    --                    print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
-                    -- Items return the player as the source, so we need to replace the nil ID with the item's ID (disenchant, milling, etc)
-                    if not source_id then
-                        source_id = action_data.identifier
-                    elseif action_data.type == AF.OBJECT then
-                        source_id = ("%s:%s"):format(action_data.spell_label, source_id)
-                    end
                     local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                    action_data.loot_sources[source_id] = action_data.loot_sources[source_id] or {}
-                    action_data.loot_sources[source_id][item_id] = action_data.loot_sources[source_id][item_id] or 0 + source_count
+                    action_data.loot_sources[source_guid] = action_data.loot_sources[source_guid] or {}
+                    action_data.loot_sources[source_guid][item_id] = action_data.loot_sources[source_guid][item_id] or 0 + loot_quantity
                 end
             elseif slot_type == _G.LOOT_SLOT_MONEY then
                 table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
