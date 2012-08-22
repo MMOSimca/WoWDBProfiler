@@ -434,7 +434,7 @@ do
             end
         end
         -- TODO: Remove this when GetLootSourceInfo() has values for money
-        if action_data.type == AF.OBJECT then
+        if #action_data.loot_list <= 0 or action_data.type == AF.OBJECT then
             -- Unfortunately, this means we can't record money from chests...
             return
         end
@@ -882,6 +882,9 @@ do
             end
 
             -- TODO: Remove this when GetLootSourceInfo() has values for money
+            if #action_data.loot_list <= 0 then
+                return
+            end
             local npc = NPCEntry(action_data.identifier)
 
             if not npc then
@@ -920,6 +923,8 @@ do
         end,
     }
 
+    -- Prevent opening the same loot window multiple times from recording data multiple times.
+    local loot_guid_registry = {}
 
     function WDP:LOOT_OPENED()
         if action_data.looting then
@@ -959,15 +964,19 @@ do
                 -- Odd index is GUID, even is count.
                 for loot_index = 1, #loot_info, 2 do
                     local source_guid = loot_info[loot_index]
-                    local loot_quantity = loot_info[loot_index + 1]
-                    local source_type, source_id = ParseGUID(source_guid)
-                    -- TODO: Remove debugging
-                    --                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                    --                    print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
-                    local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                    action_data.loot_sources[source_guid] = action_data.loot_sources[source_guid] or {}
-                    action_data.loot_sources[source_guid][item_id] = action_data.loot_sources[source_guid][item_id] or 0 + loot_quantity
+                    if not loot_guid_registry[source_guid] then
+                        local loot_quantity = loot_info[loot_index + 1]
+                        local source_type, source_id = ParseGUID(source_guid)
+                        -- TODO: Remove debugging
+                        --                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                        --                    print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
+
+                        local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                        action_data.loot_sources[source_guid] = action_data.loot_sources[source_guid] or {}
+                        action_data.loot_sources[source_guid][item_id] = action_data.loot_sources[source_guid][item_id] or 0 + loot_quantity
+                        loot_guid_registry[source_guid] = true
+                    end
                 end
             elseif slot_type == _G.LOOT_SLOT_MONEY then
                 table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
