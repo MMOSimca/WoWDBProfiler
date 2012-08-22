@@ -383,14 +383,12 @@ end -- do-block
 
 local GenericLootUpdate
 do
-    local function LootTable(entry, loot_type, loot_count, top_field)
+    local function LootTable(entry, loot_type, top_field)
         if top_field then
             entry[top_field] = entry[top_field] or {}
-            entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
             entry[top_field][loot_type] = entry[top_field][loot_type] or {}
             return entry[top_field][loot_type]
         end
-        entry[loot_count] = (entry[loot_count] or 0) + 1
         entry[loot_type] = entry[loot_type] or {}
         return entry[loot_type]
     end
@@ -398,12 +396,22 @@ do
     function GenericLootUpdate(data_type, top_field)
         local loot_type = action_data.label or "drops"
         local loot_count = ("%s_count"):format(loot_type)
+        local source_list = {}
 
         for source_id, loot_data in pairs(action_data.loot_sources) do
             local entry = DBEntry(data_type, source_id)
 
             if entry then
-                local loot_table = LootTable(entry, loot_type, loot_count, top_field)
+                local loot_table = LootTable(entry, loot_type, top_field)
+
+                if not source_list[source_id] then
+                    if top_field then
+                        entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
+                    else
+                        entry[loot_count] = (entry[loot_count] or 0) + 1
+                    end
+                    source_list[source_id] = true
+                end
                 UpdateDBEntryLocation(data_type, source_id)
 
                 for item_id, quantity in pairs(loot_data) do
@@ -417,7 +425,15 @@ do
         if not entry then
             return
         end
-        local loot_table = LootTable(entry, loot_type, loot_count, top_field)
+        local loot_table = LootTable(entry, loot_type, top_field)
+
+        if not source_list[action_data.identifier] then
+            if top_field then
+                entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
+            else
+                entry[loot_count] = (entry[loot_count] or 0) + 1
+            end
+        end
 
         for index = 1, #action_data.loot_list do
             table.insert(loot_table, action_data.loot_list[index])
@@ -825,15 +841,20 @@ do
         [AF.NPC] = function()
             local difficulty_token = InstanceDifficultyToken()
             local loot_type = action_data.label or "drops"
+            local source_list = {}
 
             for source_id, loot_data in pairs(action_data.loot_sources) do
                 local npc = NPCEntry(source_id)
 
                 if npc then
                     local encounter_data = npc.encounter_data[difficulty_token]
-                    encounter_data.loot_counts = encounter_data.loot_counts or {}
-                    encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
                     encounter_data[loot_type] = encounter_data[loot_type] or {}
+
+                    if not source_list[source_id] then
+                        encounter_data.loot_counts = encounter_data.loot_counts or {}
+                        encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
+                        source_list[source_id] = true
+                    end
 
                     for item_id, quantity in pairs(loot_data) do
                         table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
@@ -848,9 +869,12 @@ do
                 return
             end
             local encounter_data = npc.encounter_data[difficulty_token]
-            encounter_data.loot_counts = encounter_data.loot_counts or {}
-            encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
             encounter_data[loot_type] = encounter_data[loot_type] or {}
+
+            if not source_list[action_data.identifier] then
+                encounter_data.loot_counts = encounter_data.loot_counts or {}
+                encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
+            end
 
             for index = 1, #action_data.loot_list do
                 table.insert(encounter_data[loot_type], action_data.loot_list[index])
@@ -903,37 +927,38 @@ do
         for loot_slot = 1, _G.GetNumLootItems() do
             local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
-            local sources = {
-                _G.GetLootSourceInfo(loot_slot)
-            }
 
-            -- TODO: Remove debugging
-            --            print(("Loot slot %d: Source count: %d"):format(loot_slot, floor((#sources / 2) + 0.5)))
+            -- TODO: Move LOOT_SLOT_X checks within loop when money is detectable via GetLootSourceInfo
+            if slot_type == _G.LOOT_SLOT_ITEM then
+                local sources = {
+                    _G.GetLootSourceInfo(loot_slot)
+                }
 
-            -- Odd index is GUID, even is count.
-            for source_index = 1, #sources, 2 do
-                local source_type, source_id = ParseGUID(sources[source_index])
-                local source_count = sources[source_index + 1]
-                local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
                 -- TODO: Remove debugging
-                --                print(("GUID: %s - Type:ID: %s - Amount: %d"):format(sources[source_index], source_key, source_count))
+                --            print(("Loot slot %d: Source count: %d"):format(loot_slot, floor((#sources / 2) + 0.5)))
 
-                -- Items return the player as the source, so we need to replace the nil ID with the item's ID (disenchant, milling, etc)
-                if not source_id then
-                    source_id = action_data.identifier
-                elseif action_data.type == AF.OBJECT then
-                    source_id = ("%s:%s"):format(action_data.spell_label, source_id)
-                end
-                action_data.loot_sources[source_id] = action_data.loot_sources[source_id] or {}
+                -- Odd index is GUID, even is count.
+                for source_index = 1, #sources, 2 do
+                    local source_type, source_id = ParseGUID(sources[source_index])
+                    local source_count = sources[source_index + 1]
+                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                    -- TODO: Remove debugging
+                    --                print(("GUID: %s - Type:ID: %s - Amount: %d"):format(sources[source_index], source_key, source_count))
 
-                if slot_type == _G.LOOT_SLOT_ITEM then
+                    -- Items return the player as the source, so we need to replace the nil ID with the item's ID (disenchant, milling, etc)
+                    if not source_id then
+                        source_id = action_data.identifier
+                    elseif action_data.type == AF.OBJECT then
+                        source_id = ("%s:%s"):format(action_data.spell_label, source_id)
+                    end
                     local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                    action_data.loot_sources[source_id] = action_data.loot_sources[source_id] or {}
                     action_data.loot_sources[source_id][item_id] = action_data.loot_sources[source_id][item_id] or 0 + source_count
-                elseif slot_type == _G.LOOT_SLOT_MONEY then
-                    table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
-                elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                    table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
                 end
+            elseif slot_type == _G.LOOT_SLOT_MONEY then
+                table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
+            elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
         end
         update_func()
