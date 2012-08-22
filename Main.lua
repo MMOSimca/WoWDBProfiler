@@ -986,7 +986,7 @@ do
             end
         end
 
-        for guid in guids_used do
+        for guid in pairs(guids_used) do
             loot_guid_registry[guid] = true
         end
         update_func()
