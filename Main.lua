@@ -434,11 +434,17 @@ do
             end
         end
         -- TODO: Remove this when GetLootSourceInfo() has values for money
-        if #action_data.loot_list <= 0 or action_data.type == AF.OBJECT then
-            -- Unfortunately, this means we can't record money from chests...
+        if #action_data.loot_list <= 0 then
             return
         end
-        local entry = DBEntry(data_type, action_data.identifier)
+        local entry
+
+        -- At this point we only have a name if it's an object.
+        if action_data.type == AF.OBJECT then
+            entry = DBEntry(data_type, ("%s:%s"):format(action_data.spell_label, action_data.target_name))
+        else
+            entry = DBEntry(data_type, action_data.identifier)
+        end
 
         if not entry then
             return
@@ -979,8 +985,8 @@ do
                         guids_used[source_guid] = true
                     end
                 end
-            elseif slot_type == _G.LOOT_SLOT_MONEY then
-                table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
+                --            elseif slot_type == _G.LOOT_SLOT_MONEY then
+                --                table.insert(action_data.loot_list, ("money:%d"):format(_toCopper(item_text)))
             elseif slot_type == _G.LOOT_SLOT_CURRENCY then
                 table.insert(action_data.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
@@ -1373,6 +1379,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             if target_name == "" then
                 return
             end
+            action_data.target_name = target_name
             action_data.type = AF.OBJECT
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
