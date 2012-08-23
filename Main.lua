@@ -1399,6 +1399,10 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         return
     end
     private.tracked_line = nil
+
+    if spell_name:match("^Harvest") then
+        reputation_npc_id = action_data.identifier
+    end
 end
 
 function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
