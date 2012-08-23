@@ -1248,7 +1248,9 @@ function WDP:QUEST_LOG_UPDATE()
     while processed_quests <= num_quests do
         local _, _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
 
-        if not is_header then
+        if quest_id == 0 then
+            processed_quests = processed_quests + 1
+        elseif not is_header then
             _G.SelectQuestLogEntry(entry_index);
 
             local quest = DBEntry("quests", quest_id)
