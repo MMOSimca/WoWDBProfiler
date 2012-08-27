@@ -56,6 +56,7 @@ local EVENT_MAPPING = {
     COMBAT_TEXT_UPDATE = true,
     ITEM_TEXT_BEGIN = true,
     LOOT_OPENED = true,
+    MAIL_SHOW = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
@@ -1001,6 +1002,16 @@ do
 end -- do-block
 
 
+function WDP:MAIL_SHOW(event_name)
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
+
+    if not unit_idnum or unit_type ~= private.UNIT_TYPES.OBJECT then
+        return
+    end
+    UpdateDBEntryLocation("objects", unit_idnum)
+end
+
+
 do
     local POINT_MATCH_PATTERNS = {
         ("^%s$"):format(_G.ITEM_REQ_ARENA_RATING:gsub("%%d", "(%%d+)")), -- May no longer be necessary
@@ -1014,7 +1025,7 @@ do
     local ITEM_REQ_QUEST_MATCH1 = "Requires: .*"
     local ITEM_REQ_QUEST_MATCH2 = "Must have completed: .*"
 
-    function WDP:UpdateMerchantItems(event)
+    function WDP:UpdateMerchantItems(event_name)
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
         if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
@@ -1130,6 +1141,7 @@ do
     end
 end -- do-block
 
+
 function WDP:PET_BAR_UPDATE()
     if not action_data.label or not action_data.label == "mind_control" then
         return
@@ -1216,6 +1228,7 @@ do
         self:UpdateTargetLocation()
     end
 end -- do-block
+
 
 do
     local function UpdateQuestJuncture(point)
