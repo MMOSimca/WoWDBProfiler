@@ -63,6 +63,7 @@ local EVENT_MAPPING = {
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
     QUEST_LOG_UPDATE = true,
+    TAXIMAP_OPENED = true,
     TRAINER_SHOW = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
@@ -1289,6 +1290,17 @@ function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
         return
     end
     self:RegisterEvent("QUEST_LOG_UPDATE")
+end
+
+
+function WDP:TAXIMAP_OPENED(event_name)
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+    local npc = NPCEntry(unit_idnum)
+
+    if not npc then
+        return
+    end
+    npc.flight_master = true
 end
 
 
