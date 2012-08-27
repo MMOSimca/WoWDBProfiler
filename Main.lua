@@ -90,7 +90,7 @@ local action_data = {}
 local currently_drunk
 local faction_standings = {}
 local reputation_npc_id
-
+local current_target_id
 
 -----------------------------------------------------------------------
 -- Helper Functions.
@@ -373,7 +373,7 @@ do
         for faction_index = 1, MAX_FACTION_INDEX do
             local faction_name, _, current_standing, _, _, _, _, _, is_header = _G.GetFactionInfo(faction_index)
 
-            if faction_name and not is_header then
+            if faction_name then
                 faction_standings[faction_name] = STANDING_NAMES[current_standing]
             elseif not faction_name then
                 break
@@ -1157,6 +1157,7 @@ do
 
     function WDP:PLAYER_TARGET_CHANGED()
         if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
+            current_target_id = nil
             return
         end
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
@@ -1164,6 +1165,8 @@ do
         if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
             return
         end
+        current_target_id = unit_idnum
+
         local npc = NPCEntry(unit_idnum)
         local _, class_token = _G.UnitClass("target")
         npc.class = class_token
@@ -1192,7 +1195,6 @@ do
         action_data.type = AF.NPC
         action_data.identifier = unit_idnum
         action_data.npc_level = npc_level
-
         self:UpdateTargetLocation()
     end
 end -- do-block
@@ -1393,15 +1395,14 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     private.tracked_line = spell_line
 end
 
-
 function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
     if unit_id ~= "player" then
         return
     end
     private.tracked_line = nil
 
-    if spell_name:match("^Harvest") then
-        reputation_npc_id = action_data.identifier
+    if spell_name:match("^Harvest.+") then
+        reputation_npc_id = current_target_id
     end
 end
 
