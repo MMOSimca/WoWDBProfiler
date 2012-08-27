@@ -1010,6 +1010,8 @@ do
     }
 
     local ITEM_REQ_REPUTATION_MATCH = "Requires (.-) %- (.*)"
+    local ITEM_REQ_QUEST_MATCH1 = "Requires: .*"
+    local ITEM_REQ_QUEST_MATCH2 = "Must have completed: .*"
 
     function WDP:UpdateMerchantItems(event)
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
@@ -1049,6 +1051,21 @@ do
 
                     if faction or reputation then
                         DBEntry("items", item_id).req_reputation = ("%s:%s"):format(faction:gsub("-", ""), reputation:upper())
+                        break
+                    end
+                end
+
+                for line_index = 1, num_lines do
+                    local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
+
+                    if not current_line then
+                        break
+                    end
+                    local line_text = current_line:GetText()
+                    local quest_name = line_text:match(ITEM_REQ_QUEST_MATCH1) or line_text:match(ITEM_REQ_QUEST_MATCH2)
+
+                    if quest_name then
+                        DBEntry("items", item_id).req_quest = ("%s"):format(quest_name:gsub("(.+): ", ""), quest_name)
                         break
                     end
                 end
