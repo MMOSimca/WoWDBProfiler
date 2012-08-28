@@ -18,11 +18,6 @@ local select = _G.select
 -----------------------------------------------------------------------
 local ADDON_NAME, private = ...
 
--- TODO: Remove this once 5.0.4 hits Live.
-if private.wow_version == "4.3.4" then
-    return
-end
-
 local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
 
