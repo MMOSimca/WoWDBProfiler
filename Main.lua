@@ -49,11 +49,16 @@ local DATABASE_DEFAULTS = {
 
 
 local EVENT_MAPPING = {
+    AUCTION_HOUSE_SHOW = true,
+    BANKFRAME_OPENED = true,
+    BATTLEFIELDS_SHOW = true,
     BLACK_MARKET_ITEM_UPDATE = true,
     CHAT_MSG_LOOT = true,
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
+    FORGE_MASTER_OPENED = true,
+    GOSSIP_SHOW = true,
     ITEM_TEXT_BEGIN = true,
     LOOT_OPENED = true,
     MAIL_SHOW = true,
@@ -66,12 +71,14 @@ local EVENT_MAPPING = {
     QUEST_LOG_UPDATE = true,
     TAXIMAP_OPENED = true,
     TRAINER_SHOW = true,
+    TRANSMOGRIFY_OPEN = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
     UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
     UNIT_SPELLCAST_INTERRUPTED = "HandleSpellFailure",
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
+    VOID_STORAGE_OPEN = true,
 }
 
 
@@ -569,7 +576,7 @@ end
 -----------------------------------------------------------------------
 -- Event handlers.
 -----------------------------------------------------------------------
-function WDP:BLACK_MARKET_ITEM_UPDATE(event)
+function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
     local num_items = _G.C_BlackMarket.GetNumItems()
 
     for index = 1, num_items do
@@ -1306,17 +1313,6 @@ function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
 end
 
 
-function WDP:TAXIMAP_OPENED(event_name)
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
-    local npc = NPCEntry(unit_idnum)
-
-    if not npc then
-        return
-    end
-    npc.flight_master = true
-end
-
-
 function WDP:TRAINER_SHOW()
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
     local npc = NPCEntry(unit_idnum)
@@ -1448,6 +1444,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     end
 end
 
+
 function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
     if unit_id ~= "player" then
         return
@@ -1457,3 +1454,67 @@ function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spe
         private.tracked_line = nil
     end
 end
+
+
+do
+    local function SetUnitField(field, required_type)
+        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
+
+        if not unit_idnum or (required_type and unit_type ~= required_type) then
+            return
+        end
+
+        if unit_type == private.UNIT_TYPES.NPC then
+            NPCEntry(unit_idnum)[field] = true
+        elseif unit_type == private.UNIT_TYPES.OBJECT then
+            DBEntry("objects", unit_idnum)[field] = true
+        end
+    end
+
+
+    function WDP:AUCTION_HOUSE_SHOW(event_name)
+        SetUnitField("auctioneer", private.UNIT_TYPES.NPC)
+    end
+
+
+    function WDP:BANKFRAME_OPENED(event_name)
+        SetUnitField("banker", private.UNIT_TYPES.NPC)
+    end
+
+
+    function WDP:BATTLEFIELDS_SHOW(event_name)
+        SetUnitField("battlemaster", private.UNIT_TYPES.NPC)
+    end
+
+
+    function WDP:FORGE_MASTER_OPENED()
+        SetUnitField("arcane_reforger", private.UNIT_TYPES.NPC)
+    end
+
+
+    function WDP:GOSSIP_SHOW()
+        local gossip_options = { _G.GetGossipOptions() }
+
+        for index = 2, #gossip_options, 2 do
+            if gossip_options[index] == "binder" then
+                SetUnitField("innkeeper", private.UNIT_TYPES.NPC)
+                return
+            end
+        end
+    end
+
+
+    function WDP:TAXIMAP_OPENED(event_name)
+        SetUnitField("flight_master", private.UNIT_TYPES.NPC)
+    end
+
+
+    function WDP:TRANSMOGRIFY_OPEN(event_name)
+        SetUnitField("transmogrifier", private.UNIT_TYPES.NPC)
+    end
+
+
+    function WDP:VOID_STORAGE_OPEN(event_name)
+        SetUnitField("void_storage", private.UNIT_TYPES.NPC)
+    end
+end -- do-block
