@@ -1363,7 +1363,7 @@ do
         for tradeskill_index = 1, _G.GetNumTradeSkills() do
             local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
 
-            if tradeskill_type == "header" then
+            if tradeskill_type == "header" or tradeskill_type == "subheader" then
                 if not is_expanded then
                     header_list[name] = true
                     _G.ExpandTradeSkillSubClass(tradeskill_index)
@@ -1520,6 +1520,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
     private.tracked_line = spell_line
 end
+
 
 function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
     if unit_id ~= "player" then
