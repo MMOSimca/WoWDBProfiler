@@ -50,6 +50,9 @@ local EVENT_MAPPING = {
     BATTLEFIELDS_SHOW = true,
     BLACK_MARKET_ITEM_UPDATE = true,
     CHAT_MSG_LOOT = true,
+    CHAT_MSG_MONSTER_SAY = "RecordQuote",
+    CHAT_MSG_MONSTER_WHISPER = "RecordQuote",
+    CHAT_MSG_MONSTER_YELL = "RecordQuote",
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
@@ -89,7 +92,9 @@ local AF = private.ACTION_TYPE_FLAGS
 
 local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
 local PLAYER_GUID = _G.UnitGUID("player")
+local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
+
 
 -----------------------------------------------------------------------
 -- Local variables.
@@ -101,6 +106,8 @@ local db
 local durability_timer_handle
 local faction_standings = {}
 local forge_spell_ids = {}
+local languages_known = {}
+local name_to_id_map = {}
 local reputation_npc_id
 local target_location_timer_handle
 local current_target_id
@@ -504,6 +511,10 @@ function WDP:OnEnable()
     for event_name, mapping in pairs(EVENT_MAPPING) do
         self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
     end
+
+    for index = 1, _G.GetNumLanguages() do
+        languages_known[_G.GetLanguageByIndex(index)] = true
+    end
     durability_timer_handle = self:ScheduleRepeatingTimer("ProcessDurability", 30)
     target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.5)
 
@@ -618,6 +629,26 @@ function WDP:CHAT_MSG_LOOT(event_name, message)
     GenericLootUpdate("zones")
     table.wipe(action_data)
 end
+
+
+do
+    local function ReplaceName(text)
+        if text == PLAYER_NAME then
+            return "<name>"
+        end
+    end
+
+
+    function WDP:RecordQuote(event_name, message, source_name, language_name)
+        if not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
+            return
+        end
+        local npc = NPCEntry(name_to_id_map[source_name])
+        npc.quotes = npc.quotes or {}
+        npc.quotes[event_name] = npc.quotes[event_name] or {}
+        npc.quotes[event_name][message:gsub("(%w+)", ReplaceName)] = true
+    end
+end -- do-block
 
 
 do
@@ -1233,6 +1264,8 @@ do
                 encounter_data[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
             end
         end
+        name_to_id_map[_G.UnitName("target")] = unit_idnum
+
         table.wipe(action_data)
         action_data.type = AF.NPC
         action_data.identifier = unit_idnum
