@@ -32,6 +32,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 local DB_VERSION = 4
 
+
 local DATABASE_DEFAULTS = {
     global = {
         items = {},
@@ -65,6 +66,7 @@ local EVENT_MAPPING = {
     QUEST_DETAIL = true,
     QUEST_LOG_UPDATE = true,
     TAXIMAP_OPENED = true,
+    TRADE_SKILL_SHOW = true,
     TRAINER_SHOW = true,
     TRANSMOGRIFY_OPEN = true,
     UNIT_QUEST_LOG_CHANGED = true,
@@ -77,6 +79,10 @@ local EVENT_MAPPING = {
 }
 
 
+local OBJECT_ID_ANVIL = 192628
+local OBJECT_ID_FORGE = 1685
+
+
 local AF = private.ACTION_TYPE_FLAGS
 
 
@@ -87,14 +93,17 @@ local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 -----------------------------------------------------------------------
 -- Local variables.
 -----------------------------------------------------------------------
-local db
-local durability_timer_handle
-local target_location_timer_handle
+local anvil_spell_ids = {}
 local action_data = {}
 local currently_drunk
+local db
+local durability_timer_handle
 local faction_standings = {}
+local forge_spell_ids = {}
 local reputation_npc_id
+local target_location_timer_handle
 local current_target_id
+
 
 -----------------------------------------------------------------------
 -- Helper Functions.
@@ -625,7 +634,7 @@ do
         _G.DRUNK_MESSAGE_SELF4:gsub("%%s", ".+"),
     }
 
-    function WDP:CHAT_MSG_SYSTEM(event, message)
+    function WDP:CHAT_MSG_SYSTEM(event_name, message)
         if currently_drunk then
             if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
                 currently_drunk = nil
@@ -681,7 +690,7 @@ do
     }
 
 
-    function WDP:COMBAT_LOG_EVENT_UNFILTERED(event, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, ...)
+    function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, ...)
         local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
 
         if not combat_log_func then
@@ -756,7 +765,7 @@ do
     }
 
 
-    function WDP:COMBAT_TEXT_UPDATE(event, message_type, faction_name, amount)
+    function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
         if message_type ~= "FACTION" or not reputation_npc_id then
             return
         end
@@ -798,7 +807,7 @@ do
 end -- do-block
 
 
-function WDP:ITEM_TEXT_BEGIN()
+function WDP:ITEM_TEXT_BEGIN(event_name)
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
 
     if not unit_idnum or unit_type ~= private.UNIT_TYPES.OBJECT or _G.UnitName("npc") ~= _G.ItemTextGetItem() then
@@ -936,7 +945,7 @@ do
     -- Prevent opening the same loot window multiple times from recording data multiple times.
     local loot_guid_registry = {}
 
-    function WDP:LOOT_OPENED()
+    function WDP:LOOT_OPENED(event_name)
         if action_data.looting then
             return
         end
@@ -1144,7 +1153,7 @@ do
 end -- do-block
 
 
-function WDP:PET_BAR_UPDATE()
+function WDP:PET_BAR_UPDATE(event_name)
     if not action_data.label or not action_data.label == "mind_control" then
         return
     end
@@ -1187,7 +1196,7 @@ do
     }
 
 
-    function WDP:PLAYER_TARGET_CHANGED()
+    function WDP:PLAYER_TARGET_CHANGED(event_name)
         if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
             current_target_id = nil
             return
@@ -1252,14 +1261,14 @@ do
     end
 
 
-    function WDP:QUEST_COMPLETE()
+    function WDP:QUEST_COMPLETE(event_name)
         -- Make sure the quest NPC isn't erroneously recorded as giving reputation for quests which award it.
         reputation_npc_id = nil
         UpdateQuestJuncture("end")
     end
 
 
-    function WDP:QUEST_DETAIL()
+    function WDP:QUEST_DETAIL(event_name)
         local quest = UpdateQuestJuncture("begin")
 
         if not quest then
@@ -1275,7 +1284,7 @@ do
 end -- do-block
 
 
-function WDP:QUEST_LOG_UPDATE()
+function WDP:QUEST_LOG_UPDATE(event_name)
     local selected_quest = _G.GetQuestLogSelection() -- Save current selection to be restored when we're done.
     local entry_index, processed_quests = 1, 0
     local _, num_quests = _G.GetNumQuestLogEntries()
@@ -1300,7 +1309,7 @@ function WDP:QUEST_LOG_UPDATE()
 end
 
 
-function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
+function WDP:UNIT_QUEST_LOG_CHANGED(event_name, unit_id)
     if unit_id ~= "player" then
         return
     end
@@ -1308,7 +1317,91 @@ function WDP:UNIT_QUEST_LOG_CHANGED(event, unit_id)
 end
 
 
-function WDP:TRAINER_SHOW()
+do
+    local TRADESKILL_TOOLS = {
+        Anvil = anvil_spell_ids,
+        Forge = forge_spell_ids,
+    }
+
+
+    function WDP:TRADE_SKILL_SHOW(event_name)
+        local profession_name, prof_level = _G.GetTradeSkillLine()
+
+        if profession_name == _G.UNKNOWN then
+            return
+        end
+
+        if _G.TradeSkillFrame and _G.TradeSkillFrame:IsVisible() then
+            -- Clear the search box focus so the scan will have correct results.
+            local search_box = _G.TradeSkillFrameSearchBox
+            search_box:SetText("")
+            _G.TradeSkillSearch_OnTextChanged(search_box)
+            search_box:ClearFocus()
+            search_box:GetScript("OnEditFocusLost")(search_box)
+        end
+        local header_list = {}
+
+        -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
+        local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
+        local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
+
+        if have_materials then
+            _G.TradeSkillFrame.filterTbl.hasMaterials = false
+            _G.TradeSkillOnlyShowMakeable(false)
+        end
+
+        if have_skillup then
+            _G.TradeSkillFrame.filterTbl.hasSkillUp = false
+            _G.TradeSkillOnlyShowSkillUps(false)
+        end
+        _G.SetTradeSkillInvSlotFilter(0, 1, 1)
+        _G.TradeSkillUpdateFilterBar()
+        _G.TradeSkillFrame_Update()
+
+        -- Expand all headers so we can see all the recipes there are
+        for tradeskill_index = 1, _G.GetNumTradeSkills() do
+            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+
+            if tradeskill_type == "header" then
+                if not is_expanded then
+                    header_list[name] = true
+                    _G.ExpandTradeSkillSubClass(tradeskill_index)
+                end
+            else
+                local spell_id = tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
+                local required_tool = _G.GetTradeSkillTools(tradeskill_index)
+
+                if required_tool then
+                    for tool_name, registry in pairs(TRADESKILL_TOOLS) do
+                        if required_tool:find(tool_name) then
+                            print(("Set %s spell: %d"):format(tool_name, spell_id))
+                            registry[spell_id] = true
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Restore the state of the things we changed.
+        for tradeskill_index = 1, _G.GetNumTradeSkills() do
+            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+
+            if header_list[name] then
+                _G.CollapseTradeSkillSubClass(tradeskill_index)
+            end
+        end
+        _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
+        _G.TradeSkillOnlyShowMakeable(have_materials)
+        _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
+        _G.TradeSkillOnlyShowSkillUps(have_skillup)
+
+        _G.TradeSkillUpdateFilterBar()
+        _G.TradeSkillFrame_Update()
+    end
+end -- do-block
+
+
+function WDP:TRAINER_SHOW(event_name)
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
     local npc = NPCEntry(unit_idnum)
 
@@ -1437,6 +1530,12 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     if spell_name:match("^Harvest.+") then
         reputation_npc_id = current_target_id
     end
+
+    if anvil_spell_ids[spell_id] then
+        UpdateDBEntryLocation("objects", OBJECT_ID_ANVIL)
+    elseif forge_spell_ids[spell_id] then
+        UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
+    end
 end
 
 
@@ -1482,12 +1581,12 @@ do
     end
 
 
-    function WDP:FORGE_MASTER_OPENED()
+    function WDP:FORGE_MASTER_OPENED(event_name)
         SetUnitField("arcane_reforger", private.UNIT_TYPES.NPC)
     end
 
 
-    function WDP:GOSSIP_SHOW()
+    function WDP:GOSSIP_SHOW(event_name)
         local gossip_options = { _G.GetGossipOptions() }
 
         for index = 2, #gossip_options, 2 do
