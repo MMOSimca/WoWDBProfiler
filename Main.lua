@@ -55,6 +55,7 @@ local EVENT_MAPPING = {
     COMBAT_TEXT_UPDATE = true,
     FORGE_MASTER_OPENED = true,
     GOSSIP_SHOW = true,
+    GUILDBANKFRAME_OPENED = true,
     ITEM_TEXT_BEGIN = true,
     LOOT_OPENED = true,
     MAIL_SHOW = true,
@@ -1374,7 +1375,6 @@ do
                 if required_tool then
                     for tool_name, registry in pairs(TRADESKILL_TOOLS) do
                         if required_tool:find(tool_name) then
-                            print(("Set %s spell: %d"):format(tool_name, spell_id))
                             registry[spell_id] = true
                         end
                     end
@@ -1562,6 +1562,7 @@ do
             NPCEntry(unit_idnum)[field] = true
         elseif unit_type == private.UNIT_TYPES.OBJECT then
             DBEntry("objects", unit_idnum)[field] = true
+            UpdateDBEntryLocation("objects", unit_idnum)
         end
     end
 
@@ -1595,6 +1596,11 @@ do
                 return
             end
         end
+    end
+
+
+    function WDP:GUILDBANKFRAME_OPENED(event_name)
+        SetUnitField("guild_bank", private.UNIT_TYPES.OBJECT)
     end
 
 
