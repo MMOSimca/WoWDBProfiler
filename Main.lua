@@ -69,6 +69,7 @@ local EVENT_MAPPING = {
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
     QUEST_LOG_UPDATE = true,
+    QUEST_PROGRESS = true,
     TAXIMAP_OPENED = true,
     TRADE_SKILL_SHOW = true,
     TRAINER_SHOW = true,
@@ -486,6 +487,32 @@ do
     end
 end -- do-block
 
+
+local ReplaceKeywords
+do
+    local KEYWORD_SUBSTITUTIONS = {
+        class = PLAYER_CLASS,
+        name = PLAYER_NAME,
+        race = PLAYER_RACE,
+    }
+
+
+    function ReplaceKeywords(text)
+        if not text or text == "" then
+            return ""
+        end
+
+        for category, lookup in pairs(KEYWORD_SUBSTITUTIONS) do
+            local category_format = ("<%s>"):format(category)
+            text = text:gsub(lookup, category_format):gsub(lookup:lower(), category_format)
+        end
+        return text
+    end
+
+
+end -- do-block
+
+
 -----------------------------------------------------------------------
 -- Methods.
 -----------------------------------------------------------------------
@@ -631,37 +658,15 @@ function WDP:CHAT_MSG_LOOT(event_name, message)
 end
 
 
-do
-    local KEYWORD_SUBSTITUTIONS = {
-        class = PLAYER_CLASS,
-        name = PLAYER_NAME,
-        race = PLAYER_RACE,
-    }
-
-
-    local function ReplaceKeywords(text)
-        if not text or text == "" then
-            return ""
-        end
-
-        for category, lookup in pairs(KEYWORD_SUBSTITUTIONS) do
-            local category_format = ("<%s>"):format(category)
-            text = text:gsub(lookup, category_format):gsub(lookup:lower(), category_format)
-        end
-        return text
+function WDP:RecordQuote(event_name, message, source_name, language_name)
+    if not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
+        return
     end
-
-
-    function WDP:RecordQuote(event_name, message, source_name, language_name)
-        if not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
-            return
-        end
-        local npc = NPCEntry(name_to_id_map[source_name])
-        npc.quotes = npc.quotes or {}
-        npc.quotes[event_name] = npc.quotes[event_name] or {}
-        npc.quotes[event_name][ReplaceKeywords(message)] = true
-    end
-end -- do-block
+    local npc = NPCEntry(name_to_id_map[source_name])
+    npc.quotes = npc.quotes or {}
+    npc.quotes[event_name] = npc.quotes[event_name] or {}
+    npc.quotes[event_name][ReplaceKeywords(message)] = true
+end
 
 
 do
@@ -1309,9 +1314,11 @@ do
 
 
     function WDP:QUEST_COMPLETE(event_name)
+        local quest = UpdateQuestJuncture("end")
+        quest.reward_text = ReplaceKeywords(_G.GetRewardText())
+
         -- Make sure the quest NPC isn't erroneously recorded as giving reputation for quests which award it.
         reputation_npc_id = nil
-        UpdateQuestJuncture("end")
     end
 
 
@@ -1353,6 +1360,11 @@ function WDP:QUEST_LOG_UPDATE(event_name)
     end
     _G.SelectQuestLogEntry(selected_quest)
     self:UnregisterEvent("QUEST_LOG_UPDATE")
+end
+
+
+function WDP:QUEST_PROGRESS(event_name)
+    DBEntry("quests", _G.GetQuestID()).progress_text = ReplaceKeywords(_G.GetProgressText())
 end
 
 
