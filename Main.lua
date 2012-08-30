@@ -632,10 +632,23 @@ end
 
 
 do
-    local function ReplaceName(text)
-        if text == PLAYER_NAME then
-            return "<name>"
+    local KEYWORD_SUBSTITUTIONS = {
+        class = PLAYER_CLASS,
+        name = PLAYER_NAME,
+        race = PLAYER_RACE,
+    }
+
+
+    local function ReplaceKeywords(text)
+        if not text or text == "" then
+            return ""
         end
+
+        for category, lookup in pairs(KEYWORD_SUBSTITUTIONS) do
+            local category_format = ("<%s>"):format(category)
+            text = text:gsub(lookup, category_format):gsub(lookup:lower(), category_format)
+        end
+        return text
     end
 
 
@@ -646,7 +659,7 @@ do
         local npc = NPCEntry(name_to_id_map[source_name])
         npc.quotes = npc.quotes or {}
         npc.quotes[event_name] = npc.quotes[event_name] or {}
-        npc.quotes[event_name][message:gsub("(%w+)", ReplaceName)] = true
+        npc.quotes[event_name][ReplaceKeywords(message)] = true
     end
 end -- do-block
 
