@@ -92,6 +92,7 @@ local AF = private.ACTION_TYPE_FLAGS
 
 
 local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
+local PLAYER_FACTION = _G.UnitFactionGroup("player")
 local PLAYER_GUID = _G.UnitGUID("player")
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
@@ -1334,9 +1335,8 @@ do
         quest.classes = quest.classes or {}
         quest.classes[PLAYER_CLASS] = true
 
-        local _, race = _G.UnitRace("player")
         quest.races = quest.races or {}
-        quest.races[race] = true
+        quest.races[(PLAYER_RACE == "Pandaren") and ("%s_%s"):format(PLAYER_RACE, PLAYER_FACTION or "Neutral") or PLAYER_RACE] = true
     end
 end -- do-block
 
