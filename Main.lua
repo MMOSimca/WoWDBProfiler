@@ -508,8 +508,6 @@ do
         end
         return text
     end
-
-
 end -- do-block
 
 
@@ -733,6 +731,7 @@ do
 
             if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
                 reputation_npc_id = nil
+                private.harvesting = nil
                 return
             end
             reputation_npc_id = unit_idnum
@@ -825,10 +824,15 @@ do
             return
         end
         local npc = NPCEntry(reputation_npc_id)
+        reputation_npc_id = nil
 
         if not npc then
+            private.harvesting = nil
             return
         end
+        npc.harvested = private.harvesting
+        private.harvesting = nil
+
         local modifier = 1
 
         if _G.IsSpellKnown(DIPLOMACY_SPELL_ID) then
@@ -852,7 +856,6 @@ do
         end
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
-        reputation_npc_id = nil
     end
 end -- do-block
 
@@ -1588,6 +1591,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
 
     if spell_name:match("^Harvest.+") then
         reputation_npc_id = current_target_id
+        private.harvesting = true
     end
 
     if anvil_spell_ids[spell_id] then
