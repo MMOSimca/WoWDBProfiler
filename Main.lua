@@ -198,6 +198,8 @@ end
 
 
 local function CurrentLocationData()
+    _G.SetMapToCurrentZone()
+
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
 
