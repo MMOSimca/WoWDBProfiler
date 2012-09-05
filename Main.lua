@@ -1002,12 +1002,8 @@ do
     local loot_guid_registry = {}
 
     function WDP:LOOT_OPENED(event_name)
-        if action_data.looting then
+        if action_data.looting or not action_data.type then
             return
-        end
-
-        if not action_data.type then
-            action_data.type = AF.NPC
         end
         local verify_func = LOOT_VERIFY_FUNCS[action_data.type]
         local update_func = LOOT_UPDATE_FUNCS[action_data.type]
@@ -1065,6 +1061,7 @@ do
             loot_guid_registry[guid] = true
         end
         update_func()
+        table.wipe(action_data)
     end
 end -- do-block
 
