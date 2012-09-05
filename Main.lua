@@ -355,7 +355,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             table.wipe(action_data)
             action_data.type = AF.ITEM
             action_data.identifier = item_id
-            action_data.label = "contains"
+            action_data.loot_label = "contains"
             break
         end
     end
@@ -421,7 +421,7 @@ do
     end
 
     function GenericLootUpdate(data_type, top_field)
-        local loot_type = action_data.label or "drops"
+        local loot_type = action_data.loot_label or "drops"
         local loot_count = ("%s_count"):format(loot_type)
         local source_list = {}
 
@@ -933,7 +933,7 @@ do
         end,
         [AF.NPC] = function()
             local difficulty_token = InstanceDifficultyToken()
-            local loot_type = action_data.label or "drops"
+            local loot_type = action_data.loot_label or "drops"
             local source_list = {}
 
             for source_guid, loot_data in pairs(action_data.loot_sources) do
@@ -989,7 +989,7 @@ do
                     drops = {}
                 }
             end
-            local loot_count = ("%s_count"):format(action_data.label or "drops")
+            local loot_count = ("%s_count"):format(action_data.loot_label or "drops")
             action_data.zone_data[location_token][loot_count] = (action_data.zone_data[location_token][loot_count] or 0) + 1
 
             for index = 1, #action_data.loot_list do
@@ -1210,7 +1210,7 @@ end -- do-block
 
 
 function WDP:PET_BAR_UPDATE(event_name)
-    if not action_data.label or not action_data.label == "mind_control" then
+    if action_data.spell_label ~= "MIND_CONTROL" then
         return
     end
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("pet"))
@@ -1546,7 +1546,10 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     action_data.y = y
     action_data.zone = ("%s:%d"):format(zone_name, area_id)
     action_data.spell_label = spell_label
-    action_data.label = spell_label:lower()
+
+    if not private.NON_LOOT_SPELL_LABELS[spell_label] then
+        action_data.loot_label = spell_label:lower()
+    end
 
     if tt_unit_name and not tt_item_name then
         if bit.band(spell_flags, AF.NPC) == AF.NPC then

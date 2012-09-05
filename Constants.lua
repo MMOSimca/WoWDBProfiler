@@ -63,6 +63,10 @@ private.SPELL_LABELS_BY_NAME = {
     [_G.GetSpellInfo(8613)] = "SKINNING",
 }
 
+private.NON_LOOT_SPELL_LABELS = {
+    MIND_CONTROL = true,
+}
+
 local AF = private.ACTION_TYPE_FLAGS
 
 private.SPELL_FLAGS_BY_LABEL = {
