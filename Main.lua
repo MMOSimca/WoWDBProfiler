@@ -268,8 +268,13 @@ do
     local COORD_MAX = 5
 
     function UpdateNPCLocation(unit_idnum)
+        local npc = NPCEntry(unit_idnum)
+
+        if not npc then
+            return
+        end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-        local npc_data = NPCEntry(unit_idnum).encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
+        local npc_data = npc.encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
         local zone_token = ("%s:%d"):format(zone_name, area_id)
         npc_data.locations = npc_data.locations or {}
 
