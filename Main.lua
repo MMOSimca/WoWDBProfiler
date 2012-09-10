@@ -272,41 +272,6 @@ do
 end -- do-block
 
 
-local UpdateNPCLocation
-do
-    local COORD_MAX = 5
-
-    function UpdateNPCLocation(unit_idnum)
-        local npc = NPCEntry(unit_idnum)
-
-        if not npc then
-            return
-        end
-        local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-        local npc_data = npc.encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
-        local zone_token = ("%s:%d"):format(zone_name, area_id)
-        npc_data.locations = npc_data.locations or {}
-
-        local zone_data = npc_data.locations[zone_token]
-
-        if not zone_data then
-            zone_data = {}
-            npc_data.locations[zone_token] = zone_data
-        end
-
-        for location_token in pairs(zone_data) do
-            local loc_level, loc_x, loc_y = (":"):split(location_token)
-            loc_level = tonumber(loc_level)
-
-            if map_level == loc_level and math.abs(x - loc_x) <= COORD_MAX and math.abs(y - loc_y) <= COORD_MAX then
-                return
-            end
-        end
-        zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
-    end
-end -- do-block
-
-
 local function UpdateDBEntryLocation(entry_type, identifier)
     if not identifier then
         return
@@ -611,25 +576,52 @@ function WDP:ProcessDurability()
     end
 end
 
+do
+    local COORD_MAX = 5
 
-function WDP:UpdateTargetLocation()
-    if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
-        return
-    end
-
-    for index = 1, 4 do
-        if not _G.CheckInteractDistance("target", index) then
+    function WDP:UpdateTargetLocation()
+        if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
             return
         end
-    end
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-    if not unit_idnum or unit_type ~= private.UNIT_TYPES.NPC then
-        return
-    end
-    UpdateNPCLocation(unit_idnum)
-end
+        for index = 1, 4 do
+            if not _G.CheckInteractDistance("target", index) then
+                return
+            end
+        end
+        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
+        if not unit_idnum or unit_type ~= private.UNIT_TYPES.NPC then
+            return
+        end
+        local npc = NPCEntry(unit_idnum)
+
+        if not npc then
+            return
+        end
+        local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+        local npc_data = npc.encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
+        local zone_token = ("%s:%d"):format(zone_name, area_id)
+        npc_data.locations = npc_data.locations or {}
+
+        local zone_data = npc_data.locations[zone_token]
+
+        if not zone_data then
+            zone_data = {}
+            npc_data.locations[zone_token] = zone_data
+        end
+
+        for location_token in pairs(zone_data) do
+            local loc_level, loc_x, loc_y = (":"):split(location_token)
+            loc_level = tonumber(loc_level)
+
+            if map_level == loc_level and math.abs(x - loc_x) <= COORD_MAX and math.abs(y - loc_y) <= COORD_MAX then
+                return
+            end
+        end
+        zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
+    end
+end -- do-block
 
 -----------------------------------------------------------------------
 -- Event handlers.
@@ -1283,6 +1275,7 @@ do
         npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
+        npc.wild_pet = (_G.UnitCreatureType("target") == "Wild Pet") and true or nil
 
         local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
