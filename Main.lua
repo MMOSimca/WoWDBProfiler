@@ -98,6 +98,15 @@ local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
 
+local CLIENT_LOCALE = _G.GetLocale()
+
+
+local ALLOWED_LOCALES = {
+    enUS = true,
+    enGB = true,
+}
+
+
 -----------------------------------------------------------------------
 -- Local variables.
 -----------------------------------------------------------------------
@@ -665,7 +674,7 @@ end
 
 
 function WDP:RecordQuote(event_name, message, source_name, language_name)
-    if not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
+    if not ALLOWED_LOCALES[CLIENT_LOCALE] or not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
         return
     end
     local npc = NPCEntry(name_to_id_map[source_name])
@@ -1323,8 +1332,10 @@ do
 
     function WDP:QUEST_COMPLETE(event_name)
         local quest = UpdateQuestJuncture("end")
-        quest.reward_text = ReplaceKeywords(_G.GetRewardText())
 
+        if ALLOWED_LOCALES[CLIENT_LOCALE] then
+            quest.reward_text = ReplaceKeywords(_G.GetRewardText())
+        end
         -- Make sure the quest NPC isn't erroneously recorded as giving reputation for quests which award it.
         reputation_npc_id = nil
     end
@@ -1371,6 +1382,9 @@ end
 
 
 function WDP:QUEST_PROGRESS(event_name)
+    if not ALLOWED_LOCALES[CLIENT_LOCALE] then
+        return
+    end
     DBEntry("quests", _G.GetQuestID()).progress_text = ReplaceKeywords(_G.GetProgressText())
 end
 
