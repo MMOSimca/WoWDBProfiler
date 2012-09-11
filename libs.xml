@@ -9,5 +9,6 @@
     <Include file="Libs\AceDB-3.0\AceDB-3.0.xml"/>
     <Include file="Libs\AceTimer-3.0\AceTimer-3.0.xml"/>
     <Include file="Libs\LibDeformat-3.0\lib.xml"/>
+    <Script file="Libs\LibPetJournal-2.0\LibPetJournal-2.0.lua"/>
     <!--@end-no-lib-strip@-->
 </Ui>
