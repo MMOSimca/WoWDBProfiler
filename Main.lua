@@ -22,6 +22,7 @@ local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
+local LPJ = LibStub("LibPetJournal-2.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -65,6 +66,7 @@ local EVENT_MAPPING = {
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
+    PET_JOURNAL_LIST_UPDATE = true,
     PLAYER_TARGET_CHANGED = true,
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
@@ -731,10 +733,21 @@ do
         end
     end
 
+    local HEAL_BATTLE_PETS_SPELL_ID = 125801
+
     local COMBAT_LOG_FUNCS = {
         SPELL_AURA_APPLIED = RecordNPCSpell,
         SPELL_CAST_START = RecordNPCSpell,
-        SPELL_CAST_SUCCESS = RecordNPCSpell,
+        SPELL_CAST_SUCCESS = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+            if spell_id == HEAL_BATTLE_PETS_SPELL_ID then
+                local unit_type, unit_idnum = ParseGUID(source_guid)
+
+                if unit_type == private.UNIT_TYPES.NPC and unit_idnum then
+                    NPCEntry(unit_idnum).stable_master = true
+                end
+            end
+            RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+        end,
         UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
@@ -1226,6 +1239,32 @@ function WDP:PET_BAR_UPDATE(event_name)
 end
 
 
+function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
+    local num_pets = LPJ:NumPets()
+
+    LPJ:ClearFilters()
+    for index, pet_id in LPJ:IteratePetIDs() do
+        local _, _, is_owned, _, level, _, _, name, icon, pet_type, npc_id, _, _, is_wild = _G.C_PetJournal.GetPetInfoByIndex(index)
+
+        if is_owned then
+            local health, max_health, attack, speed, rarity = _G.C_PetJournal.GetPetStats(pet_id)
+            local rarity_name = _G["ITEM_QUALITY" .. rarity - 1 .. "_DESC"]
+            local npc = NPCEntry(npc_id)
+            npc.wild_pet = is_wild or nil
+            npc.battle_pet_data = npc.battle_pet_data or {}
+            npc.battle_pet_data[rarity_name] = npc.battle_pet_data[rarity_name] or {}
+            npc.battle_pet_data[rarity_name]["level_" .. level] = npc.battle_pet_data[rarity_name]["level_" .. level] or {}
+
+            local data = npc.battle_pet_data[rarity_name]["level_" .. level]
+            data.max_health = max_health
+            data.attack = attack
+            data.speed = speed
+        end
+    end
+    LPJ:RestoreFilters()
+end
+
+
 do
     local GENDER_NAMES = {
         "UNKNOWN",
@@ -1275,7 +1314,6 @@ do
         npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
-        npc.wild_pet = (_G.UnitCreatureType("target") == "Wild Pet") and true or nil
 
         local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
