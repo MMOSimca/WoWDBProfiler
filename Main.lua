@@ -1242,7 +1242,6 @@ end
 function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
     local num_pets = LPJ:NumPets()
 
-    LPJ:ClearFilters()
     for index, pet_id in LPJ:IteratePetIDs() do
         local _, _, is_owned, _, level, _, _, name, icon, pet_type, npc_id, _, _, is_wild = _G.C_PetJournal.GetPetInfoByIndex(index)
 
@@ -1261,7 +1260,6 @@ function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
             data.speed = speed
         end
     end
-    LPJ:RestoreFilters()
 end
 
 
