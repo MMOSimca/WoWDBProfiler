@@ -406,7 +406,7 @@ do
         local loot_count = ("%s_count"):format(loot_type)
         local source_list = {}
 
-        for source_guid, loot_data in pairs(action_data.loot_sources) do
+        for source_guid, loot_data in pairs(action_data.loot_sources) do -- TODO: Find out why this breaks with gas extractions.
             local entry, source_id
 
             if action_data.type == AF.ITEM then
@@ -578,6 +578,84 @@ function WDP:ProcessDurability()
     end
 end
 
+
+local PlayerTarget
+do
+    local GENDER_NAMES = {
+        "UNKNOWN",
+        "MALE",
+        "FEMALE",
+    }
+
+
+    local REACTION_NAMES = {
+        "HATED",
+        "HOSTILE",
+        "UNFRIENDLY",
+        "NEUTRAL",
+        "FRIENDLY",
+        "HONORED",
+        "REVERED",
+        "EXALTED",
+    }
+
+
+    local POWER_TYPE_NAMES = {
+        ["0"] = "MANA",
+        ["1"] = "RAGE",
+        ["2"] = "FOCUS",
+        ["3"] = "ENERGY",
+        ["6"] = "RUNIC_POWER",
+    }
+
+
+    function PlayerTarget()
+        if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
+            current_target_id = nil
+            return
+        end
+        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+
+        if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+            return
+        end
+        current_target_id = unit_idnum
+
+        local npc = NPCEntry(unit_idnum)
+        local _, class_token = _G.UnitClass("target")
+        npc.class = class_token
+        npc.faction = UnitFactionStanding("target")
+        npc.genders = npc.genders or {}
+        npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
+        npc.is_pvp = _G.UnitIsPVP("target") and true or nil
+        npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
+
+        local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
+        local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
+
+        if not encounter_data[npc_level] then
+            encounter_data[npc_level] = {
+                max_health = _G.UnitHealthMax("target"),
+            }
+
+            local max_power = _G.UnitManaMax("target")
+
+            if max_power > 0 then
+                local power_type = _G.UnitPowerType("target")
+                encounter_data[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+            end
+        end
+        name_to_id_map[_G.UnitName("target")] = unit_idnum
+
+        table.wipe(action_data)
+        action_data.type = AF.NPC
+        action_data.identifier = unit_idnum
+        action_data.npc_level = npc_level
+        return npc, unit_idnum
+    end
+end -- do-block
+
+
 do
     local COORD_MAX = 5
 
@@ -591,12 +669,7 @@ do
                 return
             end
         end
-        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
-
-        if not unit_idnum or unit_type ~= private.UNIT_TYPES.NPC then
-            return
-        end
-        local npc = NPCEntry(unit_idnum)
+        local npc = PlayerTarget()
 
         if not npc then
             return
@@ -604,7 +677,7 @@ do
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
         local npc_data = npc.encounter_data[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
         local zone_token = ("%s:%d"):format(zone_name, area_id)
-        npc_data.locations = npc_data.locations or {}
+        npc_data.locations = npc_data.locations or {} -- TODO: Fix this. It is broken. Possibly something to do with the timed updates.
 
         local zone_data = npc_data.locations[zone_token]
 
@@ -624,6 +697,7 @@ do
         zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
     end
 end -- do-block
+
 
 -----------------------------------------------------------------------
 -- Event handlers.
@@ -1263,80 +1337,12 @@ function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
 end
 
 
-do
-    local GENDER_NAMES = {
-        "UNKNOWN",
-        "MALE",
-        "FEMALE",
-    }
-
-
-    local REACTION_NAMES = {
-        "HATED",
-        "HOSTILE",
-        "UNFRIENDLY",
-        "NEUTRAL",
-        "FRIENDLY",
-        "HONORED",
-        "REVERED",
-        "EXALTED",
-    }
-
-
-    local POWER_TYPE_NAMES = {
-        ["0"] = "MANA",
-        ["1"] = "RAGE",
-        ["2"] = "FOCUS",
-        ["3"] = "ENERGY",
-        ["6"] = "RUNIC_POWER",
-    }
-
-
-    function WDP:PLAYER_TARGET_CHANGED(event_name)
-        if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
-            current_target_id = nil
-            return
-        end
-        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
-
-        if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
-            return
-        end
-        current_target_id = unit_idnum
-
-        local npc = NPCEntry(unit_idnum)
-        local _, class_token = _G.UnitClass("target")
-        npc.class = class_token
-        npc.faction = UnitFactionStanding("target")
-        npc.genders = npc.genders or {}
-        npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
-        npc.is_pvp = _G.UnitIsPVP("target") and true or nil
-        npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
-
-        local encounter_data = npc.encounter_data[InstanceDifficultyToken()].stats
-        local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
-
-        if not encounter_data[npc_level] then
-            encounter_data[npc_level] = {
-                max_health = _G.UnitHealthMax("target"),
-            }
-
-            local max_power = _G.UnitManaMax("target")
-
-            if max_power > 0 then
-                local power_type = _G.UnitPowerType("target")
-                encounter_data[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
-            end
-        end
-        name_to_id_map[_G.UnitName("target")] = unit_idnum
-
-        table.wipe(action_data)
-        action_data.type = AF.NPC
-        action_data.identifier = unit_idnum
-        action_data.npc_level = npc_level
-        self:UpdateTargetLocation()
+function WDP:PLAYER_TARGET_CHANGED(event_name)
+    if not PlayerTarget() then
+        return
     end
-end -- do-block
+    self:UpdateTargetLocation()
+end
 
 
 do
