@@ -61,6 +61,7 @@ local EVENT_MAPPING = {
     GOSSIP_SHOW = true,
     GUILDBANKFRAME_OPENED = true,
     ITEM_TEXT_BEGIN = true,
+    LOOT_CLOSED = true,
     LOOT_OPENED = true,
     MAIL_SHOW = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
@@ -1109,9 +1110,16 @@ do
 
     -- Prevent opening the same loot window multiple times from recording data multiple times.
     local loot_guid_registry = {}
+    local currently_looting
+
+
+    function WDP:LOOT_CLOSED(event_name)
+        currently_looting = nil
+    end
+
 
     function WDP:LOOT_OPENED(event_name)
-        if current_action.looting or not current_action.target_type then
+        if currently_looting or not current_action.target_type then
             return
         end
         local verify_func = LOOT_VERIFY_FUNCS[current_action.target_type]
@@ -1127,7 +1135,7 @@ do
         local guids_used = {}
         current_action.loot_list = {}
         current_action.loot_sources = {}
-        current_action.looting = true
+        currently_looting = true
 
         for loot_slot = 1, _G.GetNumLootItems() do
             local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
