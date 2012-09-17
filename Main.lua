@@ -406,36 +406,38 @@ do
         local loot_count = ("%s_count"):format(loot_type)
         local source_list = {}
 
-        for source_guid, loot_data in pairs(action_data.loot_sources) do -- TODO: Find out why this breaks with gas extractions.
-            local entry, source_id
+        if action_data.loot_sources then
+            for source_guid, loot_data in pairs(action_data.loot_sources) do
+                local entry, source_id
 
-            if action_data.type == AF.ITEM then
-                -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
-                source_id = action_data.identifier
-                entry = DBEntry(data_type, source_id)
-            elseif action_data.type == AF.OBJECT then
-                source_id = ("%s:%s"):format(action_data.spell_label, select(2, ParseGUID(source_guid)))
-                entry = DBEntry(data_type, source_id)
-            else
-                source_id = select(2, ParseGUID(source_guid))
-                entry = DBEntry(data_type, source_id)
-            end
-
-            if entry then
-                local loot_table = LootTable(entry, loot_type, top_field)
-
-                if not source_list[source_guid] then
-                    if top_field then
-                        entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
-                    else
-                        entry[loot_count] = (entry[loot_count] or 0) + 1
-                    end
-                    source_list[source_guid] = true
+                if action_data.type == AF.ITEM then
+                    -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
+                    source_id = action_data.identifier
+                    entry = DBEntry(data_type, source_id)
+                elseif action_data.type == AF.OBJECT then
+                    source_id = ("%s:%s"):format(action_data.spell_label, select(2, ParseGUID(source_guid)))
+                    entry = DBEntry(data_type, source_id)
+                else
+                    source_id = select(2, ParseGUID(source_guid))
+                    entry = DBEntry(data_type, source_id)
                 end
-                UpdateDBEntryLocation(data_type, source_id)
 
-                for item_id, quantity in pairs(loot_data) do
-                    table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                if entry then
+                    local loot_table = LootTable(entry, loot_type, top_field)
+
+                    if not source_list[source_guid] then
+                        if top_field then
+                            entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
+                        else
+                            entry[loot_count] = (entry[loot_count] or 0) + 1
+                        end
+                        source_list[source_guid] = true
+                    end
+                    UpdateDBEntryLocation(data_type, source_id)
+
+                    for item_id, quantity in pairs(loot_data) do
+                        table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                    end
                 end
             end
         end
