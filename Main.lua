@@ -134,7 +134,7 @@ local current_action = {
     loot_sources = nil,
     map_level = nil,
     spell_label = nil,
-    type = nil,
+    target_type = nil,
     x = nil,
     y = nil,
     zone_data = nil,
@@ -348,7 +348,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 
         if current_line:GetText() == _G.ITEM_OPENABLE then
             table.wipe(current_action)
-            current_action.type = AF.ITEM
+            current_action.target_type = AF.ITEM
             current_action.identifier = item_id
             current_action.loot_label = "contains"
             break
@@ -424,11 +424,11 @@ do
             for source_guid, loot_data in pairs(current_action.loot_sources) do
                 local entry, source_id
 
-                if current_action.type == AF.ITEM then
+                if current_action.target_type == AF.ITEM then
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_action.identifier
                     entry = DBEntry(data_type, source_id)
-                elseif current_action.type == AF.OBJECT then
+                elseif current_action.target_type == AF.OBJECT then
                     source_id = ("%s:%s"):format(current_action.spell_label, select(2, ParseGUID(source_guid)))
                     entry = DBEntry(data_type, source_id)
                 else
@@ -463,7 +463,7 @@ do
         local entry
 
         -- At this point we only have a name if it's an object.
-        if current_action.type == AF.OBJECT then
+        if current_action.target_type == AF.OBJECT then
             entry = DBEntry(data_type, ("%s:%s"):format(current_action.spell_label, current_action.object_name))
         else
             entry = DBEntry(data_type, current_action.identifier)
@@ -665,7 +665,7 @@ do
         name_to_id_map[_G.UnitName("target")] = unit_idnum
 
         table.wipe(current_action)
-        current_action.type = AF.NPC
+        current_action.target_type = AF.NPC
         current_action.identifier = unit_idnum
         return npc, unit_idnum
     end
@@ -1111,11 +1111,11 @@ do
     local loot_guid_registry = {}
 
     function WDP:LOOT_OPENED(event_name)
-        if current_action.looting or not current_action.type then
+        if current_action.looting or not current_action.target_type then
             return
         end
-        local verify_func = LOOT_VERIFY_FUNCS[current_action.type]
-        local update_func = LOOT_UPDATE_FUNCS[current_action.type]
+        local verify_func = LOOT_VERIFY_FUNCS[current_action.target_type]
+        local update_func = LOOT_UPDATE_FUNCS[current_action.target_type]
 
         if not verify_func or not update_func then
             return
@@ -1623,10 +1623,10 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             if not tt_unit_id or tt_unit_name ~= target_name then
                 return
             end
-            current_action.type = AF.NPC
+            current_action.target_type = AF.NPC
         end
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
-        current_action.type = AF.ITEM
+        current_action.target_type = AF.ITEM
 
         if tt_item_name and tt_item_name == target_name then
             current_action.identifier = ItemLinkToID(tt_item_link)
@@ -1640,11 +1640,11 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
                 return
             end
             current_action.object_name = target_name
-            current_action.type = AF.OBJECT
+            current_action.target_type = AF.OBJECT
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
             current_action.zone_data = UpdateDBEntryLocation("zones", identifier)
-            current_action.type = AF.ZONE
+            current_action.target_type = AF.ZONE
             current_action.identifier = identifier
         end
     end
