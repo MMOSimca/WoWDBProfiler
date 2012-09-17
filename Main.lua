@@ -113,7 +113,6 @@ local ALLOWED_LOCALES = {
 -- Local variables.
 -----------------------------------------------------------------------
 local anvil_spell_ids = {}
-local action_data = {}
 local currently_drunk
 local db
 local durability_timer_handle
@@ -125,6 +124,22 @@ local reputation_npc_id
 local target_location_timer_handle
 local current_target_id
 
+-----------------------------------------------------------------------
+-- Data for our current action. Including possible values as a reference.
+-----------------------------------------------------------------------
+local action_data = {
+    identifier = nil,
+    loot_label = nil,
+    loot_list = nil,
+    loot_sources = nil,
+    map_level = nil,
+    spell_label = nil,
+    type = nil,
+    x = nil,
+    y = nil,
+    zone_data = nil,
+
+}
 
 -----------------------------------------------------------------------
 -- Helper Functions.
@@ -441,7 +456,8 @@ do
                 end
             end
         end
-        -- TODO: Remove this when GetLootSourceInfo() has values for money
+
+        -- This is used for Gas Extractions.
         if #action_data.loot_list <= 0 then
             return
         end
@@ -449,7 +465,7 @@ do
 
         -- At this point we only have a name if it's an object.
         if action_data.type == AF.OBJECT then
-            entry = DBEntry(data_type, ("%s:%s"):format(action_data.spell_label, action_data.target_name))
+            entry = DBEntry(data_type, ("%s:%s"):format(action_data.spell_label, action_data.object_name))
         else
             entry = DBEntry(data_type, action_data.identifier)
         end
@@ -652,7 +668,6 @@ do
         table.wipe(action_data)
         action_data.type = AF.NPC
         action_data.identifier = unit_idnum
-        action_data.npc_level = npc_level
         return npc, unit_idnum
     end
 end -- do-block
@@ -1597,7 +1612,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     action_data.map_level = map_level
     action_data.x = x
     action_data.y = y
-    action_data.zone = ("%s:%d"):format(zone_name, area_id)
+    action_data.zone_data = ("%s:%d"):format(zone_name, area_id)
     action_data.spell_label = spell_label
 
     if not private.NON_LOOT_SPELL_LABELS[spell_label] then
@@ -1610,7 +1625,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
                 return
             end
             action_data.type = AF.NPC
-            action_data.unit_name = tt_unit_name
         end
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         action_data.type = AF.ITEM
@@ -1622,13 +1636,11 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             action_data.identifier = ItemLinkToID(target_item_link)
         end
     elseif not tt_item_name and not tt_unit_name then
-        action_data.name = target_name
-
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
             if target_name == "" then
                 return
             end
-            action_data.target_name = target_name
+            action_data.object_name = target_name
             action_data.type = AF.OBJECT
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
