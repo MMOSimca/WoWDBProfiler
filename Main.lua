@@ -31,7 +31,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 5
+local DB_VERSION = 6
 
 
 local DATABASE_DEFAULTS = {
@@ -84,6 +84,7 @@ local EVENT_MAPPING = {
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
     VOID_STORAGE_OPEN = true,
+    ZONE_CHANGED = true,
 }
 
 
@@ -124,6 +125,7 @@ local name_to_id_map = {}
 local reputation_npc_id
 local target_location_timer_handle
 local current_target_id
+local current_area_id
 
 -----------------------------------------------------------------------
 -- Data for our current action. Including possible values as a reference.
@@ -224,8 +226,6 @@ end
 
 
 local function CurrentLocationData()
-    _G.SetMapToCurrentZone()
-
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
 
@@ -258,7 +258,7 @@ local function CurrentLocationData()
     if y % 2 ~= 0 then
         y = y + 1
     end
-    return _G.GetRealZoneText(), _G.GetCurrentMapAreaID(), x, y, map_level, InstanceDifficultyToken()
+    return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
 end
 
 
@@ -513,6 +513,15 @@ do
 end -- do-block
 
 
+local function SetCurrentAreaID()
+    local map_area_id = _G.GetCurrentMapAreaID()
+    _G.SetMapToCurrentZone()
+
+    current_area_id = _G.GetCurrentMapAreaID()
+    _G.SetMapByID(map_area_id)
+end
+
+
 -----------------------------------------------------------------------
 -- Methods.
 -----------------------------------------------------------------------
@@ -559,6 +568,8 @@ function WDP:OnEnable()
         local _, item_link = _G.GetItemInfo(identifier)
         HandleItemUse(item_link)
     end)
+
+    SetCurrentAreaID()
 end
 
 
@@ -1688,6 +1699,11 @@ function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spe
         private.tracked_line = nil
         table.wipe(current_action)
     end
+end
+
+
+function WDP:ZONE_CHANGED(event_name)
+    SetCurrentAreaID()
 end
 
 
