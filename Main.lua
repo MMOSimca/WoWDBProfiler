@@ -35,6 +35,7 @@ local DB_VERSION = 6
 
 
 local DATABASE_DEFAULTS = {
+    char = {},
     global = {
         items = {},
         npcs = {},
@@ -116,7 +117,8 @@ local ALLOWED_LOCALES = {
 -----------------------------------------------------------------------
 local anvil_spell_ids = {}
 local currently_drunk
-local db
+local char_db
+local global_db
 local durability_timer_handle
 local faction_standings = {}
 local forge_spell_ids = {}
@@ -201,11 +203,11 @@ local function DBEntry(data_type, unit_id)
     if not data_type or not unit_id then
         return
     end
-    local unit = db[data_type][unit_id]
+    local unit = global_db[data_type][unit_id]
 
     if not unit then
-        db[data_type][unit_id] = {}
-        unit = db[data_type][unit_id]
+        global_db[data_type][unit_id] = {}
+        unit = global_db[data_type][unit_id]
     end
     return unit
 end
@@ -287,6 +289,25 @@ do
         return unit_type
     end
 end -- do-block
+
+
+local function UpdateBlacklistMaps()
+    local empty_count = 0
+
+    for index = 1, _G.MAX_BLACKLIST_BATTLEGROUNDS do
+        local map_id = _G.GetBlacklistMap(index)
+        char_db.bg_blacklist = char_db.bg_blacklist or {}
+        char_db.bg_blacklist[index] = map_id
+
+        if map_id < 0 then
+            empty_count = empty_count + 1
+        end
+    end
+
+    if empty_count == _G.MAX_BLACKLIST_BATTLEGROUNDS then
+        char_db.bg_blacklist = nil
+    end
+end
 
 
 local function UpdateDBEntryLocation(entry_type, identifier)
@@ -526,7 +547,9 @@ end
 -- Methods.
 -----------------------------------------------------------------------
 function WDP:OnInitialize()
-    db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default").global
+    local db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default")
+    global_db = db.global
+    char_db = db.char
 
     local raw_db = _G["WoWDBProfilerData"]
     local build_num = tonumber(private.build_num)
@@ -535,7 +558,7 @@ function WDP:OnInitialize()
     --    if raw_db.build_num and raw_db.build_num < build_num then
     if raw_db.version and raw_db.version < DB_VERSION then
         for entry in pairs(DATABASE_DEFAULTS.global) do
-            db[entry] = {}
+            global_db[entry] = {}
         end
     end
     raw_db.build_num = build_num
@@ -568,8 +591,12 @@ function WDP:OnEnable()
         local _, item_link = _G.GetItemInfo(identifier)
         HandleItemUse(item_link)
     end)
-
     SetCurrentAreaID()
+
+    _G.hooksecurefunc("SetBlacklistMap", UpdateBlacklistMaps)
+    _G.hooksecurefunc("ClearBlacklistMap", UpdateBlacklistMaps)
+
+    UpdateBlacklistMaps()
 end
 
 
@@ -578,10 +605,10 @@ local function RecordDurability(item_id, durability)
         return
     end
 
-    if not db.items[item_id] then
-        db.items[item_id] = {}
+    if not global_db.items[item_id] then
+        global_db.items[item_id] = {}
     end
-    db.items[item_id].durability = durability
+    global_db.items[item_id].durability = durability
 end
 
 
@@ -1597,7 +1624,6 @@ function WDP:TRAINER_SHOW(event_name)
             end
         end
     end
-
     -- Reset the filters to what they were before
     _G.SetTrainerServiceTypeFilter("available", available or 0)
     _G.SetTrainerServiceTypeFilter("unavailable", unavailable or 0)
