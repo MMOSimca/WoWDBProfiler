@@ -31,7 +31,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 6
+local DB_VERSION = 7
 
 
 local DATABASE_DEFAULTS = {
@@ -85,7 +85,9 @@ local EVENT_MAPPING = {
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
     VOID_STORAGE_OPEN = true,
-    ZONE_CHANGED = true,
+    ZONE_CHANGED = "SetCurrentAreaID",
+    ZONE_CHANGED_INDOORS = "SetCurrentAreaID",
+    ZONE_CHANGED_NEW_AREA = "SetCurrentAreaID",
 }
 
 
@@ -534,7 +536,7 @@ do
 end -- do-block
 
 
-local function SetCurrentAreaID()
+function WDP:SetCurrentAreaID(event_name)
     local map_area_id = _G.GetCurrentMapAreaID()
     _G.SetMapToCurrentZone()
 
@@ -591,7 +593,7 @@ function WDP:OnEnable()
         local _, item_link = _G.GetItemInfo(identifier)
         HandleItemUse(item_link)
     end)
-    SetCurrentAreaID()
+    self:SetCurrentAreaID("OnEnable")
 
     _G.hooksecurefunc("SetBlacklistMap", UpdateBlacklistMaps)
     _G.hooksecurefunc("ClearBlacklistMap", UpdateBlacklistMaps)
@@ -1725,11 +1727,6 @@ function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spe
         private.tracked_line = nil
         table.wipe(current_action)
     end
-end
-
-
-function WDP:ZONE_CHANGED(event_name)
-    SetCurrentAreaID()
 end
 
 
