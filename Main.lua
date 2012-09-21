@@ -441,7 +441,7 @@ do
     end
 
     function GenericLootUpdate(data_type, top_field)
-        local loot_type = current_loot.label or "drops"
+        local loot_type = current_loot.label
         local loot_count = ("%s_count"):format(loot_type)
         local source_list = {}
 
@@ -795,7 +795,7 @@ function WDP:CHAT_MSG_LOOT(event_name, message)
             ("%d:%d"):format(item_id, quantity)
         },
         identifier = current_action.identifier,
-        label = current_action.loot_label,
+        label = current_action.loot_label or "drops",
         map_level = current_action.map_level,
         object_name = current_action.object_name,
         spell_label = current_action.spell_label,
@@ -1094,7 +1094,7 @@ do
         end,
         [AF.NPC] = function()
             local difficulty_token = InstanceDifficultyToken()
-            local loot_type = current_loot.label or "drops"
+            local loot_type = current_loot.label
             local source_list = {}
 
             for source_guid, loot_data in pairs(current_loot.sources) do
@@ -1150,7 +1150,7 @@ do
                     drops = {}
                 }
             end
-            local loot_count = ("%s_count"):format(current_loot.label or "drops")
+            local loot_count = ("%s_count"):format(current_loot.label)
             current_loot.zone_data[location_token][loot_count] = (current_loot.zone_data[location_token][loot_count] or 0) + 1
 
             if current_loot.sources then
@@ -1182,9 +1182,11 @@ do
 
 
     function WDP:LOOT_OPENED(event_name)
-        if current_loot or not current_action.target_type then
+        if current_loot then
             return
         end
+        current_action.target_type = current_action.target_type or AF.NPC
+
         local verify_func = LOOT_VERIFY_FUNCS[current_action.target_type]
         local update_func = LOOT_UPDATE_FUNCS[current_action.target_type]
 
@@ -1196,11 +1198,12 @@ do
             return
         end
         local guids_used = {}
+
         current_loot = {
             list = {},
             sources = {},
             identifier = current_action.identifier,
-            label = current_action.loot_label,
+            label = current_action.loot_label or "drops",
             map_level = current_action.map_level,
             object_name = current_action.object_name,
             spell_label = current_action.spell_label,
