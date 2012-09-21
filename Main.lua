@@ -130,6 +130,7 @@ local reputation_npc_id
 local target_location_timer_handle
 local current_target_id
 local current_area_id
+local current_loot
 
 -----------------------------------------------------------------------
 -- Data for our current action. Including possible values as a reference.
@@ -440,20 +441,20 @@ do
     end
 
     function GenericLootUpdate(data_type, top_field)
-        local loot_type = current_action.loot_label or "drops"
+        local loot_type = current_loot.label or "drops"
         local loot_count = ("%s_count"):format(loot_type)
         local source_list = {}
 
-        if current_action.loot_sources then
-            for source_guid, loot_data in pairs(current_action.loot_sources) do
+        if current_loot.sources then
+            for source_guid, loot_data in pairs(current_loot.sources) do
                 local entry, source_id
 
-                if current_action.target_type == AF.ITEM then
+                if current_loot.target_type == AF.ITEM then
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
-                    source_id = current_action.identifier
+                    source_id = current_loot.identifier
                     entry = DBEntry(data_type, source_id)
-                elseif current_action.target_type == AF.OBJECT then
-                    source_id = ("%s:%s"):format(current_action.spell_label, select(2, ParseGUID(source_guid)))
+                elseif current_loot.target_type == AF.OBJECT then
+                    source_id = ("%s:%s"):format(current_loot.spell_label, select(2, ParseGUID(source_guid)))
                     entry = DBEntry(data_type, source_id)
                 else
                     source_id = select(2, ParseGUID(source_guid))
@@ -481,16 +482,16 @@ do
         end
 
         -- This is used for Gas Extractions.
-        if #current_action.loot_list <= 0 then
+        if #current_loot.list <= 0 then
             return
         end
         local entry
 
         -- At this point we only have a name if it's an object.
-        if current_action.target_type == AF.OBJECT then
-            entry = DBEntry(data_type, ("%s:%s"):format(current_action.spell_label, current_action.object_name))
+        if current_loot.target_type == AF.OBJECT then
+            entry = DBEntry(data_type, ("%s:%s"):format(current_loot.spell_label, current_loot.object_name))
         else
-            entry = DBEntry(data_type, current_action.identifier)
+            entry = DBEntry(data_type, current_loot.identifier)
         end
 
         if not entry then
@@ -498,7 +499,7 @@ do
         end
         local loot_table = LootTable(entry, loot_type, top_field)
 
-        if not source_list[current_action.identifier] then
+        if not source_list[current_loot.identifier] then
             if top_field then
                 entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
             else
@@ -506,8 +507,8 @@ do
             end
         end
 
-        for index = 1, #current_action.loot_list do
-            table.insert(loot_table, current_action.loot_list[index])
+        for index = 1, #current_loot.list do
+            table.insert(loot_table, current_loot.list[index])
         end
     end
 end -- do-block
@@ -705,7 +706,6 @@ do
         end
         name_to_id_map[_G.UnitName("target")] = unit_idnum
 
-        table.wipe(current_action)
         current_action.target_type = AF.NPC
         current_action.identifier = unit_idnum
         return npc, unit_idnum
@@ -790,11 +790,22 @@ function WDP:CHAT_MSG_LOOT(event_name, message)
     if not item_id then
         return
     end
-    current_action.loot_list = {
-        ("%d:%d"):format(item_id, quantity)
+    current_loot = {
+        list = {
+            ("%d:%d"):format(item_id, quantity)
+        },
+        identifier = current_action.identifier,
+        label = current_action.loot_label,
+        map_level = current_action.map_level,
+        object_name = current_action.object_name,
+        spell_label = current_action.spell_label,
+        target_type = current_action.target_type,
+        x = current_action.x,
+        y = current_action.y,
+        zone_data = current_action.zone_data,
     }
-    GenericLootUpdate("zones")
     table.wipe(current_action)
+    GenericLootUpdate("zones")
 end
 
 
@@ -1083,10 +1094,10 @@ do
         end,
         [AF.NPC] = function()
             local difficulty_token = InstanceDifficultyToken()
-            local loot_type = current_action.loot_label or "drops"
+            local loot_type = current_loot.label or "drops"
             local source_list = {}
 
-            for source_guid, loot_data in pairs(current_action.loot_sources) do
+            for source_guid, loot_data in pairs(current_loot.sources) do
                 local source_id = select(2, ParseGUID(source_guid))
                 local npc = NPCEntry(source_id)
 
@@ -1107,10 +1118,10 @@ do
             end
 
             -- TODO: Remove this when GetLootSourceInfo() has values for money
-            if #current_action.loot_list <= 0 then
+            if #current_loot.list <= 0 then
                 return
             end
-            local npc = NPCEntry(current_action.identifier)
+            local npc = NPCEntry(current_loot.identifier)
 
             if not npc then
                 return
@@ -1118,48 +1129,60 @@ do
             local encounter_data = npc.encounter_data[difficulty_token]
             encounter_data[loot_type] = encounter_data[loot_type] or {}
 
-            if not source_list[current_action.identifier] then
+            if not source_list[current_loot.identifier] then
                 encounter_data.loot_counts = encounter_data.loot_counts or {}
                 encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
             end
 
-            for index = 1, #current_action.loot_list do
-                table.insert(encounter_data[loot_type], current_action.loot_list[index])
+            for index = 1, #current_loot.list do
+                table.insert(encounter_data[loot_type], current_loot.list[index])
             end
         end,
         [AF.OBJECT] = function()
             GenericLootUpdate("objects", InstanceDifficultyToken())
         end,
         [AF.ZONE] = function()
-            local location_token = ("%s:%s:%s"):format(current_action.map_level, current_action.x, current_action.y)
+            local location_token = ("%s:%s:%s"):format(current_loot.map_level, current_loot.x, current_loot.y)
 
             -- This will start life as a boolean true.
-            if _G.type(current_action.zone_data[location_token]) ~= "table" then
-                current_action.zone_data[location_token] = {
+            if _G.type(current_loot.zone_data[location_token]) ~= "table" then
+                current_loot.zone_data[location_token] = {
                     drops = {}
                 }
             end
-            local loot_count = ("%s_count"):format(current_action.loot_label or "drops")
-            current_action.zone_data[location_token][loot_count] = (current_action.zone_data[location_token][loot_count] or 0) + 1
+            local loot_count = ("%s_count"):format(current_loot.label or "drops")
+            current_loot.zone_data[location_token][loot_count] = (current_loot.zone_data[location_token][loot_count] or 0) + 1
 
-            for index = 1, #current_action.loot_list do
-                table.insert(current_action.zone_data[location_token].drops, current_action.loot_list[index])
+            if current_loot.sources then
+                for source_guid, loot_data in pairs(current_loot.sources) do
+                    for item_id, quantity in pairs(loot_data) do
+                        table.insert(current_loot.zone_data[location_token].drops, ("%d:%d"):format(item_id, quantity))
+                    end
+                end
+            end
+
+            if #current_loot.list <= 0 then
+                return
+            end
+
+            for index = 1, #current_loot.list do
+                table.insert(current_loot.zone_data[location_token].drops, current_loot.loot_list[index])
             end
         end,
     }
 
     -- Prevent opening the same loot window multiple times from recording data multiple times.
     local loot_guid_registry = {}
-    local currently_looting
 
 
     function WDP:LOOT_CLOSED(event_name)
-        currently_looting = nil
+        current_loot = nil
+        table.wipe(current_action)
     end
 
 
     function WDP:LOOT_OPENED(event_name)
-        if currently_looting or not current_action.target_type then
+        if current_loot or not current_action.target_type then
             return
         end
         local verify_func = LOOT_VERIFY_FUNCS[current_action.target_type]
@@ -1173,9 +1196,20 @@ do
             return
         end
         local guids_used = {}
-        current_action.loot_list = {}
-        current_action.loot_sources = {}
-        currently_looting = true
+        current_loot = {
+            list = {},
+            sources = {},
+            identifier = current_action.identifier,
+            label = current_action.loot_label,
+            map_level = current_action.map_level,
+            object_name = current_action.object_name,
+            spell_label = current_action.spell_label,
+            target_type = current_action.target_type,
+            x = current_action.x,
+            y = current_action.y,
+            zone_data = current_action.zone_data,
+        }
+        table.wipe(current_action)
 
         for loot_slot = 1, _G.GetNumLootItems() do
             local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
@@ -1187,9 +1221,6 @@ do
                     _G.GetLootSourceInfo(loot_slot)
                 }
 
-                -- TODO: Remove debugging
-                --            print(("Loot slot %d: Source count: %d"):format(loot_slot, floor((#sources / 2) + 0.5)))
-
                 -- Odd index is GUID, even is count.
                 for loot_index = 1, #loot_info, 2 do
                     local source_guid = loot_info[loot_index]
@@ -1198,19 +1229,19 @@ do
                         local loot_quantity = loot_info[loot_index + 1]
                         local source_type, source_id = ParseGUID(source_guid)
                         -- TODO: Remove debugging
-                        --                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                        --                    print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
+--                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+--                        print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                        current_action.loot_sources[source_guid] = current_action.loot_sources[source_guid] or {}
-                        current_action.loot_sources[source_guid][item_id] = current_action.loot_sources[source_guid][item_id] or 0 + loot_quantity
+                        current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                        current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                         guids_used[source_guid] = true
                     end
                 end
                 --            elseif slot_type == _G.LOOT_SLOT_MONEY then
                 --                table.insert(current_action.loot_list, ("money:%d"):format(_toCopper(item_text)))
             elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                table.insert(current_action.loot_list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+                table.insert(current_loot.list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
         end
 
@@ -1218,7 +1249,6 @@ do
             loot_guid_registry[guid] = true
         end
         update_func()
-        table.wipe(current_action)
     end
 end -- do-block
 
