@@ -401,6 +401,7 @@ do
 
 
     function UnitFactionStanding(unit)
+        local unit_name = _G.UnitName(unit)
         UpdateFactionData()
         DatamineTT:ClearLines()
         DatamineTT:SetUnit(unit)
@@ -408,7 +409,7 @@ do
         for line_index = 1, DatamineTT:NumLines() do
             local faction_name = _G["WDPDatamineTTTextLeft" .. line_index]:GetText():trim()
 
-            if faction_name and faction_standings[faction_name] then
+            if faction_name and faction_name ~= unit_name and faction_standings[faction_name] then
                 return faction_name, faction_standings[faction_name]
             end
         end
