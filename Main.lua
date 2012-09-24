@@ -31,7 +31,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 7
+local DB_VERSION = 8
 
 
 local DATABASE_DEFAULTS = {
@@ -65,6 +65,7 @@ local EVENT_MAPPING = {
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
     MAIL_SHOW = true,
+    MERCHANT_CLOSED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
@@ -1232,8 +1233,8 @@ do
                         local loot_quantity = loot_info[loot_index + 1]
                         local source_type, source_id = ParseGUID(source_guid)
                         -- TODO: Remove debugging
---                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
---                        print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
+                        --                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                        --                        print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                         current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
@@ -1279,21 +1280,30 @@ do
     local ITEM_REQ_QUEST_MATCH1 = "Requires: .*"
     local ITEM_REQ_QUEST_MATCH2 = "Must have completed: .*"
 
+    local current_merchant
+    local merchant_standing
+
+    function WDP:MERCHANT_CLOSED(event_name)
+        current_merchant = nil
+        merchant_standing = nil
+    end
+
+
     function WDP:UpdateMerchantItems(event_name)
-        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+        if not current_merchant then
+            local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-        if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
-            return
+            if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+                return
+            end
+            merchant_standing = select(2, UnitFactionStanding("target"))
+            current_merchant = NPCEntry(unit_idnum)
+            current_merchant.sells = current_merchant.sells or {}
         end
+        local num_items = _G.GetMerchantNumItems()
         local current_filters = _G.GetMerchantFilter()
-        local _, merchant_standing = UnitFactionStanding("target")
-        local merchant = NPCEntry(unit_idnum)
-        merchant.sells = merchant.sells or {}
-
         _G.SetMerchantFilter(_G.LE_LOOT_FILTER_ALL)
         _G.MerchantFrame_Update()
-
-        local num_items = _G.GetMerchantNumItems()
 
         for item_index = 1, num_items do
             local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
@@ -1383,12 +1393,12 @@ do
                         price_string = ("%s:%s"):format(price_string, currency_list[currency_index])
                     end
                 end
-                merchant.sells[item_id] = ("%s:%s:[%s]"):format(num_available, stack_size, price_string)
+                current_merchant.sells[item_id] = ("%s:%s:[%s]"):format(num_available, stack_size, price_string)
             end
         end
 
         if _G.CanMerchantRepair() then
-            merchant.can_repair = true
+            current_merchant.can_repair = true
         end
         _G.SetMerchantFilter(current_filters)
         _G.MerchantFrame_Update()
