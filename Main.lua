@@ -199,6 +199,11 @@ local function InstanceDifficultyToken()
     if not instance_type or instance_type == "" then
         instance_type = "NONE"
     end
+
+    -- Raid difficulty of 2 is 25-man
+    if instance_type == "raid" and instance_difficulty == 2 and _G.IsPartyLFG() and _G.IsInLFGDungeon() then
+        difficulty_name = "LOOKING_FOR_RAID"
+    end
     return ("%s:%s:%s"):format(instance_type:upper(), difficulty_name:upper():gsub(" ", "_"), _G.tostring(is_dynamic))
 end
 
