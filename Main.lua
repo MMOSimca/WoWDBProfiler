@@ -559,9 +559,7 @@ function WDP:OnInitialize()
     local raw_db = _G["WoWDBProfilerData"]
     local build_num = tonumber(private.build_num)
 
-    -- TODO: Merge this with the DB version check when MoP goes live.
-    --    if raw_db.build_num and raw_db.build_num < build_num then
-    if raw_db.version and raw_db.version < DB_VERSION then
+    if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
         for entry in pairs(DATABASE_DEFAULTS.global) do
             global_db[entry] = {}
         end
