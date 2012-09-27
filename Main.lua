@@ -1432,17 +1432,20 @@ function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
 
         if is_owned then
             local health, max_health, attack, speed, rarity = _G.C_PetJournal.GetPetStats(pet_id)
-            local rarity_name = _G["ITEM_QUALITY" .. rarity - 1 .. "_DESC"]
-            local npc = NPCEntry(npc_id)
-            npc.wild_pet = is_wild or nil
-            npc.battle_pet_data = npc.battle_pet_data or {}
-            npc.battle_pet_data[rarity_name] = npc.battle_pet_data[rarity_name] or {}
-            npc.battle_pet_data[rarity_name]["level_" .. level] = npc.battle_pet_data[rarity_name]["level_" .. level] or {}
 
-            local data = npc.battle_pet_data[rarity_name]["level_" .. level]
-            data.max_health = max_health
-            data.attack = attack
-            data.speed = speed
+            if rarity then
+                local rarity_name = _G["BATTLE_PET_BREED_QUALITY" .. rarity]
+                local npc = NPCEntry(npc_id)
+                npc.wild_pet = is_wild or nil
+                npc.battle_pet_data = npc.battle_pet_data or {}
+                npc.battle_pet_data[rarity_name] = npc.battle_pet_data[rarity_name] or {}
+                npc.battle_pet_data[rarity_name]["level_" .. level] = npc.battle_pet_data[rarity_name]["level_" .. level] or {}
+
+                local data = npc.battle_pet_data[rarity_name]["level_" .. level]
+                data.max_health = max_health
+                data.attack = attack
+                data.speed = speed
+            end
         end
     end
 end
