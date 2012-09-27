@@ -58,6 +58,7 @@ local EVENT_MAPPING = {
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
+    CURSOR_UPDATE = true,
     FORGE_MASTER_OPENED = true,
     GOSSIP_SHOW = true,
     GUILDBANKFRAME_OPENED = true,
@@ -1029,6 +1030,21 @@ do
 end -- do-block
 
 
+function WDP:CURSOR_UPDATE(event_name)
+    if current_action.fishing_target or _G.Minimap:IsMouseOver() or not private.SPELL_FLAGS_BY_LABEL[current_action.spell_label] then
+        return
+    end
+    local text = _G["GameTooltipTextLeft1"]:GetText()
+
+    if not text or text == "Fishing Bobber" then
+        text = "NONE"
+    else
+        current_action.fishing_target = true
+    end
+    current_action.identifier = ("%s:%s"):format(current_action.spell_label, text)
+end
+
+
 function WDP:ITEM_TEXT_BEGIN(event_name)
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
 
@@ -1088,7 +1104,11 @@ do
         end,
         [AF.OBJECT] = true,
         [AF.ZONE] = function()
-            return _G.IsFishingLoot()
+            if not _G.IsFishingLoot() then
+                return false
+            end
+            current_action.zone_data = UpdateDBEntryLocation("zones", current_action.identifier)
+            return true
         end,
     }
 
@@ -1739,10 +1759,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
             current_action.object_name = target_name
             current_action.target_type = AF.OBJECT
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
-            local identifier = ("%s:%s"):format(spell_label, _G["GameTooltipTextLeft1"]:GetText() or "NONE") -- Possible fishing pool name.
-            current_action.zone_data = UpdateDBEntryLocation("zones", identifier)
             current_action.target_type = AF.ZONE
-            current_action.identifier = identifier
         end
     end
     private.tracked_line = spell_line
