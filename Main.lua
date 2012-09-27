@@ -23,6 +23,7 @@ local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTim
 
 local deformat = LibStub("LibDeformat-3.0")
 local LPJ = LibStub("LibPetJournal-2.0")
+local MapData = LibStub("LibMapData-1.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -320,26 +321,55 @@ local function UpdateBlacklistMaps()
 end
 
 
-local function UpdateDBEntryLocation(entry_type, identifier)
-    if not identifier then
-        return
-    end
-    local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-    local entry = DBEntry(entry_type, identifier)
-    entry[difficulty_token] = entry[difficulty_token] or {}
-    entry[difficulty_token].locations = entry[difficulty_token].locations or {}
+local UpdateDBEntryLocation
+do
+    local pi = math.pi
 
-    local zone_token = ("%s:%d"):format(zone_name, area_id)
-    local zone_data = entry[difficulty_token].locations[zone_token]
+    -- Fishing node coordinate code based on code in GatherMate2 with permission from Kagaro.
+    local function FishingCoordinates(x, y, yard_width, yard_height)
+        local facing = _G.GetPlayerFacing()
 
-    if not zone_data then
-        zone_data = {}
-        entry[difficulty_token].locations[zone_token] = zone_data
+        if not facing then
+            return x, y
+        end
+        local rad = facing + pi
+        return x + math.sin(rad) * 15 / yard_width, y + math.cos(rad) * 15 / yard_height
     end
-    local location_token = ("%s:%s:%s"):format(map_level, x, y)
-    zone_data[location_token] = zone_data[location_token] or true
-    return zone_data
-end
+
+
+    function UpdateDBEntryLocation(entry_type, identifier)
+        if not identifier then
+            return
+        end
+        local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+        local entry = DBEntry(entry_type, identifier)
+        entry[difficulty_token] = entry[difficulty_token] or {}
+        entry[difficulty_token].locations = entry[difficulty_token].locations or {}
+
+        local zone_token = ("%s:%d"):format(zone_name, area_id)
+        local zone_data = entry[difficulty_token].locations[zone_token]
+
+        if not zone_data then
+            zone_data = {}
+            entry[difficulty_token].locations[zone_token] = zone_data
+        end
+
+        -- Special case for Fishing.
+        if current_action.spell_label == "FISHING" then
+            local yard_width, yard_height = MapData:MapArea(area_id, map_level)
+
+            if yard_width > 0 and yard_height > 0 then
+                x, y = FishingCoordinates(x, y, yard_width, yard_height)
+                current_action.x = x
+                current_action.y = y
+            end
+        end
+        local location_token = ("%d:%d:%d"):format(map_level, x, y)
+
+        zone_data[location_token] = zone_data[location_token] or true
+        return zone_data
+    end
+end -- do-block
 
 
 local function HandleItemUse(item_link, bag_index, slot_index)
@@ -757,7 +787,7 @@ do
                 return
             end
         end
-        zone_data[("%s:%s:%s"):format(map_level, x, y)] = true
+        zone_data[("%d:%d:%d"):format(map_level, x, y)] = true
     end
 end -- do-block
 
@@ -1031,7 +1061,7 @@ end -- do-block
 
 
 function WDP:CURSOR_UPDATE(event_name)
-    if current_action.fishing_target or _G.Minimap:IsMouseOver() or not private.SPELL_FLAGS_BY_LABEL[current_action.spell_label] then
+    if current_action.fishing_target or _G.Minimap:IsMouseOver() or current_action.spell_label ~= "FISHING" then
         return
     end
     local text = _G["GameTooltipTextLeft1"]:GetText()
@@ -1167,7 +1197,7 @@ do
             GenericLootUpdate("objects", InstanceDifficultyToken())
         end,
         [AF.ZONE] = function()
-            local location_token = ("%s:%s:%s"):format(current_loot.map_level, current_loot.x, current_loot.y)
+            local location_token = ("%d:%d:%d"):format(current_loot.map_level, current_loot.x, current_loot.y)
 
             -- This will start life as a boolean true.
             if _G.type(current_loot.zone_data[location_token]) ~= "table" then
