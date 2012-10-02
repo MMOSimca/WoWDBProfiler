@@ -312,6 +312,7 @@ local function UpdateBlacklistMaps()
 
         if map_id < 0 then
             empty_count = empty_count + 1
+            empty_count = empty_count + 1
         end
     end
 
@@ -575,13 +576,42 @@ do
 end -- do-block
 
 
-function WDP:SetCurrentAreaID(event_name)
-    local map_area_id = _G.GetCurrentMapAreaID()
-    _G.SetMapToCurrentZone()
+do
+    -- MapFileName = MapAreaID
+    local MICRO_DUNGEON_IDS = {
+        ShrineofTwoMoons = 903,
+        ShrineofSevenStars = 905,
+    }
 
-    current_area_id = _G.GetCurrentMapAreaID()
-    _G.SetMapByID(map_area_id)
-end
+    -- Contains a dirty hack due to Blizzard's strange handling of Micro Dungeons; GetMapInfo() will not return correct information
+    -- unless the WorldMapFrame is shown.
+    function WDP:SetCurrentAreaID(event_name)
+        local world_map = _G.WorldMapFrame
+        local map_visible = world_map:IsVisible()
+        local sfx_value = _G.tonumber(_G.GetCVar("Sound_EnableSFX"))
+
+        if not map_visible then
+            _G.SetCVar("Sound_EnableSFX", 0)
+            world_map:Show()
+        end
+        local micro_dungeon_id = MICRO_DUNGEON_IDS[select(5, _G.GetMapInfo())]
+
+        if micro_dungeon_id then
+            current_area_id = micro_dungeon_id
+        else
+            local map_area_id = _G.GetCurrentMapAreaID()
+            _G.SetMapToCurrentZone()
+
+            current_area_id = _G.GetCurrentMapAreaID()
+            _G.SetMapByID(map_area_id)
+        end
+
+        if not map_visible then
+            world_map:Hide()
+            _G.SetCVar("Sound_EnableSFX", sfx_value)
+        end
+    end
+end -- do-block
 
 
 -----------------------------------------------------------------------
