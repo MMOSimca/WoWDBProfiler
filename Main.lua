@@ -1855,8 +1855,8 @@ function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spe
 
     if private.tracked_line == spell_line then
         private.tracked_line = nil
-        table.wipe(current_action)
     end
+    table.wipe(current_action)
 end
 
 
