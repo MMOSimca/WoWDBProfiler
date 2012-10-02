@@ -1374,7 +1374,7 @@ do
 
 
     function WDP:UpdateMerchantItems(event_name)
-        if not current_merchant then
+        if not current_merchant or event_name == "MERCHANT_SHOW" then
             local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
             if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
