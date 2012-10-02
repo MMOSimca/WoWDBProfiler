@@ -239,6 +239,9 @@ end
 
 
 local function CurrentLocationData()
+    if _G.WorldMapFrame:IsVisible() then
+        return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
+    end
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
 
