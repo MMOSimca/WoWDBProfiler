@@ -47,6 +47,13 @@ private.ACTION_TYPE_FLAGS = {
 }
 
 
+private.ACTION_TYPE_NAMES = {}
+
+for name, bit in _G.pairs(private.ACTION_TYPE_FLAGS) do
+    private.ACTION_TYPE_NAMES[bit] = name
+end
+
+
 private.SPELL_LABELS_BY_NAME = {
     [_G.GetSpellInfo(13262)] = "DISENCHANT",
     [_G.GetSpellInfo(4036)] = "ENGINEERING",
@@ -73,7 +80,7 @@ private.SPELL_FLAGS_BY_LABEL = {
     DISENCHANT = AF.ITEM,
     ENGINEERING = AF.NPC,
     EXTRACT_GAS = AF.ZONE,
-    FISHING =  AF.ZONE,
+    FISHING = AF.ZONE,
     HERB_GATHERING = bit.bor(AF.NPC, AF.OBJECT),
     MILLING = AF.ITEM,
     MIND_CONTROL = AF.NPC,

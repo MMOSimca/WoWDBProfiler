@@ -32,8 +32,8 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 9
-
+local DB_VERSION = 10
+local DEBUGGING = false
 
 local DATABASE_DEFAULTS = {
     char = {},
@@ -154,6 +154,14 @@ local current_action = {
 -----------------------------------------------------------------------
 -- Helper Functions.
 -----------------------------------------------------------------------
+local function Debug(...)
+    if not DEBUGGING then
+        return
+    end
+    _G.print(...)
+end
+
+
 local ActualCopperCost
 do
     local BARTERING_SPELL_ID = 83964
@@ -774,8 +782,6 @@ do
             end
         end
         name_to_id_map[_G.UnitName("target")] = unit_idnum
-
-        current_action.target_type = AF.NPC
         current_action.identifier = unit_idnum
         return npc, unit_idnum
     end
@@ -1264,6 +1270,7 @@ do
 
 
     function WDP:LOOT_CLOSED(event_name)
+        Debug(event_name)
         current_loot = nil
         table.wipe(current_action)
     end
@@ -1273,7 +1280,14 @@ do
         if current_loot then
             return
         end
-        current_action.target_type = current_action.target_type or AF.NPC
+
+        Debug(event_name)
+        if not current_action.target_type then
+            Debug("No target type.")
+            return
+        else
+            Debug(("current_action.target_type: %s"):format(private.ACTION_TYPE_NAMES[current_action.target_type]))
+        end
 
         local verify_func = LOOT_VERIFY_FUNCS[current_action.target_type]
         local update_func = LOOT_UPDATE_FUNCS[current_action.target_type]
@@ -1320,8 +1334,8 @@ do
                         local loot_quantity = loot_info[loot_index + 1]
                         local source_type, source_id = ParseGUID(source_guid)
                         -- TODO: Remove debugging
-                        --                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                        --                        print(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
+                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                        Debug(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                         current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
@@ -1539,6 +1553,8 @@ function WDP:PLAYER_TARGET_CHANGED(event_name)
     if not PlayerTarget() then
         return
     end
+    Debug(event_name)
+    current_action.target_type = AF.NPC
     self:UpdateTargetLocation()
 end
 
@@ -1773,6 +1789,8 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
     local spell_label = private.SPELL_LABELS_BY_NAME[spell_name]
 
+    Debug(event_name, unit_id, spell_name, spell_rank, target_name, spell_line)
+
     if not spell_label then
         return
     end
@@ -1780,6 +1798,8 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
 
     local item_name, item_link = _G.GameTooltip:GetItem()
     local unit_name, unit_id = _G.GameTooltip:GetUnit()
+
+    Debug(("Item name: '%s', Unit name: '%s'"):format(tostring(item_name), tostring(unit_name)))
 
     if not unit_name and _G.UnitName("target") == target_name then
         unit_name = target_name
@@ -1799,7 +1819,8 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         current_action.loot_label = spell_label:lower()
     end
 
-    if unit_name and not item_name then
+    if unit_name and unit_name == target_name and not item_name then
+        Debug("Unit name is same as target_name")
         if bit.band(spell_flags, AF.NPC) == AF.NPC then
             if not unit_id or unit_name ~= target_name then
                 return
@@ -1817,10 +1838,13 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     elseif not item_name and not unit_name then
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
             if target_name == "" then
+                Debug("Didn't set current_action.target_type")
                 return
             end
             current_action.object_name = target_name
             current_action.target_type = AF.OBJECT
+
+            Debug(("Set current_action.target_type to %s"):format(private.ACTION_TYPE_NAMES[current_action.target_type]))
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             current_action.target_type = AF.ZONE
         end
@@ -1834,6 +1858,8 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         return
     end
     private.tracked_line = nil
+
+    Debug(event_name)
 
     if spell_name:match("^Harvest.+") then
         reputation_npc_id = current_target_id
@@ -1852,6 +1878,7 @@ function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spe
     if unit_id ~= "player" then
         return
     end
+    Debug(event_name)
 
     if private.tracked_line == spell_line then
         private.tracked_line = nil
