@@ -1387,10 +1387,11 @@ do
             current_merchant = NPCEntry(unit_idnum)
             current_merchant.sells = current_merchant.sells or {}
         end
-        local num_items = _G.GetMerchantNumItems()
         local current_filters = _G.GetMerchantFilter()
         _G.SetMerchantFilter(_G.LE_LOOT_FILTER_ALL)
         _G.MerchantFrame_Update()
+
+        local num_items = _G.GetMerchantNumItems()
 
         for item_index = 1, num_items do
             local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
@@ -1777,12 +1778,12 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
     table.wipe(current_action)
 
-    local tt_item_name, tt_item_link = _G.GameTooltip:GetItem()
-    local tt_unit_name, tt_unit_id = _G.GameTooltip:GetUnit()
+    local item_name, item_link = _G.GameTooltip:GetItem()
+    local unit_name, unit_id = _G.GameTooltip:GetUnit()
 
-    if not tt_unit_name and _G.UnitName("target") == target_name then
-        tt_unit_name = target_name
-        tt_unit_id = "target"
+    if not unit_name and _G.UnitName("target") == target_name then
+        unit_name = target_name
+        unit_id = "target"
     end
     local spell_flags = private.SPELL_FLAGS_BY_LABEL[spell_label]
     local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
@@ -1798,9 +1799,9 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         current_action.loot_label = spell_label:lower()
     end
 
-    if tt_unit_name and not tt_item_name then
+    if unit_name and not item_name then
         if bit.band(spell_flags, AF.NPC) == AF.NPC then
-            if not tt_unit_id or tt_unit_name ~= target_name then
+            if not unit_id or unit_name ~= target_name then
                 return
             end
             current_action.target_type = AF.NPC
@@ -1808,13 +1809,12 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         current_action.target_type = AF.ITEM
 
-        if tt_item_name and tt_item_name == target_name then
-            current_action.identifier = ItemLinkToID(tt_item_link)
+        if item_name and item_name == target_name then
+            current_action.identifier = ItemLinkToID(item_link)
         elseif target_name and target_name ~= "" then
-            local _, target_item_link = _G.GetItemInfo(target_name)
-            current_action.identifier = ItemLinkToID(target_item_link)
+            current_action.identifier = ItemLinkToID(select(2, _G.GetItemInfo(target_name)))
         end
-    elseif not tt_item_name and not tt_unit_name then
+    elseif not item_name and not unit_name then
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
             if target_name == "" then
                 return
