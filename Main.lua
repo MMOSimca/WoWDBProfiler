@@ -255,8 +255,11 @@ end
 
 local function CurrentLocationData()
     if _G.WorldMapFrame:IsVisible() then
+        Debug("Map is opened. Returning 0, 0 for x, y")
         return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
     end
+    WDP:SetCurrentAreaID()
+
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
 
@@ -289,6 +292,8 @@ local function CurrentLocationData()
     if y % 2 ~= 0 then
         y = y + 1
     end
+
+    Debug(("x: %d y: %d"):format(x, y))
     return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
 end
 
@@ -594,6 +599,8 @@ do
 end -- do-block
 
 
+-- Contains a dirty hack due to Blizzard's strange handling of Micro Dungeons; GetMapInfo() will not return correct information
+-- unless the WorldMapFrame is shown.
 do
     -- MapFileName = MapAreaID
     local MICRO_DUNGEON_IDS = {
@@ -601,11 +608,10 @@ do
         ShrineofSevenStars = 905,
     }
 
-    -- Contains a dirty hack due to Blizzard's strange handling of Micro Dungeons; GetMapInfo() will not return correct information
-    -- unless the WorldMapFrame is shown.
     function WDP:SetCurrentAreaID(event_name)
         local world_map = _G.WorldMapFrame
         local map_visible = world_map:IsVisible()
+        local map_area_id = _G.GetCurrentMapAreaID()
         local sfx_value = _G.tonumber(_G.GetCVar("Sound_EnableSFX"))
 
         if not map_visible then
@@ -614,23 +620,22 @@ do
         end
         local micro_dungeon_id = MICRO_DUNGEON_IDS[select(5, _G.GetMapInfo())]
 
+        _G.SetMapToCurrentZone()
+
         if micro_dungeon_id then
             current_area_id = micro_dungeon_id
         else
-            local map_area_id = _G.GetCurrentMapAreaID()
-            _G.SetMapToCurrentZone()
-
             current_area_id = _G.GetCurrentMapAreaID()
-            _G.SetMapByID(map_area_id)
         end
 
-        if not map_visible then
+        if map_visible then
+            _G.SetMapByID(map_area_id)
+        else
             world_map:Hide()
             _G.SetCVar("Sound_EnableSFX", sfx_value)
         end
     end
-end -- do-block
-
+end
 
 -----------------------------------------------------------------------
 -- Methods.
@@ -657,13 +662,10 @@ function WDP:EventDispatcher(...)
     local event_name = ...
 
     if DEBUGGING then
-        if reputation_npc_id then
-            if event_name == "COMBAT_LOG_EVENT_UNFILTERED" then
-                Debug(event_name)
-            else
-                Debug(...)
-            end
-            Debug(("reputation_npc_id == '%s'"):format(reputation_npc_id))
+        if event_name == "COMBAT_LOG_EVENT_UNFILTERED" then
+            Debug(event_name)
+        else
+            Debug(...)
         end
     end
     local func = EVENT_MAPPING[event_name]
