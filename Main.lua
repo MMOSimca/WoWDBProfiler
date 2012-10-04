@@ -200,6 +200,13 @@ do
 end -- do-block
 
 
+-- Called on a timer
+local function ClearReputationNPC()
+    Debug("Clearing reputation_npc_id")
+    reputation_npc_id = nil
+end
+
+
 local function InstanceDifficultyToken()
     local _, instance_type, instance_difficulty, difficulty_name, _, _, is_dynamic = _G.GetInstanceInfo()
     if not difficulty_name or difficulty_name == "" then
@@ -646,9 +653,36 @@ function WDP:OnInitialize()
 end
 
 
+function WDP:EventDispatcher(...)
+    local event_name = ...
+
+    if DEBUGGING then
+        if reputation_npc_id then
+            if event_name == "COMBAT_LOG_EVENT_UNFILTERED" then
+                Debug(event_name)
+            else
+                Debug(...)
+            end
+            Debug(("reputation_npc_id == '%s'"):format(reputation_npc_id))
+        end
+    end
+    local func = EVENT_MAPPING[event_name]
+
+    if _G.type(func) == "boolean" then
+        self[event_name](self, ...)
+    elseif _G.type(func) == "function" then
+        EVENT_MAPPING[event_name](self, ...)
+    end
+end
+
+
 function WDP:OnEnable()
     for event_name, mapping in pairs(EVENT_MAPPING) do
-        self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
+        if DEBUGGING then
+            self:RegisterEvent(event_name, "EventDispatcher")
+        else
+            self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
+        end
     end
 
     for index = 1, _G.GetNumLanguages() do
@@ -966,6 +1000,9 @@ do
             RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
         end,
         UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+            if dest_guid ~= _G.UnitGUID("target") then
+                return
+            end
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
@@ -974,6 +1011,7 @@ do
                 return
             end
             reputation_npc_id = unit_idnum
+            WDP:ScheduleTimer(ClearReputationNPC, 0.1)
         end,
     }
 
@@ -1093,6 +1131,7 @@ do
                 end
             end
         end
+        Debug(("Setting reputation for %s."):format(faction_name))
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
@@ -1270,7 +1309,6 @@ do
 
 
     function WDP:LOOT_CLOSED(event_name)
-        Debug(event_name)
         current_loot = nil
         table.wipe(current_action)
     end
@@ -1281,7 +1319,6 @@ do
             return
         end
 
-        Debug(event_name)
         if not current_action.target_type then
             Debug("No target type.")
             return
@@ -1553,7 +1590,6 @@ function WDP:PLAYER_TARGET_CHANGED(event_name)
     if not PlayerTarget() then
         return
     end
-    Debug(event_name)
     current_action.target_type = AF.NPC
     self:UpdateTargetLocation()
 end
@@ -1789,8 +1825,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
     local spell_label = private.SPELL_LABELS_BY_NAME[spell_name]
 
-    Debug(event_name, unit_id, spell_name, spell_rank, target_name, spell_line)
-
     if not spell_label then
         return
     end
@@ -1859,8 +1893,6 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     end
     private.tracked_line = nil
 
-    Debug(event_name)
-
     if spell_name:match("^Harvest.+") then
         reputation_npc_id = current_target_id
         private.harvesting = true
@@ -1878,7 +1910,6 @@ function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spe
     if unit_id ~= "player" then
         return
     end
-    Debug(event_name)
 
     if private.tracked_line == spell_line then
         private.tracked_line = nil
