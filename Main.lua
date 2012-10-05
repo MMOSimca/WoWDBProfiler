@@ -609,9 +609,13 @@ do
     }
 
     function WDP:SetCurrentAreaID(event_name)
+        local map_area_id = _G.GetCurrentMapAreaID()
+
+        if map_area_id == current_area_id then
+            return
+        end
         local world_map = _G.WorldMapFrame
         local map_visible = world_map:IsVisible()
-        local map_area_id = _G.GetCurrentMapAreaID()
         local sfx_value = _G.tonumber(_G.GetCVar("Sound_EnableSFX"))
 
         if not map_visible then
