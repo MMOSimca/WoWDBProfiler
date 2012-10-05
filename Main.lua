@@ -34,6 +34,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 local DB_VERSION = 10
 local DEBUGGING = false
+local EVENT_DEBUG = false
 
 local DATABASE_DEFAULTS = {
     char = {},
@@ -72,6 +73,8 @@ local EVENT_MAPPING = {
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
     PET_JOURNAL_LIST_UPDATE = true,
+    PLAYER_REGEN_DISABLED = true,
+    PLAYER_REGEN_ENABLED = true,
     PLAYER_TARGET_CHANGED = true,
     QUEST_COMPLETE = true,
     QUEST_DETAIL = true,
@@ -254,8 +257,7 @@ end
 
 
 local function CurrentLocationData()
-    if _G.WorldMapFrame:IsVisible() then
-        Debug("Map is opened. Returning 0, 0 for x, y")
+    if _G.WorldMapFrame:IsVisible() or private.in_combat then
         return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
     end
     WDP:SetCurrentAreaID()
@@ -609,6 +611,10 @@ do
     }
 
     function WDP:SetCurrentAreaID(event_name)
+        if private.in_combat then
+            private.set_area_id = true
+            return
+        end
         local map_area_id = _G.GetCurrentMapAreaID()
 
         if map_area_id == current_area_id then
@@ -677,14 +683,14 @@ function WDP:EventDispatcher(...)
     if _G.type(func) == "boolean" then
         self[event_name](self, ...)
     elseif _G.type(func) == "function" then
-        EVENT_MAPPING[event_name](self, ...)
+        self[EVENT_MAPPING[event_name]](self, ...)
     end
 end
 
 
 function WDP:OnEnable()
     for event_name, mapping in pairs(EVENT_MAPPING) do
-        if DEBUGGING then
+        if EVENT_DEBUG then
             self:RegisterEvent(event_name, "EventDispatcher")
         else
             self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
@@ -1588,6 +1594,21 @@ function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
                 data.speed = speed
             end
         end
+    end
+end
+
+
+function WDP:PLAYER_REGEN_DISABLED(event_name)
+    private.in_combat = true
+end
+
+
+function WDP:PLAYER_REGEN_ENABLED(event_name)
+    private.in_combat = nil
+
+    if private.set_area_id then
+        self:SetCurrentAreaID(event_name)
+        private.set_area_id = nil
     end
 end
 
