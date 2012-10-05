@@ -32,9 +32,10 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 10
+local DB_VERSION = 11
 local DEBUGGING = false
 local EVENT_DEBUG = false
+
 
 local DATABASE_DEFAULTS = {
     char = {},
