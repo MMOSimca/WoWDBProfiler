@@ -165,6 +165,13 @@ local function Debug(...)
     _G.print(...)
 end
 
+local SHA_OF_ANGER_ID = 60491
+local GALLEON_ID = 62346
+
+local function IsHardCodedNPC(unit_id)
+    return unit_id == SHA_OF_ANGER_ID or unit_id == GALLEON_ID
+end
+
 
 local ActualCopperCost
 do
@@ -684,7 +691,7 @@ function WDP:EventDispatcher(...)
     if _G.type(func) == "boolean" then
         self[event_name](self, ...)
     elseif _G.type(func) == "function" then
-        self[EVENT_MAPPING[event_name]](self, ...)
+        self[func](self, ...)
     end
 end
 
@@ -799,7 +806,7 @@ do
         end
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-        if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+        if not unit_idnum or (unit_type ~= private.UNIT_TYPES.NPC and not IsHardCodedNPC(unit_idnum)) then
             return
         end
         current_target_id = unit_idnum
@@ -986,7 +993,7 @@ do
         end
         local source_type, source_id = ParseGUID(source_guid)
 
-        if not source_id or source_type ~= private.UNIT_TYPES.NPC then
+        if not source_id or (source_type ~= private.UNIT_TYPES.NPC and not IsHardCodedNPC(source_id)) then
             return
         end
 
