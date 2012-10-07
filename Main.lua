@@ -165,13 +165,6 @@ local function Debug(...)
     _G.print(...)
 end
 
-local SHA_OF_ANGER_ID = 60491
-local GALLEON_ID = 62346
-
-local function IsHardCodedNPC(unit_id)
-    return unit_id == SHA_OF_ANGER_ID or unit_id == GALLEON_ID
-end
-
 
 local ActualCopperCost
 do
@@ -803,7 +796,7 @@ do
         end
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-        if not unit_idnum or (unit_type ~= private.UNIT_TYPES.NPC and not IsHardCodedNPC(unit_idnum)) then
+        if not unit_idnum or unit_type ~= private.UNIT_TYPES.NPC then
             return
         end
         current_target_id = unit_idnum
@@ -990,7 +983,7 @@ do
         end
         local source_type, source_id = ParseGUID(source_guid)
 
-        if not source_id or (source_type ~= private.UNIT_TYPES.NPC and not IsHardCodedNPC(source_id)) then
+        if not source_id or source_type ~= private.UNIT_TYPES.NPC then
             return
         end
 
