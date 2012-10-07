@@ -265,11 +265,9 @@ end
 
 
 local function CurrentLocationData()
-    if _G.WorldMapFrame:IsVisible() or private.in_combat then
+    if _G.GetCurrentMapAreaID() ~= current_area_id then
         return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
     end
-    WDP:SetCurrentAreaID()
-
     local map_level = _G.GetCurrentMapDungeonLevel() or 0
     local x, y = _G.GetPlayerMapPosition("player")
 
@@ -302,8 +300,7 @@ local function CurrentLocationData()
     if y % 2 ~= 0 then
         y = y + 1
     end
-
-    Debug(("x: %d y: %d"):format(x, y))
+    Debug(("x: %d y: %d map_id: %d"):format(x, y, _G.GetCurrentMapAreaID()))
     return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
 end
 
