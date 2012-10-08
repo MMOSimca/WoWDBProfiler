@@ -1792,12 +1792,13 @@ end -- do-block
 
 function WDP:TRAINER_SHOW(event_name)
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
-    local npc = NPCEntry(unit_idnum)
+    local trainer = NPCEntry(unit_idnum)
 
-    if not npc then
+    if not trainer then
         return
     end
-    npc.teaches = npc.teaches or {}
+    local trainer_standing = select(2, UnitFactionStanding("target"))
+    trainer.teaches = trainer.teaches or {}
 
     -- Get the initial trainer filters
     local available = _G.GetTrainerServiceTypeFilter("available")
@@ -1819,20 +1820,22 @@ function WDP:TRAINER_SHOW(event_name)
             local _, _, spell_id = DatamineTT:GetSpell()
 
             if spell_id then
+                local class_professions = trainer.teaches[PLAYER_CLASS]
+
+                if not class_professions then
+                    trainer.teaches[PLAYER_CLASS] = {}
+                    class_professions = trainer.teaches[PLAYER_CLASS]
+                end
                 local profession, min_skill = _G.GetTrainerServiceSkillReq(index)
                 profession = profession or "General"
 
-                local class_professions = npc.teaches[PLAYER_CLASS]
-                if not class_professions then
-                    npc.teaches[PLAYER_CLASS] = {}
-                    class_professions = npc.teaches[PLAYER_CLASS]
-                end
-
                 local profession_skills = class_professions[profession]
+
                 if not profession_skills then
                     class_professions[profession] = {}
                     profession_skills = class_professions[profession]
                 end
+--                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, ActualCopperCost(_G.GetTrainerServiceCost(index), trainer_standing))
                 profession_skills[spell_id] = ("%d:%d"):format(required_level, min_skill)
             end
         end
