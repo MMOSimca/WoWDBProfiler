@@ -437,6 +437,8 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             current_action.target_type = AF.ITEM
             current_action.identifier = item_id
             current_action.loot_label = "contains"
+
+            Debug(("HandleItemUse: current_action.identifier: '%s'"):format(item_id))
             break
         end
     end
@@ -512,6 +514,7 @@ do
                 local entry, source_id
 
                 if current_loot.target_type == AF.ITEM then
+                    Debug(("GenericLootUpdate: current_loot.identifier: '%s'"):format(tostring(current_loot.identifier)))
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
                     entry = DBEntry(data_type, source_id)
@@ -1202,13 +1205,19 @@ do
 
                     if is_locked then
                         locked_item_id = ItemLinkToID(_G.GetContainerItemLink(bag_index, slot_index))
+                        break
                     end
+                end
+
+                if locked_item_id then
+                    break
                 end
             end
 
             if not locked_item_id or (current_action.identifier and current_action.identifier ~= locked_item_id) then
                 return false
             end
+            Debug(("LOOT_VERIFY_FUNCS[AF.ITEM]: current_action.identifier: '%s'"):format(locked_item_id))
             current_action.identifier = locked_item_id
             return true
         end,
@@ -1835,7 +1844,7 @@ function WDP:TRAINER_SHOW(event_name)
                     class_professions[profession] = {}
                     profession_skills = class_professions[profession]
                 end
---                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, ActualCopperCost(_G.GetTrainerServiceCost(index), trainer_standing))
+                --                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, ActualCopperCost(_G.GetTrainerServiceCost(index), trainer_standing))
                 profession_skills[spell_id] = ("%d:%d"):format(required_level, min_skill)
             end
         end
@@ -1861,8 +1870,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     local item_name, item_link = _G.GameTooltip:GetItem()
     local unit_name, unit_id = _G.GameTooltip:GetUnit()
 
-    Debug(("Item name: '%s', Unit name: '%s'"):format(tostring(item_name), tostring(unit_name)))
-
     if not unit_name and _G.UnitName("target") == target_name then
         unit_name = target_name
         unit_id = "target"
@@ -1882,7 +1889,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
 
     if unit_name and unit_name == target_name and not item_name then
-        Debug("Unit name is same as target_name")
         if bit.band(spell_flags, AF.NPC) == AF.NPC then
             if not unit_id or unit_name ~= target_name then
                 return
@@ -1892,11 +1898,14 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         current_action.target_type = AF.ITEM
 
+        Debug(("%s: Item name: '%s'"):format(event_name, tostring(item_name)))
+
         if item_name and item_name == target_name then
             current_action.identifier = ItemLinkToID(item_link)
         elseif target_name and target_name ~= "" then
             current_action.identifier = ItemLinkToID(select(2, _G.GetItemInfo(target_name)))
         end
+        Debug(("%s: current_action.identifier: '%s'"):format(event_name, tostring(current_action.identifier)))
     elseif not item_name and not unit_name then
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
             if target_name == "" then
