@@ -1844,8 +1844,7 @@ function WDP:TRAINER_SHOW(event_name)
                     class_professions[profession] = {}
                     profession_skills = class_professions[profession]
                 end
-                --                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, ActualCopperCost(_G.GetTrainerServiceCost(index), trainer_standing))
-                profession_skills[spell_id] = ("%d:%d"):format(required_level, min_skill)
+                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, ActualCopperCost(_G.GetTrainerServiceCost(index), trainer_standing))
             end
         end
     end
