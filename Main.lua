@@ -44,6 +44,7 @@ local DATABASE_DEFAULTS = {
         npcs = {},
         objects = {},
         quests = {},
+        spells = {},
         zones = {},
     }
 }
@@ -83,6 +84,7 @@ local EVENT_MAPPING = {
     QUEST_PROGRESS = true,
     TAXIMAP_OPENED = true,
     TRADE_SKILL_SHOW = true,
+    TRAINER_CLOSED = true,
     TRAINER_SHOW = true,
     TRANSMOGRIFY_OPEN = true,
     UNIT_QUEST_LOG_CHANGED = true,
@@ -163,6 +165,66 @@ local function Debug(...)
         return
     end
     _G.print(...)
+end
+
+
+local function TradeSkillExecutePer(iter_func)
+    if _G.TradeSkillFrame and _G.TradeSkillFrame:IsVisible() then
+        -- Clear the search box focus so the scan will have correct results.
+        local search_box = _G.TradeSkillFrameSearchBox
+        search_box:SetText("")
+        _G.TradeSkillSearch_OnTextChanged(search_box)
+        search_box:ClearFocus()
+        search_box:GetScript("OnEditFocusLost")(search_box)
+    end
+    local header_list = {}
+
+    -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
+    local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
+    local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
+
+    if have_materials then
+        _G.TradeSkillFrame.filterTbl.hasMaterials = false
+        _G.TradeSkillOnlyShowMakeable(false)
+    end
+
+    if have_skillup then
+        _G.TradeSkillFrame.filterTbl.hasSkillUp = false
+        _G.TradeSkillOnlyShowSkillUps(false)
+    end
+    _G.SetTradeSkillInvSlotFilter(0, 1, 1)
+    _G.TradeSkillUpdateFilterBar()
+    _G.TradeSkillFrame_Update()
+
+    -- Expand all headers so we can see all the recipes there are
+    for tradeskill_index = 1, _G.GetNumTradeSkills() do
+        local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+
+        if tradeskill_type == "header" or tradeskill_type == "subheader" then
+            if not is_expanded then
+                header_list[name] = true
+                _G.ExpandTradeSkillSubClass(tradeskill_index)
+            end
+        else
+            iter_func(name, tradeskill_index)
+        end
+    end
+
+    -- Restore the state of the things we changed.
+    for tradeskill_index = 1, _G.GetNumTradeSkills() do
+        local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+
+        if header_list[name] then
+            _G.CollapseTradeSkillSubClass(tradeskill_index)
+        end
+    end
+    _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
+    _G.TradeSkillOnlyShowMakeable(have_materials)
+    _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
+    _G.TradeSkillOnlyShowSkillUps(have_skillup)
+
+    _G.TradeSkillUpdateFilterBar()
+    _G.TradeSkillFrame_Update()
 end
 
 
@@ -957,7 +1019,42 @@ do
         _G.DRUNK_MESSAGE_SELF4:gsub("%%s", ".+"),
     }
 
+    local RECIPE_MATCH = _G.ERR_LEARN_RECIPE_S:gsub("%%s", "(.*)")
+
+
+    local function RecordDiscovery(tradeskill_name, tradeskill_index)
+        if tradeskill_name == private.discovered_recipe_name then
+            DBEntry("spells", tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
+
+            private.discovered_recipe_name = nil
+            private.profession_level = nil
+            private.previous_spell_id = nil
+        end
+    end
+
+
+    local function IterativeRecordDiscovery()
+        TradeSkillExecutePer(RecordDiscovery)
+    end
+
+
     function WDP:CHAT_MSG_SYSTEM(event_name, message)
+        if not private.trainer_shown then
+            local recipe_name = message:match(RECIPE_MATCH)
+
+            if recipe_name and private.previous_spell_id then
+                local profession_name, prof_level = _G.GetTradeSkillLine()
+
+                if profession_name == _G.UNKNOWN then
+                    return
+                end
+                private.discovered_recipe_name = recipe_name
+                private.profession_level = prof_level
+
+                self:ScheduleTimer(IterativeRecordDiscovery, 0.2)
+            end
+        end
+
         if currently_drunk then
             if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
                 currently_drunk = nil
@@ -1723,80 +1820,34 @@ do
     }
 
 
+    local function RegisterTools(tradeskill_name, tradeskill_index)
+        local spell_id = tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
+        local required_tool = _G.GetTradeSkillTools(tradeskill_index)
+
+        if required_tool then
+            for tool_name, registry in pairs(TRADESKILL_TOOLS) do
+                if required_tool:find(tool_name) then
+                    registry[spell_id] = true
+                end
+            end
+        end
+    end
+
+
     function WDP:TRADE_SKILL_SHOW(event_name)
         local profession_name, prof_level = _G.GetTradeSkillLine()
 
         if profession_name == _G.UNKNOWN then
             return
         end
-
-        if _G.TradeSkillFrame and _G.TradeSkillFrame:IsVisible() then
-            -- Clear the search box focus so the scan will have correct results.
-            local search_box = _G.TradeSkillFrameSearchBox
-            search_box:SetText("")
-            _G.TradeSkillSearch_OnTextChanged(search_box)
-            search_box:ClearFocus()
-            search_box:GetScript("OnEditFocusLost")(search_box)
-        end
-        local header_list = {}
-
-        -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
-        local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
-        local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
-
-        if have_materials then
-            _G.TradeSkillFrame.filterTbl.hasMaterials = false
-            _G.TradeSkillOnlyShowMakeable(false)
-        end
-
-        if have_skillup then
-            _G.TradeSkillFrame.filterTbl.hasSkillUp = false
-            _G.TradeSkillOnlyShowSkillUps(false)
-        end
-        _G.SetTradeSkillInvSlotFilter(0, 1, 1)
-        _G.TradeSkillUpdateFilterBar()
-        _G.TradeSkillFrame_Update()
-
-        -- Expand all headers so we can see all the recipes there are
-        for tradeskill_index = 1, _G.GetNumTradeSkills() do
-            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
-
-            if tradeskill_type == "header" or tradeskill_type == "subheader" then
-                if not is_expanded then
-                    header_list[name] = true
-                    _G.ExpandTradeSkillSubClass(tradeskill_index)
-                end
-            else
-                local spell_id = tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
-                local required_tool = _G.GetTradeSkillTools(tradeskill_index)
-
-                if required_tool then
-                    for tool_name, registry in pairs(TRADESKILL_TOOLS) do
-                        if required_tool:find(tool_name) then
-                            registry[spell_id] = true
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Restore the state of the things we changed.
-        for tradeskill_index = 1, _G.GetNumTradeSkills() do
-            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
-
-            if header_list[name] then
-                _G.CollapseTradeSkillSubClass(tradeskill_index)
-            end
-        end
-        _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
-        _G.TradeSkillOnlyShowMakeable(have_materials)
-        _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
-        _G.TradeSkillOnlyShowSkillUps(have_skillup)
-
-        _G.TradeSkillUpdateFilterBar()
-        _G.TradeSkillFrame_Update()
+        TradeSkillExecutePer(RegisterTools)
     end
 end -- do-block
+
+
+function WDP:TRAINER_CLOSED(event_name)
+    private.trainer_shown = nil
+end
 
 
 function WDP:TRAINER_SHOW(event_name)
@@ -1808,6 +1859,8 @@ function WDP:TRAINER_SHOW(event_name)
     end
     local trainer_standing = select(2, UnitFactionStanding("target"))
     trainer.teaches = trainer.teaches or {}
+
+    private.trainer_shown = true
 
     -- Get the initial trainer filters
     local available = _G.GetTrainerServiceTypeFilter("available")
@@ -1928,6 +1981,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         return
     end
     private.tracked_line = nil
+    private.previous_spell_id = spell_id
 
     if spell_name:match("^Harvest.+") then
         reputation_npc_id = current_target_id
