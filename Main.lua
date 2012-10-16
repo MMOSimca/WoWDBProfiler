@@ -377,6 +377,11 @@ local function ItemLinkToID(item_link)
 end
 
 
+local function UnitTypeIsNPC(unit_type)
+    return unit_type == private.UNIT_TYPES.NPC or unit_type == private.UNIT_TYPES.VEHICLE
+end
+
+
 local ParseGUID
 do
     local UNIT_TYPE_BITMASK = 0x007
@@ -870,7 +875,7 @@ do
         end
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-        if not unit_idnum or unit_type ~= private.UNIT_TYPES.NPC then
+        if not unit_idnum or not UnitTypeIsNPC(unit_type) then
             return
         end
         current_target_id = unit_idnum
@@ -1094,7 +1099,7 @@ do
         end
         local source_type, source_id = ParseGUID(source_guid)
 
-        if not source_id or source_type ~= private.UNIT_TYPES.NPC then
+        if not source_id or not UnitTypeIsNPC(source_type) then
             return
         end
 
@@ -1114,7 +1119,7 @@ do
             if spell_id == HEAL_BATTLE_PETS_SPELL_ID then
                 local unit_type, unit_idnum = ParseGUID(source_guid)
 
-                if unit_type == private.UNIT_TYPES.NPC and unit_idnum then
+                if unit_idnum and UnitTypeIsNPC(unit_type) then
                     NPCEntry(unit_idnum).stable_master = true
                 end
             end
@@ -1126,7 +1131,7 @@ do
             end
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
-            if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+            if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 reputation_npc_id = nil
                 private.harvesting = nil
                 return
@@ -1558,7 +1563,7 @@ do
         if not current_merchant or event_name == "MERCHANT_SHOW" then
             local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
 
-            if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+            if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 return
             end
             merchant_standing = select(2, UnitFactionStanding("target"))
@@ -1678,7 +1683,7 @@ function WDP:PET_BAR_UPDATE(event_name)
     end
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("pet"))
 
-    if unit_type ~= private.UNIT_TYPES.NPC or not unit_idnum then
+    if not unit_idnum or not UnitTypeIsNPC(unit_type) then
         return
     end
     NPCEntry(unit_idnum).mind_control = true
@@ -2027,7 +2032,7 @@ do
             return
         end
 
-        if unit_type == private.UNIT_TYPES.NPC then
+        if UnitTypeIsNPC(unit_type) then
             NPCEntry(unit_idnum)[field] = true
         elseif unit_type == private.UNIT_TYPES.OBJECT then
             DBEntry("objects", unit_idnum)[field] = true
