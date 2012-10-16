@@ -168,64 +168,73 @@ local function Debug(...)
 end
 
 
-local function TradeSkillExecutePer(iter_func)
-    if _G.TradeSkillFrame and _G.TradeSkillFrame:IsVisible() then
+local TradeSkillExecutePer
+do
+    local header_list = {}
+
+    -- iter_func returns true to indicate that the loop should be broken
+    function TradeSkillExecutePer(iter_func)
+        if not _G.TradeSkillFrame or not _G.TradeSkillFrame:IsVisible() then
+            return
+        end
         -- Clear the search box focus so the scan will have correct results.
         local search_box = _G.TradeSkillFrameSearchBox
         search_box:SetText("")
+
         _G.TradeSkillSearch_OnTextChanged(search_box)
         search_box:ClearFocus()
         search_box:GetScript("OnEditFocusLost")(search_box)
-    end
-    local header_list = {}
 
-    -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
-    local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
-    local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
+        table.wipe(header_list)
 
-    if have_materials then
-        _G.TradeSkillFrame.filterTbl.hasMaterials = false
-        _G.TradeSkillOnlyShowMakeable(false)
-    end
+        -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
+        local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
+        local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
 
-    if have_skillup then
-        _G.TradeSkillFrame.filterTbl.hasSkillUp = false
-        _G.TradeSkillOnlyShowSkillUps(false)
-    end
-    _G.SetTradeSkillInvSlotFilter(0, 1, 1)
-    _G.TradeSkillUpdateFilterBar()
-    _G.TradeSkillFrame_Update()
+        if have_materials then
+            _G.TradeSkillFrame.filterTbl.hasMaterials = false
+            _G.TradeSkillOnlyShowMakeable(false)
+        end
 
-    -- Expand all headers so we can see all the recipes there are
-    for tradeskill_index = 1, _G.GetNumTradeSkills() do
-        local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+        if have_skillup then
+            _G.TradeSkillFrame.filterTbl.hasSkillUp = false
+            _G.TradeSkillOnlyShowSkillUps(false)
+        end
+        _G.SetTradeSkillInvSlotFilter(0, 1, 1)
+        _G.TradeSkillUpdateFilterBar()
+        _G.TradeSkillFrame_Update()
 
-        if tradeskill_type == "header" or tradeskill_type == "subheader" then
-            if not is_expanded then
-                header_list[name] = true
-                _G.ExpandTradeSkillSubClass(tradeskill_index)
+        -- Expand all headers so we can see all the recipes there are
+        for tradeskill_index = 1, _G.GetNumTradeSkills() do
+            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+
+            if tradeskill_type == "header" or tradeskill_type == "subheader" then
+                if not is_expanded then
+                    header_list[name] = true
+                    _G.ExpandTradeSkillSubClass(tradeskill_index)
+                end
+            elseif iter_func(name, tradeskill_index) then
+                break
             end
-        else
-            iter_func(name, tradeskill_index)
         end
-    end
 
-    -- Restore the state of the things we changed.
-    for tradeskill_index = 1, _G.GetNumTradeSkills() do
-        local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+        -- Restore the state of the things we changed.
+        for tradeskill_index = 1, _G.GetNumTradeSkills() do
+            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
 
-        if header_list[name] then
-            _G.CollapseTradeSkillSubClass(tradeskill_index)
+            if header_list[name] then
+                _G.CollapseTradeSkillSubClass(tradeskill_index)
+            end
         end
-    end
-    _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
-    _G.TradeSkillOnlyShowMakeable(have_materials)
-    _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
-    _G.TradeSkillOnlyShowSkillUps(have_skillup)
+        _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
+        _G.TradeSkillOnlyShowMakeable(have_materials)
+        _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
+        _G.TradeSkillOnlyShowSkillUps(have_skillup)
 
-    _G.TradeSkillUpdateFilterBar()
-    _G.TradeSkillFrame_Update()
-end
+        _G.TradeSkillUpdateFilterBar()
+        _G.TradeSkillFrame_Update()
+    end
+end -- do-block
 
 
 local ActualCopperCost
@@ -1029,6 +1038,8 @@ do
             private.discovered_recipe_name = nil
             private.profession_level = nil
             private.previous_spell_id = nil
+
+            return true
         end
     end
 
