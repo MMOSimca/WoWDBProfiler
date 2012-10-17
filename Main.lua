@@ -32,7 +32,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 11
+local DB_VERSION = 12
 local DEBUGGING = false
 local EVENT_DEBUG = false
 
@@ -1913,7 +1913,7 @@ function WDP:TRAINER_SHOW(event_name)
                     class_professions[profession] = {}
                     profession_skills = class_professions[profession]
                 end
-                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, ActualCopperCost(_G.GetTrainerServiceCost(index), trainer_standing))
+                profession_skills[spell_id] = ("%d:%d:%d"):format(required_level, min_skill, _G.GetTrainerServiceCost(index))
             end
         end
     end
