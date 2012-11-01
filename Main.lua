@@ -1308,7 +1308,7 @@ do
     end
 
 
-    local LOOT_VERIFY_FUNCS = {
+    local LOOT_OPENED_VERIFY_FUNCS = {
         [AF.ITEM] = function()
             local locked_item_id
 
@@ -1353,7 +1353,7 @@ do
     }
 
 
-    local LOOT_UPDATE_FUNCS = {
+    local LOOT_OPENED_UPDATE_FUNCS = {
         [AF.ITEM] = function()
             GenericLootUpdate("items")
         end,
@@ -1458,8 +1458,8 @@ do
             Debug(("current_action.target_type: %s"):format(private.ACTION_TYPE_NAMES[current_action.target_type]))
         end
 
-        local verify_func = LOOT_VERIFY_FUNCS[current_action.target_type]
-        local update_func = LOOT_UPDATE_FUNCS[current_action.target_type]
+        local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
+        local update_func = LOOT_OPENED_UPDATE_FUNCS[current_action.target_type]
 
         if not verify_func or not update_func then
             return
