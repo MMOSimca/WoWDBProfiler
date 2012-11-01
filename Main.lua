@@ -135,7 +135,7 @@ local faction_standings = {}
 local forge_spell_ids = {}
 local languages_known = {}
 local name_to_id_map = {}
-local reputation_npc_id
+local last_killed_npc_id
 local target_location_timer_handle
 local current_target_id
 local current_area_id
@@ -276,9 +276,9 @@ end -- do-block
 
 
 -- Called on a timer
-local function ClearReputationNPC()
-    Debug("Clearing reputation_npc_id")
-    reputation_npc_id = nil
+local function ClearLastKilledNPC()
+    Debug("Clearing last_killed_npc_id")
+    last_killed_npc_id = nil
 end
 
 
@@ -1132,12 +1132,12 @@ do
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
-                reputation_npc_id = nil
+                last_killed_npc_id = nil
                 private.harvesting = nil
                 return
             end
-            reputation_npc_id = unit_idnum
-            WDP:ScheduleTimer(ClearReputationNPC, 0.1)
+            last_killed_npc_id = unit_idnum
+            WDP:ScheduleTimer(ClearLastKilledNPC, 0.1)
         end,
     }
 
@@ -1218,7 +1218,7 @@ do
 
 
     function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
-        if message_type ~= "FACTION" or not reputation_npc_id then
+        if message_type ~= "FACTION" or not last_killed_npc_id then
             return
         end
         UpdateFactionData()
@@ -1226,8 +1226,8 @@ do
         if not faction_name or not faction_standings[faction_name] then
             return
         end
-        local npc = NPCEntry(reputation_npc_id)
-        reputation_npc_id = nil
+        local npc = NPCEntry(last_killed_npc_id)
+        last_killed_npc_id = nil
 
         if not npc then
             private.harvesting = nil
@@ -1769,7 +1769,7 @@ do
             quest.reward_text = ReplaceKeywords(_G.GetRewardText())
         end
         -- Make sure the quest NPC isn't erroneously recorded as giving reputation for quests which award it.
-        reputation_npc_id = nil
+        last_killed_npc_id = nil
     end
 
 
@@ -2000,7 +2000,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     private.previous_spell_id = spell_id
 
     if spell_name:match("^Harvest.+") then
-        reputation_npc_id = current_target_id
+        last_killed_npc_id = current_target_id
         private.harvesting = true
     end
 
