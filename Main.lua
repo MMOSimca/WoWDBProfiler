@@ -135,7 +135,7 @@ local faction_standings = {}
 local forge_spell_ids = {}
 local languages_known = {}
 local name_to_id_map = {}
-local last_killed_npc_id
+local killed_npc_id
 local target_location_timer_handle
 local current_target_id
 local current_area_id
@@ -276,9 +276,14 @@ end -- do-block
 
 
 -- Called on a timer
-local function ClearLastKilledNPC()
+local function ClearKilledNPC()
     Debug("Clearing last_killed_npc_id")
-    last_killed_npc_id = nil
+    killed_npc_id = nil
+end
+
+
+local function IsRaidFinderInstance(instance_type, instance_difficulty)
+    return instance_type == "raid" and instance_difficulty == 2 and _G.IsPartyLFG() and _G.IsInLFGDungeon()
 end
 
 
@@ -293,7 +298,7 @@ local function InstanceDifficultyToken()
     end
 
     -- Raid difficulty of 2 is 25-man
-    if instance_type == "raid" and instance_difficulty == 2 and _G.IsPartyLFG() and _G.IsInLFGDungeon() then
+    if IsRaidFinderInstance(instance_type, instance_difficulty) then
         difficulty_name = "LOOKING_FOR_RAID"
     end
     return ("%s:%s:%s"):format(instance_type:upper(), difficulty_name:upper():gsub(" ", "_"), _G.tostring(is_dynamic))
@@ -970,8 +975,55 @@ function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
 end
 
 
+local CHAT_MSG_LOOT_UPDATE_FUNCS = {
+    [AF.NPC] = function(item_id, quantity)
+        local npc = NPCEntry(private.raid_finder_boss_id)
+
+        if not npc then
+            return
+        end
+        local loot_type = "raid_finder_loot"
+        local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
+        encounter_data[loot_type] = encounter_data[loot_type] or {}
+        encounter_data.loot_counts = encounter_data.loot_counts or {}
+        encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
+
+        table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
+    end,
+    [AF.ZONE] = function(item_id, quantity)
+        current_loot = {
+            list = {
+                ("%d:%d"):format(item_id, quantity)
+            },
+            identifier = current_action.identifier,
+            label = current_action.loot_label or "drops",
+            map_level = current_action.map_level,
+            object_name = current_action.object_name,
+            spell_label = current_action.spell_label,
+            target_type = current_action.target_type,
+            x = current_action.x,
+            y = current_action.y,
+            zone_data = current_action.zone_data,
+        }
+        table.wipe(current_action)
+        GenericLootUpdate("zones")
+    end,
+}
+
+
 function WDP:CHAT_MSG_LOOT(event_name, message)
+    local category
+
+    Debug(event_name)
+
     if current_action.spell_label ~= "EXTRACT_GAS" then
+        category = AF.ZONE
+    elseif private.raid_finder_boss_id then
+        category = AF.NPC
+    end
+    local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
+
+    if not category or not update_func then
         return
     end
     local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
@@ -979,31 +1031,12 @@ function WDP:CHAT_MSG_LOOT(event_name, message)
     if not item_link then
         quantity, item_link = 1, deformat(message, _G.LOOT_ITEM_PUSHED_SELF)
     end
-
-    if not item_link then
-        return
-    end
     local item_id = ItemLinkToID(item_link)
 
     if not item_id then
         return
     end
-    current_loot = {
-        list = {
-            ("%d:%d"):format(item_id, quantity)
-        },
-        identifier = current_action.identifier,
-        label = current_action.loot_label or "drops",
-        map_level = current_action.map_level,
-        object_name = current_action.object_name,
-        spell_label = current_action.spell_label,
-        target_type = current_action.target_type,
-        x = current_action.x,
-        y = current_action.y,
-        zone_data = current_action.zone_data,
-    }
-    table.wipe(current_action)
-    GenericLootUpdate("zones")
+    update_func(item_id, quantity)
 end
 
 
@@ -1110,6 +1143,10 @@ do
         end
     end
 
+    local function ClearKilledBossID()
+        private.raid_finder_boss_id = nil
+    end
+
     local HEAL_BATTLE_PETS_SPELL_ID = 125801
 
     local COMBAT_LOG_FUNCS = {
@@ -1131,13 +1168,24 @@ do
             end
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
+            Debug(sub_event)
+
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
-                last_killed_npc_id = nil
+                ClearKilledNPC()
                 private.harvesting = nil
                 return
             end
-            last_killed_npc_id = unit_idnum
-            WDP:ScheduleTimer(ClearLastKilledNPC, 0.1)
+
+            if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
+                local _, instance_type, instance_difficulty = _G.GetInstanceInfo()
+
+                if IsRaidFinderInstance(instance_type, instance_difficulty) then
+                    private.raid_finder_boss_id = unit_idnum
+                    WDP:ScheduleTimer(ClearKilledBossID, 0.5)
+                end
+            end
+            killed_npc_id = unit_idnum
+            WDP:ScheduleTimer(ClearKilledNPC, 0.1)
         end,
     }
 
@@ -1218,7 +1266,7 @@ do
 
 
     function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
-        if message_type ~= "FACTION" or not last_killed_npc_id then
+        if message_type ~= "FACTION" or not killed_npc_id then
             return
         end
         UpdateFactionData()
@@ -1226,8 +1274,8 @@ do
         if not faction_name or not faction_standings[faction_name] then
             return
         end
-        local npc = NPCEntry(last_killed_npc_id)
-        last_killed_npc_id = nil
+        local npc = NPCEntry(killed_npc_id)
+        ClearKilledNPC()
 
         if not npc then
             private.harvesting = nil
@@ -1769,7 +1817,7 @@ do
             quest.reward_text = ReplaceKeywords(_G.GetRewardText())
         end
         -- Make sure the quest NPC isn't erroneously recorded as giving reputation for quests which award it.
-        last_killed_npc_id = nil
+        ClearKilledNPC()
     end
 
 
@@ -2000,7 +2048,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     private.previous_spell_id = spell_id
 
     if spell_name:match("^Harvest.+") then
-        last_killed_npc_id = current_target_id
+        killed_npc_id = current_target_id
         private.harvesting = true
     end
 

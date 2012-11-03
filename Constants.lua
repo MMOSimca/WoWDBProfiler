@@ -91,3 +91,27 @@ private.SPELL_FLAGS_BY_LABEL = {
     SEARCHING_FOR_ARTIFACTS = AF.OBJECT,
     SKINNING = AF.NPC,
 }
+
+private.RAID_FINDER_BOSS_IDS = {
+    [59915] = true, -- Jasper Guardian
+    [60009] = true, -- Feng the Accursed
+    [60043] = true, -- Jade Guardian
+    [60047] = true, -- Amethyst Guardian
+    [60051] = true, -- Cobalt Guardian
+    [60583] = true, -- Protector Kaolan
+    [60585] = true, -- Elder Regail
+    [60586] = true, -- Elder Asani
+    [60999] = true, -- Sha of Fear
+    [60143] = true, -- Gara'jal the Spiritbinder
+    [60399] = true, -- Qin-xi
+    [60410] = true, -- Elegon
+    [60701] = true, -- Zian of the Endless Shadow
+    [62164] = true, -- Garalon
+    [62397] = true, -- Wind Lord Mel'jarak
+    [62442] = true, -- Tsulong
+    [62511] = true, -- Amber-Shaper Un'sok
+    [62543] = true, -- Blade Lord Ta'yak
+    [62837] = true, -- Grand Empress Shek'zeer
+    [62980] = true, -- Imperial Vizier Zor'lok
+    [62983] = true, -- Lei Shi
+}
