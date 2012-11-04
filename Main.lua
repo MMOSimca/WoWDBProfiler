@@ -82,6 +82,7 @@ local EVENT_MAPPING = {
     QUEST_DETAIL = true,
     QUEST_LOG_UPDATE = true,
     QUEST_PROGRESS = true,
+    SHOW_LOOT_TOAST = true,
     TAXIMAP_OPENED = true,
     TRADE_SKILL_SHOW = true,
     TRAINER_CLOSED = true,
@@ -975,20 +976,32 @@ function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
 end
 
 
+function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
+    if loot_type ~= "item" then
+        return
+    end
+    local npc = NPCEntry(private.raid_finder_boss_id)
+
+    if not npc then
+        return
+    end
+    local item_id = ItemLinkToID(item_link)
+
+    if not item_id then
+        return
+    end
+    local loot_type = "raid_finder_loot"
+    local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
+    encounter_data[loot_type] = encounter_data[loot_type] or {}
+    encounter_data.loot_counts = encounter_data.loot_counts or {}
+    encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
+
+    table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
+end
+
+
 local CHAT_MSG_LOOT_UPDATE_FUNCS = {
     [AF.NPC] = function(item_id, quantity)
-        local npc = NPCEntry(private.raid_finder_boss_id)
-
-        if not npc then
-            return
-        end
-        local loot_type = "raid_finder_loot"
-        local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
-        encounter_data[loot_type] = encounter_data[loot_type] or {}
-        encounter_data.loot_counts = encounter_data.loot_counts or {}
-        encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
-
-        table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
     end,
     [AF.ZONE] = function(item_id, quantity)
         current_loot = {
