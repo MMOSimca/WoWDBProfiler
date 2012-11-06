@@ -981,6 +981,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         return
     end
     local npc = NPCEntry(private.raid_finder_boss_id)
+    private.raid_finder_boss_id = nil
 
     if not npc then
         return
@@ -990,68 +991,71 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     if not item_id then
         return
     end
-    local loot_type = "raid_finder_loot"
+    local loot_type = "drops"
     local encounter_data = npc.encounter_data[InstanceDifficultyToken()]
     encounter_data[loot_type] = encounter_data[loot_type] or {}
     encounter_data.loot_counts = encounter_data.loot_counts or {}
     encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
 
     table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
+    Debug(("%s: %s - %d (%d)"):format(event_name, item_link, item_id, quantity))
 end
 
 
-local CHAT_MSG_LOOT_UPDATE_FUNCS = {
-    [AF.NPC] = function(item_id, quantity)
-    end,
-    [AF.ZONE] = function(item_id, quantity)
-        current_loot = {
-            list = {
-                ("%d:%d"):format(item_id, quantity)
-            },
-            identifier = current_action.identifier,
-            label = current_action.loot_label or "drops",
-            map_level = current_action.map_level,
-            object_name = current_action.object_name,
-            spell_label = current_action.spell_label,
-            target_type = current_action.target_type,
-            x = current_action.x,
-            y = current_action.y,
-            zone_data = current_action.zone_data,
-        }
-        table.wipe(current_action)
-        GenericLootUpdate("zones")
-    end,
-}
+do
+    local CHAT_MSG_LOOT_UPDATE_FUNCS = {
+        [AF.NPC] = function(item_id, quantity)
+            Debug(("CHAT_MSG_LOOT: %d (%d)"):format(item_id, quantity))
+        end,
+        [AF.ZONE] = function(item_id, quantity)
+            current_loot = {
+                list = {
+                    ("%d:%d"):format(item_id, quantity)
+                },
+                identifier = current_action.identifier,
+                label = current_action.loot_label or "drops",
+                map_level = current_action.map_level,
+                object_name = current_action.object_name,
+                spell_label = current_action.spell_label,
+                target_type = current_action.target_type,
+                x = current_action.x,
+                y = current_action.y,
+                zone_data = current_action.zone_data,
+            }
+            table.wipe(current_action)
+            GenericLootUpdate("zones")
+        end,
+    }
 
 
-function WDP:CHAT_MSG_LOOT(event_name, message)
-    local category
+    function WDP:CHAT_MSG_LOOT(event_name, message)
+        local category
 
-    Debug(event_name)
+        if current_action.spell_label ~= "EXTRACT_GAS" then
+            category = AF.ZONE
+        elseif private.raid_finder_boss_id then
+            category = AF.NPC
+        end
+        local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
 
-    if current_action.spell_label ~= "EXTRACT_GAS" then
-        category = AF.ZONE
-    elseif private.raid_finder_boss_id then
-        category = AF.NPC
+        if not category or not update_func then
+            Debug("No update func found")
+            return
+        end
+        local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
+
+        if not item_link then
+            quantity, item_link = 1, deformat(message, _G.LOOT_ITEM_PUSHED_SELF)
+        end
+        local item_id = ItemLinkToID(item_link)
+
+        if not item_id then
+            Debug(("%s: No item_id found."):format(event_name))
+            return
+        end
+        update_func(item_id, quantity)
     end
-    local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
-
-    if not category or not update_func then
-        return
-    end
-    local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
-
-    if not item_link then
-        quantity, item_link = 1, deformat(message, _G.LOOT_ITEM_PUSHED_SELF)
-    end
-    local item_id = ItemLinkToID(item_link)
-
-    if not item_id then
-        return
-    end
-    update_func(item_id, quantity)
 end
-
 
 function WDP:RecordQuote(event_name, message, source_name, language_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] or not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
@@ -1156,10 +1160,6 @@ do
         end
     end
 
-    local function ClearKilledBossID()
-        private.raid_finder_boss_id = nil
-    end
-
     local HEAL_BATTLE_PETS_SPELL_ID = 125801
 
     local COMBAT_LOG_FUNCS = {
@@ -1194,7 +1194,6 @@ do
 
                 if IsRaidFinderInstance(instance_type, instance_difficulty) then
                     private.raid_finder_boss_id = unit_idnum
-                    WDP:ScheduleTimer(ClearKilledBossID, 0.5)
                 end
             end
             killed_npc_id = unit_idnum
