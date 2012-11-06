@@ -278,7 +278,6 @@ end -- do-block
 
 -- Called on a timer
 local function ClearKilledNPC()
-    Debug("Clearing last_killed_npc_id")
     killed_npc_id = nil
 end
 
@@ -370,7 +369,6 @@ local function CurrentLocationData()
     if y % 2 ~= 0 then
         y = y + 1
     end
-    Debug(("x: %d y: %d map_id: %d"):format(x, y, _G.GetCurrentMapAreaID()))
     return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
 end
 
@@ -519,8 +517,6 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             current_action.target_type = AF.ITEM
             current_action.identifier = item_id
             current_action.loot_label = "contains"
-
-            Debug(("HandleItemUse: current_action.identifier: '%s'"):format(item_id))
             break
         end
     end
@@ -1039,7 +1035,6 @@ do
         local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
 
         if not category or not update_func then
-            Debug("No update func found")
             return
         end
         local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
@@ -1050,7 +1045,6 @@ do
         local item_id = ItemLinkToID(item_link)
 
         if not item_id then
-            Debug(("%s: No item_id found."):format(event_name))
             return
         end
         update_func(item_id, quantity)
@@ -1180,8 +1174,6 @@ do
                 return
             end
             local unit_type, unit_idnum = ParseGUID(dest_guid)
-
-            Debug(sub_event)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 ClearKilledNPC()
@@ -1317,7 +1309,6 @@ do
                 end
             end
         end
-        Debug(("Setting reputation for %s."):format(faction_name))
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
@@ -1390,7 +1381,6 @@ do
             if not locked_item_id or (current_action.identifier and current_action.identifier ~= locked_item_id) then
                 return false
             end
-            Debug(("LOOT_VERIFY_FUNCS[AF.ITEM]: current_action.identifier: '%s'"):format(locked_item_id))
             current_action.identifier = locked_item_id
             return true
         end,
@@ -1512,10 +1502,7 @@ do
         end
 
         if not current_action.target_type then
-            Debug("No target type.")
             return
-        else
-            Debug(("current_action.target_type: %s"):format(private.ACTION_TYPE_NAMES[current_action.target_type]))
         end
 
         local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
@@ -2026,24 +2013,18 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     elseif bit.band(spell_flags, AF.ITEM) == AF.ITEM then
         current_action.target_type = AF.ITEM
 
-        Debug(("%s: Item name: '%s'"):format(event_name, tostring(item_name)))
-
         if item_name and item_name == target_name then
             current_action.identifier = ItemLinkToID(item_link)
         elseif target_name and target_name ~= "" then
             current_action.identifier = ItemLinkToID(select(2, _G.GetItemInfo(target_name)))
         end
-        Debug(("%s: current_action.identifier: '%s'"):format(event_name, tostring(current_action.identifier)))
     elseif not item_name and not unit_name then
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
             if target_name == "" then
-                Debug("Didn't set current_action.target_type")
                 return
             end
             current_action.object_name = target_name
             current_action.target_type = AF.OBJECT
-
-            Debug(("Set current_action.target_type to %s"):format(private.ACTION_TYPE_NAMES[current_action.target_type]))
         elseif bit.band(spell_flags, AF.ZONE) == AF.ZONE then
             current_action.target_type = AF.ZONE
         end
