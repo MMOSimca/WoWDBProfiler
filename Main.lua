@@ -592,7 +592,7 @@ do
                 local entry, source_id
 
                 if current_loot.target_type == AF.ITEM then
-                    Debug(("GenericLootUpdate: current_loot.identifier: '%s'"):format(tostring(current_loot.identifier)))
+                    --                    Debug(("GenericLootUpdate: current_loot.identifier: '%s'"):format(tostring(current_loot.identifier)))
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
                     entry = DBEntry(data_type, source_id)
@@ -974,17 +974,20 @@ end
 
 function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     if loot_type ~= "item" then
+        Debug(("%s: loot_type is '%s'"):format(event_name, loot_type))
         return
     end
     local npc = NPCEntry(private.raid_finder_boss_id)
     private.raid_finder_boss_id = nil
 
     if not npc then
+        Debug(("%s: NPC is nil."):format(event_name))
         return
     end
     local item_id = ItemLinkToID(item_link)
 
     if not item_id then
+        Debug(("%s: ItemID is nil, from item link %s"):format(event_name, item_link))
         return
     end
     local loot_type = "drops"
@@ -994,7 +997,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
 
     table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
-    Debug(("%s: %s - %d (%d)"):format(event_name, item_link, item_id, quantity))
+    Debug(("%s: %sX%d (%d)"):format(event_name, item_link, quantity, item_id))
 end
 
 
@@ -1171,11 +1174,13 @@ do
         end,
         UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
             if dest_guid ~= _G.UnitGUID("target") then
+                Debug("Killed unit was not player target.")
                 return
             end
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
+                Debug(("%s: %s is not an NPC, or has no ID."):format(sub_event, dest_name))
                 ClearKilledNPC()
                 private.harvesting = nil
                 return
@@ -1185,8 +1190,13 @@ do
                 local _, instance_type, instance_difficulty = _G.GetInstanceInfo()
 
                 if IsRaidFinderInstance(instance_type, instance_difficulty) then
+                    Debug(("%s: Matching boss %s; in raid finder instance."):format(sub_event, dest_name))
                     private.raid_finder_boss_id = unit_idnum
+                else
+                    Debug(("%s: Matching boss %s; NOT in raid finder instance."):format(sub_event, dest_name))
                 end
+            else
+                Debug(("%s: Killed NPC %s (ID: %d) is not in boss list."):format(sub_event, dest_name, unit_idnum))
             end
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
