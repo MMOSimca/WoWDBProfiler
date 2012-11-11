@@ -1173,10 +1173,6 @@ do
             RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
         end,
         UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
-            if dest_guid ~= _G.UnitGUID("target") then
-                Debug("Killed unit was not player target.")
-                return
-            end
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
@@ -1197,6 +1193,11 @@ do
                 end
             else
                 Debug(("%s: Killed NPC %s (ID: %d) is not in boss list."):format(sub_event, dest_name, unit_idnum))
+            end
+
+            if dest_guid ~= _G.UnitGUID("target") then
+                ClearKilledNPC()
+                return
             end
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
