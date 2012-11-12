@@ -1183,14 +1183,8 @@ do
             end
 
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
-                local _, instance_type, instance_difficulty = _G.GetInstanceInfo()
-
-                if IsRaidFinderInstance(instance_type, instance_difficulty) then
-                    Debug(("%s: Matching boss %s; in raid finder instance."):format(sub_event, dest_name))
-                    private.raid_finder_boss_id = unit_idnum
-                else
-                    Debug(("%s: Matching boss %s; NOT in raid finder instance."):format(sub_event, dest_name))
-                end
+                Debug(("%s: Matching boss %s."):format(sub_event, dest_name))
+                private.raid_finder_boss_id = unit_idnum
             else
                 Debug(("%s: Killed NPC %s (ID: %d) is not in boss list."):format(sub_event, dest_name, unit_idnum))
             end
