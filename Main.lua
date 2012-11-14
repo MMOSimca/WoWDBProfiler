@@ -131,7 +131,7 @@ local anvil_spell_ids = {}
 local currently_drunk
 local char_db
 local global_db
-local durability_timer_handle
+local item_process_timer_handle
 local faction_standings = {}
 local forge_spell_ids = {}
 local languages_known = {}
@@ -312,8 +312,8 @@ local function DBEntry(data_type, unit_id)
     local unit = global_db[data_type][unit_id]
 
     if not unit then
-        global_db[data_type][unit_id] = {}
-        unit = global_db[data_type][unit_id]
+        unit = {}
+        global_db[data_type][unit_id] = unit
     end
     return unit
 end
@@ -779,7 +779,7 @@ function WDP:OnEnable()
     for index = 1, _G.GetNumLanguages() do
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
-    durability_timer_handle = self:ScheduleRepeatingTimer("ProcessDurability", 30)
+    item_process_timer_handle = self:ScheduleRepeatingTimer("ProcessItems", 30)
     target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.5)
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
@@ -805,25 +805,27 @@ function WDP:OnEnable()
 end
 
 
-local function RecordDurability(item_id, durability)
+local function RecordItemData(item_id, item_link, durability)
     if not durability or durability <= 0 then
         return
     end
+    local item = DBEntry("items", item_id)
+    local _, _, _, _, _, _, _, _, _, _, _, upgrade_id = (":"):split(select(3, item_link:find("^|%x+|H(.+)|h%[.+%]")))
 
-    if not global_db.items[item_id] then
-        global_db.items[item_id] = {}
+    if upgrade_id then
+        DBEntry("items", item_id).upgrade_id = upgrade_id
     end
-    global_db.items[item_id].durability = durability
+    item.durability = durability
 end
 
 
-function WDP:ProcessDurability()
-    for slot_index = 0, _G.INVSLOT_LAST_EQUIPPED do
+function WDP:ProcessItems()
+    for slot_index = _G.INVSLOT_FIRST_EQUIPPED, _G.INVSLOT_LAST_EQUIPPED do
         local item_id = _G.GetInventoryItemID("player", slot_index)
 
         if item_id and item_id > 0 then
             local _, max_durability = _G.GetInventoryItemDurability(slot_index)
-            RecordDurability(item_id, max_durability)
+            RecordItemData(item_id, _G.GetInventoryItemLink("player", slot_index), max_durability)
         end
     end
 
@@ -833,7 +835,7 @@ function WDP:ProcessDurability()
 
             if item_id and item_id > 0 then
                 local _, max_durability = _G.GetContainerItemDurability(bag_index, slot_index)
-                RecordDurability(item_id, max_durability)
+                RecordItemData(item_id, _G.GetContainerItemLink(bag_index, slot_index), max_durability)
             end
         end
     end
