@@ -67,6 +67,7 @@ local EVENT_MAPPING = {
     GOSSIP_SHOW = true,
     GUILDBANKFRAME_OPENED = true,
     ITEM_TEXT_BEGIN = true,
+    ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
     MAIL_SHOW = true,
@@ -2123,6 +2124,11 @@ do
 
     function WDP:GUILDBANKFRAME_OPENED(event_name)
         SetUnitField("guild_bank", private.UNIT_TYPES.OBJECT)
+    end
+
+
+    function WDP:ITEM_UPGRADE_MASTER_OPENED(event_name)
+        SetUnitField("item_upgrade_master", private.UNIT_TYPES.NPC)
     end
 
 
