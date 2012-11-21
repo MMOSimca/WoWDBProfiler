@@ -811,10 +811,14 @@ local function RecordItemData(item_id, item_link, durability)
         return
     end
     local item = DBEntry("items", item_id)
-    local _, _, _, _, _, _, _, _, _, _, _, upgrade_id = (":"):split(select(3, item_link:find("^|%x+|H(.+)|h%[.+%]")))
+    local item_string = select(3, item_link:find("^|%x+|H(.+)|h%[.+%]"))
 
-    if upgrade_id then
-        DBEntry("items", item_id).upgrade_id = upgrade_id
+    if item_string then
+        local _, _, _, _, _, _, _, _, _, _, _, upgrade_id = (":"):split(item_string)
+
+        if upgrade_id then
+            item.upgrade_id = upgrade_id
+        end
     end
     item.durability = durability
 end
