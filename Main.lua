@@ -1620,12 +1620,12 @@ do
 
     function WDP:UpdateMerchantItems(event_name)
         if not current_merchant or event_name == "MERCHANT_SHOW" then
-            local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+            local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 return
             end
-            merchant_standing = select(2, UnitFactionStanding("target"))
+            merchant_standing = select(2, UnitFactionStanding("npc"))
             current_merchant = NPCEntry(unit_idnum)
             current_merchant.sells = current_merchant.sells or {}
         end
