@@ -814,7 +814,10 @@ local function RecordItemData(item_id, item_link, durability)
     local item_string = select(3, item_link:find("^|%x+|H(.+)|h%[.+%]"))
 
     if item_string then
-        local _, _, _, _, _, _, _, _, _, _, _, upgrade_id = (":"):split(item_string)
+        local _, _, _, _, _, _, _, suffix_id, unique_id, _, _, upgrade_id = (":"):split(item_string)
+
+        item.suffix_id = suffix_id
+        item.unique_id = bit.band(unique_id, 0xFFFF)
 
         if upgrade_id then
             item.upgrade_id = upgrade_id
