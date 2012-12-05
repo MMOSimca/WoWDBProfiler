@@ -815,9 +815,12 @@ local function RecordItemData(item_id, item_link, durability)
 
     if item_string then
         local _, _, _, _, _, _, _, suffix_id, unique_id, _, _, upgrade_id = (":"):split(item_string)
+        suffix_id = tonumber(suffix_id)
 
-        item.suffix_id = suffix_id
-        item.unique_id = bit.band(unique_id, 0xFFFF)
+        if suffix_id and suffix_id ~= 0 then
+            item.suffix_id = suffix_id
+            item.unique_id = bit.band(unique_id, 0xFFFF)
+        end
 
         if upgrade_id then
             item.upgrade_id = upgrade_id
