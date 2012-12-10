@@ -1419,8 +1419,11 @@ do
             if not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
                 return false
             end
-            local unit_type, id_num = ParseGUID(_G.UnitGUID("target"))
-            current_action.identifier = id_num
+
+            if not current_action.identifier then
+                local unit_type, id_num = ParseGUID(_G.UnitGUID("target"))
+                current_action.identifier = id_num
+            end
             return true
         end,
         [AF.OBJECT] = true,
@@ -1535,7 +1538,6 @@ do
         if not current_action.target_type then
             return
         end
-
         local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
         local update_func = LOOT_OPENED_UPDATE_FUNCS[current_action.target_type]
 
@@ -2011,8 +2013,6 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     if not spell_label then
         return
     end
-    table.wipe(current_action)
-
     local item_name, item_link = _G.GameTooltip:GetItem()
     local unit_name, unit_id = _G.GameTooltip:GetUnit()
 
@@ -2023,6 +2023,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     local spell_flags = private.SPELL_FLAGS_BY_LABEL[spell_label]
     local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
 
+    table.wipe(current_action)
     current_action.instance_token = instance_token
     current_action.map_level = map_level
     current_action.x = x
