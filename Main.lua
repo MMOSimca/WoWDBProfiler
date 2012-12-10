@@ -283,6 +283,12 @@ local function ClearKilledNPC()
 end
 
 
+local function ClearKilledBossID()
+    private.raid_finder_boss_id = nil
+    private.world_boss_id = nil
+end
+
+
 local function IsRaidFinderInstance(instance_type, instance_difficulty)
     return instance_type == "raid" and instance_difficulty == 2 and _G.IsPartyLFG() and _G.IsInLFGDungeon()
 end
@@ -990,8 +996,9 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         Debug(("%s: loot_type is '%s'"):format(event_name, loot_type))
         return
     end
-    local npc = NPCEntry(private.raid_finder_boss_id)
+    local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
     private.raid_finder_boss_id = nil
+    private.world_boss_id = nil
 
     if not npc then
         Debug(("%s: NPC is nil."):format(event_name))
@@ -1198,8 +1205,13 @@ do
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
                 Debug(("%s: Matching boss %s."):format(sub_event, dest_name))
                 private.raid_finder_boss_id = unit_idnum
+                private.world_boss_id = nil
+            elseif private.WORLD_BOSS_IDS[unit_idnum] then
+                Debug(("%s: Matching world boss %s."):format(sub_event, dest_name))
+                private.raid_finder_boss_id = nil
+                private.world_boss_id = unit_idnum
             else
-                Debug(("%s: Killed NPC %s (ID: %d) is not in boss list."):format(sub_event, dest_name, unit_idnum))
+                Debug(("%s: Killed NPC %s (ID: %d) is not in LFG or World boss list."):format(sub_event, dest_name, unit_idnum))
             end
 
             if dest_guid ~= _G.UnitGUID("target") then
@@ -1208,6 +1220,7 @@ do
             end
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
+            WDP:ScheduleTimer(ClearKilledBossID, 1)
         end,
     }
 

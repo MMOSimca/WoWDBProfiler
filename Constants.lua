@@ -119,3 +119,8 @@ private.RAID_FINDER_BOSS_IDS = {
     [62980] = true, -- Imperial Vizier Zor'lok
     [62983] = true, -- Lei Shi
 }
+
+private.WORLD_BOSS_IDS = {
+    [60491] = true, -- Sha of Anger
+    [62346] = true, -- Galleon
+}
