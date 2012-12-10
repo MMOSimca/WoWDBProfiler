@@ -926,7 +926,6 @@ do
             end
         end
         name_to_id_map[_G.UnitName("target")] = unit_idnum
-        current_action.identifier = unit_idnum
         return npc, unit_idnum
     end
 end -- do-block
