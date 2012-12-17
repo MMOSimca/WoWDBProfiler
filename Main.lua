@@ -992,7 +992,6 @@ end
 
 function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     if loot_type ~= "item" then
-        Debug(("%s: loot_type is '%s'"):format(event_name, loot_type))
         return
     end
     local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
