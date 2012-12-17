@@ -1426,11 +1426,8 @@ do
         end,
         [AF.OBJECT] = true,
         [AF.ZONE] = function()
-            if not _G.IsFishingLoot() then
-                return false
-            end
             current_action.zone_data = UpdateDBEntryLocation("zones", current_action.identifier)
-            return true
+            return _G.IsFishingLoot()
         end,
     }
 
