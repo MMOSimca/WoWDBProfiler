@@ -813,9 +813,6 @@ end
 
 
 local function RecordItemData(item_id, item_link, durability)
-    if not durability or durability <= 0 then
-        return
-    end
     local item = DBEntry("items", item_id)
     local item_string = select(3, item_link:find("^|%x+|H(.+)|h%[.+%]"))
 
@@ -832,7 +829,10 @@ local function RecordItemData(item_id, item_link, durability)
             item.upgrade_id = upgrade_id
         end
     end
-    item.durability = durability
+
+    if durability and durability > 0 then
+        item.durability = durability
+    end
 end
 
 
