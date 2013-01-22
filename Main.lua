@@ -1008,8 +1008,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         return
     end
     local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
-    private.raid_finder_boss_id = nil
-    private.world_boss_id = nil
+    ClearKilledBossID()
 
     if not npc then
         Debug(("%s: NPC is nil."):format(event_name))
@@ -1209,17 +1208,18 @@ do
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 Debug(("%s: %s is not an NPC, or has no ID."):format(sub_event, dest_name))
                 ClearKilledNPC()
+                ClearKilledBossID()
                 private.harvesting = nil
                 return
             end
 
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
                 Debug(("%s: Matching boss %s."):format(sub_event, dest_name))
+                ClearKilledBossID()
                 private.raid_finder_boss_id = unit_idnum
-                private.world_boss_id = nil
             elseif private.WORLD_BOSS_IDS[unit_idnum] then
                 Debug(("%s: Matching world boss %s."):format(sub_event, dest_name))
-                private.raid_finder_boss_id = nil
+                ClearKilledBossID()
                 private.world_boss_id = unit_idnum
             else
                 Debug(("%s: Killed NPC %s (ID: %d) is not in LFG or World boss list."):format(sub_event, dest_name, unit_idnum))
@@ -1227,6 +1227,7 @@ do
 
             if dest_guid ~= _G.UnitGUID("target") then
                 ClearKilledNPC()
+                ClearKilledBossID()
                 return
             end
             killed_npc_id = unit_idnum
