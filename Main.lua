@@ -872,7 +872,7 @@ function WDP:ProcessItems()
 end
 
 
-local PlayerTarget
+local TargetedNPC
 do
     local GENDER_NAMES = {
         "UNKNOWN",
@@ -902,7 +902,7 @@ do
     }
 
 
-    function PlayerTarget()
+    function TargetedNPC()
         if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
             current_target_id = nil
             return
@@ -957,7 +957,7 @@ do
                 return
             end
         end
-        local npc = PlayerTarget()
+        local npc = TargetedNPC()
 
         if not npc then
             return
@@ -1822,7 +1822,7 @@ end
 
 
 function WDP:PLAYER_TARGET_CHANGED(event_name)
-    if not PlayerTarget() then
+    if not TargetedNPC() then
         return
     end
     current_action.target_type = AF.NPC
