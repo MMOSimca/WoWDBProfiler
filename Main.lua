@@ -1213,6 +1213,12 @@ do
                 return
             end
 
+            if dest_guid ~= _G.UnitGUID("target") then
+                ClearKilledNPC()
+                ClearKilledBossID()
+                return
+            end
+
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
                 Debug(("%s: Matching boss %s."):format(sub_event, dest_name))
                 ClearKilledBossID()
@@ -1225,11 +1231,6 @@ do
                 Debug(("%s: Killed NPC %s (ID: %d) is not in LFG or World boss list."):format(sub_event, dest_name, unit_idnum))
             end
 
-            if dest_guid ~= _G.UnitGUID("target") then
-                ClearKilledNPC()
-                ClearKilledBossID()
-                return
-            end
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
             WDP:ScheduleTimer(ClearKilledBossID, 1)
@@ -1574,6 +1575,8 @@ do
         }
         table.wipe(current_action)
 
+        loot_guid_registry[current_loot.label] = loot_guid_registry[current_loot.label] or {}
+
         for loot_slot = 1, _G.GetNumLootItems() do
             local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
@@ -1588,10 +1591,9 @@ do
                 for loot_index = 1, #loot_info, 2 do
                     local source_guid = loot_info[loot_index]
 
-                    if not loot_guid_registry[source_guid] then
+                    if not loot_guid_registry[current_loot.label][source_guid] then
                         local loot_quantity = loot_info[loot_index + 1]
                         local source_type, source_id = ParseGUID(source_guid)
-                        -- TODO: Remove debugging
                         local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
                         Debug(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
@@ -1609,7 +1611,7 @@ do
         end
 
         for guid in pairs(guids_used) do
-            loot_guid_registry[guid] = true
+            loot_guid_registry[current_loot.label][guid] = true
         end
         update_func()
     end
