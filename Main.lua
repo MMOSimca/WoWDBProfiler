@@ -425,26 +425,6 @@ do
 end -- do-block
 
 
-local function UpdateBlacklistMaps()
-    local empty_count = 0
-
-    for index = 1, _G.MAX_BLACKLIST_BATTLEGROUNDS do
-        local map_id = _G.GetBlacklistMap(index)
-        char_db.bg_blacklist = char_db.bg_blacklist or {}
-        char_db.bg_blacklist[index] = map_id
-
-        if map_id < 0 then
-            empty_count = empty_count + 1
-            empty_count = empty_count + 1
-        end
-    end
-
-    if empty_count == _G.MAX_BLACKLIST_BATTLEGROUNDS then
-        char_db.bg_blacklist = nil
-    end
-end
-
-
 local UpdateDBEntryLocation
 do
     local pi = math.pi
@@ -817,11 +797,6 @@ function WDP:OnEnable()
         HandleItemUse(item_link)
     end)
     self:SetCurrentAreaID("OnEnable")
-
-    _G.hooksecurefunc("SetBlacklistMap", UpdateBlacklistMaps)
-    _G.hooksecurefunc("ClearBlacklistMap", UpdateBlacklistMaps)
-
-    UpdateBlacklistMaps()
 end
 
 
