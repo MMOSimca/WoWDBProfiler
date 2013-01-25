@@ -803,11 +803,13 @@ local ScrapeItemUpgradeStats
 do
     local intermediary = {}
 
-    function ScrapeItemUpgradeStats(item_id, item_link, upgrade_id)
+    function ScrapeItemUpgradeStats(item_id, upgrade_id, reforge_id)
+        if not ALLOWED_LOCALES[CLIENT_LOCALE] then
+            return
+        end
         local create_entry
 
         table.wipe(intermediary)
-        DatamineTT:SetHyperlink(item_link)
 
         for line_index = 1, DatamineTT:NumLines() do
             local left_text = _G["WDPDatamineTTTextLeft" .. line_index]:GetText()
@@ -818,8 +820,13 @@ do
             local amount, stat = left_text:match("+(.-) (.*)")
 
             if amount and stat then
-                if stat:find("Reforged") then
-                    return
+                if reforge_id and reforge_id ~= 0 then
+                    local reforge_string = stat:find("Reforged")
+
+                    if reforge_string then
+                        stat = stat:sub(0, reforge_string - 3)
+                        intermediary.reforge_id = reforge_id
+                    end
                 end
                 create_entry = true
                 intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber(amount)
@@ -837,7 +844,9 @@ do
             item.upgrades[upgrade_id][stat] = amount
         end
     end
-end -- do-block
+end
+
+-- do-block
 
 
 local function RecordItemData(item_id, item_link, durability)
@@ -845,7 +854,7 @@ local function RecordItemData(item_id, item_link, durability)
     local item
 
     if item_string then
-        local _, _, _, _, _, _, _, suffix_id, unique_id, _, _, upgrade_id = (":"):split(item_string)
+        local _, _, _, _, _, _, _, suffix_id, unique_id, _, reforge_id, upgrade_id = (":"):split(item_string)
         suffix_id = tonumber(suffix_id)
         upgrade_id = tonumber(upgrade_id)
 
@@ -856,7 +865,8 @@ local function RecordItemData(item_id, item_link, durability)
         end
 
         if upgrade_id and upgrade_id ~= 0 then
-            ScrapeItemUpgradeStats(item_id, item_link, upgrade_id)
+            DatamineTT:SetHyperlink(item_link)
+            ScrapeItemUpgradeStats(item_id, upgrade_id, reforge_id)
         end
     end
 
