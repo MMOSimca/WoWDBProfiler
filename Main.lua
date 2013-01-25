@@ -32,7 +32,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 14
+local DB_VERSION = 15
 local DEBUGGING = false
 local EVENT_DEBUG = false
 
@@ -349,7 +349,6 @@ do
 
         return self.encounter_data
     end
-
 end
 
 
@@ -800,25 +799,69 @@ function WDP:OnEnable()
 end
 
 
+local ScrapeItemUpgradeStats
+do
+    local intermediary = {}
+
+    function ScrapeItemUpgradeStats(item_id, item_link, upgrade_id)
+        local create_entry
+
+        table.wipe(intermediary)
+        DatamineTT:SetHyperlink(item_link)
+
+        for line_index = 1, DatamineTT:NumLines() do
+            local left_text = _G["WDPDatamineTTTextLeft" .. line_index]:GetText()
+
+            if not left_text then
+                return
+            end
+            local amount, stat = left_text:match("+(.-) (.*)")
+
+            if amount and stat then
+                if stat:find("Reforged") then
+                    return
+                end
+                create_entry = true
+                intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber(amount)
+            end
+        end
+
+        if not create_entry then
+            return
+        end
+        local item = DBEntry("items", item_id)
+        item.upgrades = item.upgrades or {}
+        item.upgrades[upgrade_id] = item.upgrades[upgrade_id] or {}
+
+        for stat, amount in pairs(intermediary) do
+            item.upgrades[upgrade_id][stat] = amount
+        end
+    end
+end -- do-block
+
+
 local function RecordItemData(item_id, item_link, durability)
-    local item = DBEntry("items", item_id)
     local item_string = select(3, item_link:find("^|%x+|H(.+)|h%[.+%]"))
+    local item
 
     if item_string then
         local _, _, _, _, _, _, _, suffix_id, unique_id, _, _, upgrade_id = (":"):split(item_string)
         suffix_id = tonumber(suffix_id)
+        upgrade_id = tonumber(upgrade_id)
 
         if suffix_id and suffix_id ~= 0 then
+            item = DBEntry("items", item_id)
             item.suffix_id = suffix_id
             item.unique_id = bit.band(unique_id, 0xFFFF)
         end
 
-        if upgrade_id then
-            item.upgrade_id = upgrade_id
+        if upgrade_id and upgrade_id ~= 0 then
+            ScrapeItemUpgradeStats(item_id, item_link, upgrade_id)
         end
     end
 
     if durability and durability > 0 then
+        item = item or DBEntry("items", item_id)
         item.durability = durability
     end
 end
