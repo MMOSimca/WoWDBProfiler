@@ -1634,6 +1634,7 @@ do
                 --            elseif slot_type == _G.LOOT_SLOT_MONEY then
                 --                table.insert(current_action.loot_list, ("money:%d"):format(_toCopper(item_text)))
             elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                Debug(("Found currency: %s"):format(icon_texture))
                 table.insert(current_loot.list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
         end
