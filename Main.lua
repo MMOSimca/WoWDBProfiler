@@ -333,12 +333,12 @@ do
     }
 
     function NPCEntry(identifier)
-        local npc = _G.setmetatable(DBEntry("npcs", identifier), npc_meta)
+        local npc = DBEntry("npcs", identifier)
 
         if not npc then
             return
         end
-        return npc
+        return _G.setmetatable(npc, npc_meta)
     end
 
     function npc_prototype:EncounterData()
