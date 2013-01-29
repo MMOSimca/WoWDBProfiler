@@ -837,6 +837,7 @@ do
             return
         end
         local item = DBEntry("items", item_id)
+        item.upgrade_id = upgrade_id
         item.upgrades = item.upgrades or {}
         item.upgrades[upgrade_id] = item.upgrades[upgrade_id] or {}
 
@@ -865,7 +866,6 @@ local function RecordItemData(item_id, item_link, durability)
         end
 
         if upgrade_id and upgrade_id ~= 0 then
-            item.upgrade_id = upgrade_id
             DatamineTT:SetHyperlink(item_link)
             ScrapeItemUpgradeStats(item_id, upgrade_id, reforge_id)
         end
