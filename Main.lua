@@ -407,16 +407,21 @@ end
 
 local ParseGUID
 do
+    local UNIT_TYPES = private.UNIT_TYPES
     local UNIT_TYPE_BITMASK = 0x007
 
     function ParseGUID(guid)
         if not guid then
             return
         end
-        local types = private.UNIT_TYPES
-        local unit_type = _G.bit.band(tonumber(guid:sub(1, 5)), UNIT_TYPE_BITMASK)
+        local bitfield = tonumber(guid:sub(1, 5))
 
-        if unit_type ~= types.PLAYER and unit_type ~= types.PET then
+        if not bitfield then
+            return UNIT_TYPES.UNKNOWN
+        end
+        local unit_type = _G.bit.band(bitfield, UNIT_TYPE_BITMASK)
+
+        if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET then
             return unit_type, tonumber(guid:sub(6, 10), 16)
         end
         return unit_type
