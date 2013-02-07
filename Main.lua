@@ -515,8 +515,9 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         if not current_line then
             break
         end
+        local is_ptr = select(4, _G.GetBuildInfo()) ~= 50100
 
-        if current_line:GetText() == _G.ITEM_OPENABLE then
+        if is_ptr or current_line:GetText() == _G.ITEM_OPENABLE then
             table.wipe(current_action)
             current_action.target_type = AF.ITEM
             current_action.identifier = item_id
