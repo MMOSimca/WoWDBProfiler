@@ -1994,13 +1994,13 @@ end
 
 
 function WDP:TRAINER_SHOW(event_name)
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
     local trainer = NPCEntry(unit_idnum)
 
     if not trainer then
         return
     end
-    local trainer_standing = select(2, UnitFactionStanding("target"))
+    local trainer_standing = select(2, UnitFactionStanding("npc"))
     trainer.teaches = trainer.teaches or {}
 
     private.trainer_shown = true
