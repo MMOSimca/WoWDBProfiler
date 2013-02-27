@@ -32,7 +32,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -----------------------------------------------------------------------
 -- Local constants.
 -----------------------------------------------------------------------
-local DB_VERSION = 14
+local DB_VERSION = 15
 local DEBUGGING = false
 local EVENT_DEBUG = false
 
@@ -289,26 +289,13 @@ local function ClearKilledBossID()
 end
 
 
-local function IsRaidFinderInstance(instance_type, instance_difficulty)
-    return instance_type == "raid" and instance_difficulty == 2 and _G.IsPartyLFG() and _G.IsInLFGDungeon()
-end
-
-
 local function InstanceDifficultyToken()
-    local _, instance_type, instance_difficulty, difficulty_name, _, _, is_dynamic = _G.GetInstanceInfo()
-    if not difficulty_name or difficulty_name == "" then
-        difficulty_name = "NONE"
-    end
+    local _, instance_type, instance_difficulty, _, _, _, is_dynamic = _G.GetInstanceInfo()
 
     if not instance_type or instance_type == "" then
         instance_type = "NONE"
     end
-
-    -- Raid difficulty of 2 is 25-man
-    if IsRaidFinderInstance(instance_type, instance_difficulty) then
-        difficulty_name = "LOOKING_FOR_RAID"
-    end
-    return ("%s:%s:%s"):format(instance_type:upper(), difficulty_name:upper():gsub(" ", "_"), _G.tostring(is_dynamic))
+    return ("%s:%d:%s"):format(instance_type:upper(), instance_difficulty, _G.tostring(is_dynamic))
 end
 
 
