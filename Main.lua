@@ -1602,34 +1602,33 @@ do
         for loot_slot = 1, _G.GetNumLootItems() do
             local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
+            local loot_info = {
+                _G.GetLootSourceInfo(loot_slot)
+            }
 
-            -- TODO: Move LOOT_SLOT_X checks within loop when money is detectable via GetLootSourceInfo
-            if slot_type == _G.LOOT_SLOT_ITEM then
-                local loot_info = {
-                    _G.GetLootSourceInfo(loot_slot)
-                }
+            -- Odd index is GUID, even is count.
+            for loot_index = 1, #loot_info, 2 do
+                local source_guid = loot_info[loot_index]
 
-                -- Odd index is GUID, even is count.
-                for loot_index = 1, #loot_info, 2 do
-                    local source_guid = loot_info[loot_index]
+                if not loot_guid_registry[current_loot.label][source_guid] then
+                    local loot_quantity = loot_info[loot_index + 1]
+                    local source_type, source_id = ParseGUID(source_guid)
+                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                    Debug(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
 
-                    if not loot_guid_registry[current_loot.label][source_guid] then
-                        local loot_quantity = loot_info[loot_index + 1]
-                        local source_type, source_id = ParseGUID(source_guid)
-                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                        Debug(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
-
+                    if slot_type == _G.LOOT_SLOT_ITEM then
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                         current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
                         current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                         guids_used[source_guid] = true
+                    elseif slot_type == _G.LOOT_SLOT_MONEY then
+                        Debug(("money:%d"):format(_toCopper(item_text)))
+                        table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
+                    elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                        Debug(("Found currency: %s"):format(icon_texture))
+                        table.insert(current_loot.list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
                     end
                 end
-                --            elseif slot_type == _G.LOOT_SLOT_MONEY then
-                --                table.insert(current_action.loot_list, ("money:%d"):format(_toCopper(item_text)))
-            elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                Debug(("Found currency: %s"):format(icon_texture))
-                table.insert(current_loot.list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
             end
         end
 
