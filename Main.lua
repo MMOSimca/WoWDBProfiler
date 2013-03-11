@@ -1013,6 +1013,9 @@ end -- do-block
 -- Event handlers.
 -----------------------------------------------------------------------
 function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
+    if not ALLOWED_LOCALES[CLIENT_LOCALE] then
+        return
+    end
     local num_items = _G.C_BlackMarket.GetNumItems()
 
     for index = 1, num_items do
