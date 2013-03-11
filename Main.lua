@@ -1,6 +1,5 @@
------------------------------------------------------------------------
--- Upvalued Lua API.
------------------------------------------------------------------------
+-- LUA API ------------------------------------------------------------
+
 local _G = getfenv(0)
 
 local pairs = _G.pairs
@@ -13,9 +12,8 @@ local table = _G.table
 local select = _G.select
 
 
------------------------------------------------------------------------
--- AddOn namespace.
------------------------------------------------------------------------
+-- ADDON NAMESPACE ----------------------------------------------------
+
 local ADDON_NAME, private = ...
 
 local LibStub = _G.LibStub
@@ -29,13 +27,25 @@ local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 
 
------------------------------------------------------------------------
--- Local constants.
------------------------------------------------------------------------
-local DB_VERSION = 16
-local DEBUGGING = true
-local EVENT_DEBUG = false
+-- CONSTANTS ----------------------------------------------------------
 
+local AF = private.ACTION_TYPE_FLAGS
+local CLIENT_LOCALE = _G.GetLocale()
+local DB_VERSION = 16
+local DEBUGGING = false
+local EVENT_DEBUG = false
+local OBJECT_ID_ANVIL = 192628
+local OBJECT_ID_FORGE = 1685
+local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
+local PLAYER_FACTION = _G.UnitFactionGroup("player")
+local PLAYER_GUID = _G.UnitGUID("player")
+local PLAYER_NAME = _G.UnitName("player")
+local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
+
+local ALLOWED_LOCALES = {
+    enUS = true,
+    enGB = true,
+}
 
 local DATABASE_DEFAULTS = {
     char = {},
@@ -48,7 +58,6 @@ local DATABASE_DEFAULTS = {
         zones = {},
     }
 }
-
 
 local EVENT_MAPPING = {
     AUCTION_HOUSE_SHOW = true,
@@ -65,6 +74,7 @@ local EVENT_MAPPING = {
     CURSOR_UPDATE = true,
     FORGE_MASTER_OPENED = true,
     GOSSIP_SHOW = true,
+    GROUP_ROSTER_CHANGE = true,
     GUILDBANKFRAME_OPENED = true,
     ITEM_TEXT_BEGIN = true,
     ITEM_UPGRADE_MASTER_OPENED = true,
@@ -89,6 +99,7 @@ local EVENT_MAPPING = {
     TRAINER_CLOSED = true,
     TRAINER_SHOW = true,
     TRANSMOGRIFY_OPEN = true,
+    UNIT_PET = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
     UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
@@ -102,36 +113,15 @@ local EVENT_MAPPING = {
 }
 
 
-local OBJECT_ID_ANVIL = 192628
-local OBJECT_ID_FORGE = 1685
+-- VARIABLES ----------------------------------------------------------
 
-
-local AF = private.ACTION_TYPE_FLAGS
-
-
-local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
-local PLAYER_FACTION = _G.UnitFactionGroup("player")
-local PLAYER_GUID = _G.UnitGUID("player")
-local PLAYER_NAME = _G.UnitName("player")
-local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
-
-
-local CLIENT_LOCALE = _G.GetLocale()
-
-
-local ALLOWED_LOCALES = {
-    enUS = true,
-    enGB = true,
-}
-
-
------------------------------------------------------------------------
--- Local variables.
------------------------------------------------------------------------
 local anvil_spell_ids = {}
 local currently_drunk
 local char_db
 local global_db
+local group_member_uids = {}
+local group_owner_guids_to_pet_guids = {}
+local group_pet_guids = {}
 local item_process_timer_handle
 local faction_standings = {}
 local forge_spell_ids = {}
@@ -143,9 +133,7 @@ local current_target_id
 local current_area_id
 local current_loot
 
------------------------------------------------------------------------
 -- Data for our current action. Including possible values as a reference.
------------------------------------------------------------------------
 local current_action = {
     identifier = nil,
     loot_label = nil,
@@ -159,9 +147,9 @@ local current_action = {
     zone_data = nil,
 }
 
------------------------------------------------------------------------
--- Helper Functions.
------------------------------------------------------------------------
+
+-- HELPERS ------------------------------------------------------------
+
 local function Debug(message, ...)
     if not DEBUGGING then
         return
@@ -418,8 +406,6 @@ end -- do-block
 
 local UpdateDBEntryLocation
 do
-    local pi = math.pi
-
     -- Fishing node coordinate code based on code in GatherMate2 with permission from Kagaro.
     local function FishingCoordinates(x, y, yard_width, yard_height)
         local facing = _G.GetPlayerFacing()
@@ -427,7 +413,7 @@ do
         if not facing then
             return x, y
         end
-        local rad = facing + pi
+        local rad = facing + math.pi
         return x + math.sin(rad) * 15 / yard_width, y + math.cos(rad) * 15 / yard_height
     end
 
@@ -717,9 +703,9 @@ do
     end
 end
 
------------------------------------------------------------------------
--- Methods.
------------------------------------------------------------------------
+
+-- METHODS ------------------------------------------------------------
+
 function WDP:OnInitialize()
     local db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default")
     global_db = db.global
@@ -788,6 +774,7 @@ function WDP:OnEnable()
         HandleItemUse(item_link)
     end)
     self:SetCurrentAreaID("OnEnable")
+    self:GROUP_ROSTER_CHANGE()
 end
 
 
@@ -1008,9 +995,8 @@ do
 end -- do-block
 
 
------------------------------------------------------------------------
--- Event handlers.
------------------------------------------------------------------------
+-- EVENT HANDLERS -----------------------------------------------------
+
 function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] then
         return
@@ -1023,6 +1009,39 @@ function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
         if item_link then
             DBEntry("items", ItemLinkToID(item_link)).black_market = seller_name or "UNKNOWN"
         end
+    end
+end
+
+
+function WDP:GROUP_ROSTER_CHANGE()
+    local is_raid = _G.IsInRaid()
+    local unit_type = is_raid and "raid" or "party"
+    local group_size = is_raid and _G.GetNumGroupMembers() or _G.GetNumSubgroupMembers()
+
+    table.wipe(group_member_uids)
+
+    for index = 1, group_size do
+        group_member_uids[_G.UnitGUID(unit_type .. index)] = true
+    end
+    group_member_uids[_G.UnitGUID("player")] = true
+end
+
+
+function WDP:UNIT_PET(event_name, unit_id)
+    local unit_guid = _G.UnitGUID(unit_id)
+    local current_pet_guid = group_owner_guids_to_pet_guids[unit_guid]
+
+    if current_pet_guid then
+        Debug("Removing existing pet GUID for %s", _G.UnitName(unit_id))
+        group_owner_guids_to_pet_guids[unit_guid] = nil
+        group_pet_guids[current_pet_guid] = nil
+    end
+    local pet_guid = _G.UnitGUID(unit_id .. "pet")
+
+    if pet_guid then
+        Debug("Adding new pet GUID for %s.", _G.UnitName(unit_id))
+        group_owner_guids_to_pet_guids[unit_id] = pet_guid
+        group_pet_guids[pet_guid] = true
     end
 end
 
@@ -1213,6 +1232,8 @@ do
 
     local HEAL_BATTLE_PETS_SPELL_ID = 125801
 
+    local previous_combat_event = {}
+
     local COMBAT_LOG_FUNCS = {
         SPELL_AURA_APPLIED = RecordNPCSpell,
         SPELL_CAST_START = RecordNPCSpell,
@@ -1237,7 +1258,13 @@ do
                 return
             end
 
-            if dest_guid ~= _G.UnitGUID("target") then
+            if source_guid == "" then
+                source_guid = nil
+            end
+            local killer_guid = source_guid or previous_combat_event.source_guid
+            local killer_name = source_name or previous_combat_event.source_name
+
+            if not group_member_uids[killer_guid] and not group_pet_guids[killer_guid] then
                 ClearKilledNPC()
                 ClearKilledBossID()
                 return
@@ -1262,13 +1289,30 @@ do
     }
 
 
+    local NON_DAMAGE_EVENTS = {
+        SPELL_AURA_APPLIED = true,
+        SPELL_AURA_REMOVED = true,
+        SPELL_AURA_REMOVED_DOSE = true,
+        SPELL_CAST_FAILED = true,
+        SWING_MISSED = true,
+    }
+
+
     function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, ...)
         local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
 
         if not combat_log_func then
+            if not NON_DAMAGE_EVENTS[sub_event] then
+                Debug("Recording for %s", sub_event)
+                previous_combat_event.source_guid = source_guid
+                previous_combat_event.source_name = source_name
+                previous_combat_event.dest_guid = dest_guid
+                previous_combat_event.dest_name = dest_name
+            end
             return
         end
         combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, ...)
+        table.wipe(previous_combat_event)
     end
 
     local DIPLOMACY_SPELL_ID = 20599
