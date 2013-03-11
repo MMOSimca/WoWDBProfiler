@@ -33,7 +33,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 -- Local constants.
 -----------------------------------------------------------------------
 local DB_VERSION = 16
-local DEBUGGING = false
+local DEBUGGING = true
 local EVENT_DEBUG = false
 
 
@@ -162,11 +162,11 @@ local current_action = {
 -----------------------------------------------------------------------
 -- Helper Functions.
 -----------------------------------------------------------------------
-local function Debug(...)
+local function Debug(message, ...)
     if not DEBUGGING then
         return
     end
-    _G.print(...)
+    _G.print(message:format(...))
 end
 
 
@@ -584,7 +584,6 @@ do
                 local entry, source_id
 
                 if current_loot.target_type == AF.ITEM then
-                    --                    Debug(("GenericLootUpdate: current_loot.identifier: '%s'"):format(tostring(current_loot.identifier)))
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
                     entry = DBEntry(data_type, source_id)
@@ -1036,13 +1035,13 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     ClearKilledBossID()
 
     if not npc then
-        Debug(("%s: NPC is nil."):format(event_name))
+        Debug("%s: NPC is nil.", event_name)
         return
     end
     local item_id = ItemLinkToID(item_link)
 
     if not item_id then
-        Debug(("%s: ItemID is nil, from item link %s"):format(event_name, item_link))
+        Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
         return
     end
     local loot_type = "drops"
@@ -1052,14 +1051,14 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
 
     table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
-    Debug(("%s: %sX%d (%d)"):format(event_name, item_link, quantity, item_id))
+    Debug("%s: %sX%d (%d)", event_name, item_link, quantity, item_id)
 end
 
 
 do
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.NPC] = function(item_id, quantity)
-            Debug(("CHAT_MSG_LOOT: %d (%d)"):format(item_id, quantity))
+            Debug("CHAT_MSG_LOOT: %d (%d)", item_id, quantity)
         end,
         [AF.ZONE] = function(item_id, quantity)
             current_loot = {
@@ -1231,7 +1230,7 @@ do
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
-                Debug(("%s: %s is not an NPC, or has no ID."):format(sub_event, dest_name or _G.UNKNOWN))
+                Debug("%s: %s is not an NPC, or has no ID.", sub_event, dest_name or _G.UNKNOWN)
                 ClearKilledNPC()
                 ClearKilledBossID()
                 private.harvesting = nil
@@ -1245,15 +1244,15 @@ do
             end
 
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
-                Debug(("%s: Matching boss %s."):format(sub_event, dest_name))
+                Debug("%s: Matching boss %s.", sub_event, dest_name)
                 ClearKilledBossID()
                 private.raid_finder_boss_id = unit_idnum
             elseif private.WORLD_BOSS_IDS[unit_idnum] then
-                Debug(("%s: Matching world boss %s."):format(sub_event, dest_name))
+                Debug("%s: Matching world boss %s.", sub_event, dest_name)
                 ClearKilledBossID()
                 private.world_boss_id = unit_idnum
             else
-                Debug(("%s: Killed NPC %s (ID: %d) is not in LFG or World boss list."):format(sub_event, dest_name, unit_idnum))
+                Debug("%s: Killed NPC %s (ID: %d) is not in LFG or World boss list.", sub_event, dest_name, unit_idnum)
             end
 
             killed_npc_id = unit_idnum
@@ -1617,7 +1616,7 @@ do
                     local loot_quantity = loot_info[loot_index + 1]
                     local source_type, source_id = ParseGUID(source_guid)
                     local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                    Debug(("GUID: %s - Type:ID: %s - Amount: %d"):format(loot_info[loot_index], source_key, loot_quantity))
+                    Debug("GUID: %s - Type:ID: %s - Amount: %d", loot_info[loot_index], source_key, loot_quantity)
 
                     if slot_type == _G.LOOT_SLOT_ITEM then
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
@@ -1625,10 +1624,10 @@ do
                         current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                         guids_used[source_guid] = true
                     elseif slot_type == _G.LOOT_SLOT_MONEY then
-                        Debug(("money:%d"):format(_toCopper(item_text)))
+                        Debug("money:%d", _toCopper(item_text))
                         table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
                     elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                        Debug(("Found currency: %s"):format(icon_texture))
+                        Debug("Found currency: %s", icon_texture)
                         table.insert(current_loot.list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
                     end
                 end
