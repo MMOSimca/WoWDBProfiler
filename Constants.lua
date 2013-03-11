@@ -93,15 +93,14 @@ private.SPELL_FLAGS_BY_LABEL = {
 }
 
 private.RAID_FINDER_BOSS_IDS = {
+    -----------------------------------------------------------------------
+    -- Mogu'shan Vaults
+    -----------------------------------------------------------------------
     [59915] = true, -- Jasper Guardian
     [60009] = true, -- Feng the Accursed
     [60043] = true, -- Jade Guardian
     [60047] = true, -- Amethyst Guardian
     [60051] = true, -- Cobalt Guardian
-    [60583] = true, -- Protector Kaolan
-    [60585] = true, -- Elder Regail
-    [60586] = true, -- Elder Asani
-    [60999] = true, -- Sha of Fear
     [60143] = true, -- Gara'jal the Spiritbinder
     [60399] = true, -- Qin-xi
     [60400] = true, -- Jan-xi
@@ -110,17 +109,54 @@ private.RAID_FINDER_BOSS_IDS = {
     [60708] = true, -- Meng the Demented
     [60709] = true, -- Qiang the Merciless
     [60710] = true, -- Subetai the Swift
+
+    -----------------------------------------------------------------------
+    -- Terrace of Endless Spring
+    -----------------------------------------------------------------------
+    [60583] = true, -- Protector Kaolan
+    [60585] = true, -- Elder Regail
+    [60586] = true, -- Elder Asani
+    [60999] = true, -- Sha of Fear
+    [62442] = true, -- Tsulong
+    [62983] = true, -- Lei Shi
+
+    -----------------------------------------------------------------------
+    -- Heart of Fear
+    -----------------------------------------------------------------------
     [62164] = true, -- Garalon
     [62397] = true, -- Wind Lord Mel'jarak
-    [62442] = true, -- Tsulong
     [62511] = true, -- Amber-Shaper Un'sok
     [62543] = true, -- Blade Lord Ta'yak
     [62837] = true, -- Grand Empress Shek'zeer
     [62980] = true, -- Imperial Vizier Zor'lok
-    [62983] = true, -- Lei Shi
+
+    -----------------------------------------------------------------------
+    -- Throne of Thunder
+    -----------------------------------------------------------------------
+    [69465] = true, -- Jin'rokh the Breaker
+    [68476] = true, -- Horridon
+    [69078] = true, -- Sul the Sandcrawler
+    [69131] = true, -- Frost King Malakk
+    [69132] = true, -- High Priestess Mar'li
+    [69134] = true, -- Kazra'jin
+    [67977] = true, -- Tortos
+    [70212] = true, -- Flaming Head (of Megaera)
+    [70235] = true, -- Frozen Head (of Megaera)
+    [70247] = true, -- Venomous Head (of Megaera)
+    [69712] = true, -- Ji-kun
+    [68036] = true, -- Durumu
+    [69017] = true, -- Primordius
+    [69427] = true, -- Dark Animus
+    [68078] = true, -- Iron Qon
+    [68904] = true, -- Suen
+    [68905] = true, -- Lu'lin
+    [68397] = true, -- Lei Shen
 }
+
 
 private.WORLD_BOSS_IDS = {
     [60491] = true, -- Sha of Anger
     [62346] = true, -- Galleon
+    [69099] = true, -- Nalak
+    [69161] = true, -- Oondasta
 }
