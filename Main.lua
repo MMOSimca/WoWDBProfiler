@@ -316,13 +316,12 @@ do
         return _G.setmetatable(npc, npc_meta)
     end
 
-    function npc_prototype:EncounterData()
-        local instance_token = InstanceDifficultyToken()
+    function npc_prototype:EncounterData(difficulty_token)
         self.encounter_data = self.encounter_data or {}
-        self.encounter_data[instance_token] = self.encounter_data[instance_token] or {}
-        self.encounter_data[instance_token].stats = self.encounter_data[instance_token].stats or {}
+        self.encounter_data[difficulty_token] = self.encounter_data[difficulty_token] or {}
+        self.encounter_data[difficulty_token].stats = self.encounter_data[difficulty_token].stats or {}
 
-        return self.encounter_data
+        return self.encounter_data[difficulty_token]
     end
 end
 
@@ -931,7 +930,7 @@ do
         npc.is_pvp = _G.UnitIsPVP("target") and true or nil
         npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
 
-        local encounter_data = npc:EncounterData()[InstanceDifficultyToken()].stats
+        local encounter_data = npc:EncounterData(InstanceDifficultyToken()).stats
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
 
         if not encounter_data[npc_level] then
@@ -971,7 +970,7 @@ do
             return
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-        local npc_data = npc:EncounterData()[difficulty_token].stats[("level_%d"):format(_G.UnitLevel("target"))]
+        local npc_data = npc:EncounterData(difficulty_token).stats[("level_%d"):format(_G.UnitLevel("target"))]
         local zone_token = ("%s:%d"):format(zone_name, area_id)
         npc_data.locations = npc_data.locations or {} -- TODO: Fix this. It is broken. Possibly something to do with the timed updates.
 
@@ -1064,7 +1063,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         return
     end
     local loot_type = "drops"
-    local encounter_data = npc:EncounterData()[InstanceDifficultyToken()]
+    local encounter_data = npc:EncounterData(InstanceDifficultyToken())
     encounter_data[loot_type] = encounter_data[loot_type] or {}
     encounter_data.loot_counts = encounter_data.loot_counts or {}
     encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
@@ -1224,7 +1223,7 @@ do
         end
 
         if bit.band(FLAGS_NPC_CONTROL, source_flags) == FLAGS_NPC_CONTROL and bit.band(FLAGS_NPC, source_flags) ~= 0 then
-            local encounter_data = NPCEntry(source_id):EncounterData()[InstanceDifficultyToken()]
+            local encounter_data = NPCEntry(source_id):EncounterData(InstanceDifficultyToken())
             encounter_data.spells = encounter_data.spells or {}
             encounter_data.spells[spell_id] = (encounter_data.spells[spell_id] or 0) + 1
         end
@@ -1529,7 +1528,7 @@ do
                 local npc = NPCEntry(source_id)
 
                 if npc then
-                    local encounter_data = npc:EncounterData()[difficulty_token]
+                    local encounter_data = npc:EncounterData(difficulty_token)
                     encounter_data[loot_type] = encounter_data[loot_type] or {}
 
                     if not source_list[source_guid] then
@@ -1553,7 +1552,7 @@ do
             if not npc then
                 return
             end
-            local encounter_data = npc:EncounterData()[difficulty_token]
+            local encounter_data = npc:EncounterData(difficulty_token)
             encounter_data[loot_type] = encounter_data[loot_type] or {}
 
             if not source_list[current_loot.identifier] then
