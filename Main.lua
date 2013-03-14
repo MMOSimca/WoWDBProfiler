@@ -17,7 +17,7 @@ local select = _G.select
 local ADDON_NAME, private = ...
 
 local LibStub = _G.LibStub
-local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceTimer-3.0")
+local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
 local LPJ = LibStub("LibPetJournal-2.0")
@@ -400,6 +400,8 @@ do
         end
         return unit_type
     end
+
+    private.ParseGUID = ParseGUID
 end -- do-block
 
 
@@ -720,6 +722,8 @@ function WDP:OnInitialize()
     end
     raw_db.build_num = build_num
     raw_db.version = DB_VERSION
+
+    self:RegisterChatCommand("comment", private.ProcessCommentCommand)
 end
 
 
