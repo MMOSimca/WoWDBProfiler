@@ -1313,7 +1313,8 @@ do
 
         if not combat_log_func then
             if not NON_DAMAGE_EVENTS[sub_event] then
-                Debug("Recording for %s", sub_event)
+                -- Uncomment to look for other sub-events to blacklist.
+                --                Debug("Recording for %s", sub_event)
                 previous_combat_event.source_guid = source_guid
                 previous_combat_event.source_name = source_name
                 previous_combat_event.dest_guid = dest_guid
