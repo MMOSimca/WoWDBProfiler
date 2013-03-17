@@ -936,18 +936,19 @@ do
 
         local encounter_data = npc:EncounterData(InstanceDifficultyToken()).stats
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
+        local level_data = encounter_data[npc_level]
 
-        if not encounter_data[npc_level] then
-            encounter_data[npc_level] = {
-                max_health = _G.UnitHealthMax("target"),
-            }
+        if not level_data then
+            level_data = {}
+            encounter_data[npc_level] = level_data
+        end
+        level_data.max_health = _G.UnitHealthMax("target")
 
-            local max_power = _G.UnitManaMax("target")
+        local max_power = _G.UnitManaMax("target")
 
-            if max_power > 0 then
-                local power_type = _G.UnitPowerType("target")
-                encounter_data[npc_level].power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
-            end
+        if max_power > 0 then
+            local power_type = _G.UnitPowerType("target")
+            level_data.power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
         end
         name_to_id_map[_G.UnitName("target")] = unit_idnum
         return npc, unit_idnum
