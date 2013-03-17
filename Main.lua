@@ -723,7 +723,9 @@ function WDP:OnInitialize()
     raw_db.build_num = build_num
     raw_db.version = DB_VERSION
 
-    self:RegisterChatCommand("comment", private.ProcessCommentCommand)
+    if DEBUGGING then -- TODO: Remove this when comment subsystem is finished.
+        self:RegisterChatCommand("comment", private.ProcessCommentCommand)
+    end
 end
 
 
