@@ -940,11 +940,15 @@ do
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
         local level_data = encounter_data[npc_level]
 
+        Debug("Target npc_level is %s", npc_level)
+
         if not level_data then
             level_data = {}
             encounter_data[npc_level] = level_data
         end
+        Debug("level_data is %s", _G.tostring(level_data))
         level_data.max_health = _G.UnitHealthMax("target")
+        Debug("max_health is %s", level_data and level_data.max_health or "nil")
 
         local max_power = _G.UnitManaMax("target")
 
