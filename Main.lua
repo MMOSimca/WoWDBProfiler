@@ -372,7 +372,7 @@ local function ItemLinkToID(item_link)
     end
     return tonumber(item_link:match("item:(%d+)"))
 end
-
+private.ItemLinkToID = ItemLinkToID
 
 local function UnitTypeIsNPC(unit_type)
     return unit_type == private.UNIT_TYPES.NPC or unit_type == private.UNIT_TYPES.VEHICLE

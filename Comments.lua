@@ -13,6 +13,7 @@ local WDP = LibStub("AceAddon-3.0"):GetAddon(ADDON_NAME)
 local Dialog = LibStub("LibDialog-1.0")
 
 local ParseGUID = private.ParseGUID
+local ItemLinkToID = private.ItemLinkToID
 
 -- CONSTANTS ----------------------------------------------------------
 
@@ -27,6 +28,7 @@ local URL_TYPE_MAP = {
     ITEM = "items",
     OBJECT = "objects",
     NPC = "npcs",
+    SPELL = "spells",
     VEHICLE = "npcs",
 }
 
@@ -260,10 +262,19 @@ do
     panel.submitButton = submit
 end
 
-local function CreateUnitComment(unit_id, unit_type, unit_idnum)
+local function CreateUnitComment(unit_id)
+    if not _G.UnitExists(unit_id) then
+        WDP:Printf("Unit '%s' does not exist.", unit_id)
+        return
+    end
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
+
+    if not unit_idnum then
+        WDP:Printf("Unable to determine unit from '%s'", unit_id)
+        return
+    end
     local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
     local unit_name = _G.UnitName(unit_id)
-
     comment_subject.type_name = type_name
     comment_subject.id = unit_idnum
     comment_subject.label = unit_name
@@ -274,8 +285,52 @@ local function CreateUnitComment(unit_id, unit_type, unit_idnum)
     comment_frame:Show()
 end
 
+local DATA_TYPE_MAPPING = {
+    merchant = "ITEM",
+}
+
+local CURSOR_DATA_FUNCS = {
+    item = function(data_type, data, data_subtype)
+        local item_name = _G.GetItemInfo(data)
+        comment_subject.type_name = data_type
+        comment_subject.id = data
+        comment_subject.label = item_name
+
+        comment_frame.subject_name:SetText(item_name)
+        comment_frame.subject_data:SetFormattedText("(%s #%d)", data_type, data)
+    end,
+    merchant = function(data_type, data)
+        local item_link = _G.GetMerchantItemLink(data)
+        local item_name = _G.GetItemInfo(item_link)
+        local item_id = ItemLinkToID(item_link)
+        comment_subject.type_name = data_type
+        comment_subject.id = item_id
+        comment_subject.label = item_name
+
+        comment_frame.subject_name:SetText(item_name)
+        comment_frame.subject_data:SetFormattedText("(%s #%d)", data_type, item_id)
+    end,
+    spell = function(data_type, data, data_subtype, subdata)
+        local spell_name = _G.GetSpellInfo(subdata)
+        comment_subject.type_name = data_type
+        comment_subject.id = subdata
+        comment_subject.label = spell_name
+
+        comment_frame.subject_name:SetText(spell_name)
+        comment_frame.subject_data:SetFormattedText("(%s #%d)", data_type, subdata)
+    end,
+}
+
 local function CreateCursorComment()
-    -- TODO: Implement!
+    local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
+
+    if not CURSOR_DATA_FUNCS[data_type] then
+        WDP:Print("Unable to determine comment subject from cursor.")
+        return
+    end
+    CURSOR_DATA_FUNCS[data_type](DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
+    comment_frame.scroll_frame.edit_box:SetText("")
+    comment_frame:Show()
 end
 
 -- METHODS ------------------------------------------------------------
@@ -287,19 +342,8 @@ function private.ProcessCommentCommand(arg)
     end
 
     if arg == "cursor" then
-        WDP:Print("Not yet implemented.")
+        CreateCursorComment()
         return
     end
-
-    if not _G.UnitExists(arg) then
-        WDP:Printf("Unit '%s' does not exist.", arg)
-        return
-    end
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(arg))
-
-    if not unit_idnum then
-        WDP:Printf("Unable to determine unit from '%s'", arg)
-        return
-    end
-    CreateUnitComment(arg, unit_type, unit_idnum)
+    CreateUnitComment(arg)
 end
