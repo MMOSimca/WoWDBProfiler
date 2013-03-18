@@ -13,12 +13,17 @@ local WDP = LibStub("AceAddon-3.0"):GetAddon(ADDON_NAME)
 
 local ParseGUID = private.ParseGUID
 
+-- CONSTANTS ----------------------------------------------------------
+
+local EDIT_MAXCHARS = 3000
+local EDIT_DESCRIPTION_FORMAT = [[Enter your comment below, being as descriptive as possible. Comments are limited to %s characters, including newlines and spaces.]]
+
 -- HELPERS ------------------------------------------------------------
 
 local comment_frame
 do
     local panel = _G.CreateFrame("Frame", "WDP_CommentFrame", _G.UIParent, "TranslucentFrameTemplate")
-    panel:SetSize(480, 454)
+    panel:SetSize(480, 350)
     panel:SetPoint("CENTER", _G.UIParent, "CENTER")
     panel:SetFrameStrata("DIALOG")
     panel.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Rock]], true, true)
@@ -34,7 +39,6 @@ do
     streaks:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", -13, -35)
 
     local header = _G.CreateFrame("Frame", "$parentHeader", panel, "TranslucentFrameTemplate")
-    --    header:SetSize(180, 45)
     header:SetSize(128, 64)
     header:SetPoint("CENTER", panel, "TOP", 0, -8)
     header.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Marble]])
@@ -47,11 +51,13 @@ do
     logo:SetPoint("TOPLEFT", header, 10, -10)
     logo:SetPoint("BOTTOMRIGHT", header, -10, 10)
 
-    --[[
-        local header_label = header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-        header_label:SetPoint("CENTER", 0, 0)
-        header_label:SetText(ADDON_NAME)
-    ]]
+    local subject_name = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    subject_name:SetPoint("TOP", header, "BOTTOM", 0, -10)
+    panel.subject_name = subject_name
+
+    local subject_data = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    subject_data:SetPoint("TOP", subject_name, "BOTTOM", 0, -3)
+    panel.subject_data = subject_data
 
     local close = _G.CreateFrame("Button", nil, panel, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -7, -7)
@@ -87,6 +93,8 @@ do
         _G.ScrollFrameTemplate_OnMouseWheel(self, delta)
     end)
 
+    panel.scroll_frame = scroll_frame
+
     local edit_container = _G.CreateFrame("Frame", nil, scroll_frame)
     edit_container:SetPoint("TOPLEFT", scroll_frame, -7, 7)
     edit_container:SetPoint("BOTTOMRIGHT", scroll_frame, 7, -7)
@@ -108,14 +116,23 @@ do
     edit_container:SetBackdropBorderColor(_G.TOOLTIP_DEFAULT_COLOR.r, _G.TOOLTIP_DEFAULT_COLOR.g, _G.TOOLTIP_DEFAULT_COLOR.b)
     edit_container:SetBackdropColor(0, 0, 0)
 
+    local edit_description = edit_container:CreateFontString("MUFASA", "ARTWORK", "GameFontHighlight")
+    edit_description:SetHeight(36)
+    edit_description:SetPoint("BOTTOMLEFT", edit_container, "TOPLEFT", 5, 3)
+    edit_description:SetPoint("BOTTOMRIGHT", edit_container, "TOPRIGHT", 5, 3)
+    edit_description:SetFormattedText(EDIT_DESCRIPTION_FORMAT, _G.BreakUpLargeNumbers(EDIT_MAXCHARS))
+    edit_description:SetWordWrap(true)
+    edit_description:SetJustifyH("LEFT")
+
     local edit_box = _G.CreateFrame("EditBox", nil, scroll_frame)
     edit_box:SetMultiLine(true)
-    edit_box:SetMaxLetters(3000)
+    edit_box:SetMaxLetters(EDIT_MAXCHARS)
     edit_box:EnableMouse(true)
     edit_box:SetAutoFocus(false)
     edit_box:SetFontObject("ChatFontNormal")
     edit_box:SetSize(420, 220)
     edit_box:HighlightText(0)
+    edit_box:SetFrameLevel(scroll_frame:GetFrameLevel() - 1)
 
     edit_box:SetScript("OnCursorChanged", _G.ScrollingEdit_OnCursorChanged)
     edit_box:SetScript("OnEscapePressed", _G.EditBox_ClearFocus)
@@ -133,10 +150,12 @@ do
         local parent = self:GetParent()
         local num_letters = self:GetNumLetters()
         _G.ScrollingEdit_OnTextChanged(self, parent)
-        parent.charCount:SetText(self:GetMaxLetters() - num_letters)
+        parent.charCount:SetFormattedText(_G.BreakUpLargeNumbers(self:GetMaxLetters() - num_letters))
 
         if num_letters > 0 then
             panel.submitButton:Enable();
+        else
+            panel.submitButton:Disable()
         end
     end)
 
@@ -144,6 +163,11 @@ do
         _G.ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
     end)
 
+    edit_container:SetScript("OnMouseUp", function()
+        _G.EditBox_SetFocus(edit_box)
+    end)
+
+    scroll_frame.edit_box = edit_box
     scroll_frame:SetScrollChild(edit_box)
 
     local char_count = scroll_frame:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
@@ -171,7 +195,10 @@ do
     panel.submitButton = submit
 end
 
-local function CreateUnitComment(unit_type, unit_idnum)
+local function CreateUnitComment(unit_id, unit_type, unit_idnum)
+    comment_frame.subject_name:SetText(_G.UnitName(unit_id))
+    comment_frame.subject_data:SetFormattedText("(%s #%d)", private.UNIT_TYPE_NAMES[unit_type + 1], unit_idnum)
+    comment_frame.scroll_frame.edit_box:SetText("")
     comment_frame:Show()
 end
 
@@ -202,5 +229,5 @@ function private.ProcessCommentCommand(arg)
         WDP:Printf("Unable to determine unit from '%s'", arg)
         return
     end
-    CreateUnitComment(unit_type, unit_idnum)
+    CreateUnitComment(arg, unit_type, unit_idnum)
 end
