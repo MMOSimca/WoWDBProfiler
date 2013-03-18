@@ -1158,9 +1158,9 @@ do
     }
 
     local DRUNK_MATCHES = {
-        _G.DRUNK_MESSAGE_SELF2:gsub("%%s", ".+"),
-        _G.DRUNK_MESSAGE_SELF3:gsub("%%s", ".+"),
-        _G.DRUNK_MESSAGE_SELF4:gsub("%%s", ".+"),
+        (_G.DRUNK_MESSAGE_SELF2:gsub("%%s", ".+")),
+        (_G.DRUNK_MESSAGE_SELF3:gsub("%%s", ".+")),
+        (_G.DRUNK_MESSAGE_SELF4:gsub("%%s", ".+")),
     }
 
     local RECIPE_MATCH = _G.ERR_LEARN_RECIPE_S:gsub("%%s", "(.*)")
