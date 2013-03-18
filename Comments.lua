@@ -10,13 +10,56 @@ local ADDON_NAME, private = ...
 
 local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):GetAddon(ADDON_NAME)
+local Dialog = LibStub("LibDialog-1.0")
 
 local ParseGUID = private.ParseGUID
 
 -- CONSTANTS ----------------------------------------------------------
 
 local EDIT_MAXCHARS = 3000
-local EDIT_DESCRIPTION_FORMAT = [[Enter your comment below, being as descriptive as possible. Comments are limited to %s characters, including newlines and spaces.]]
+local EDIT_DESCRIPTION_FORMAT = "Enter your comment below, being as descriptive as possible. Comments are limited to %s characters, including newlines and spaces."
+local LINK_COMMENT_TOOLTIP = "Click here to create a link to the comment page on WoWDB."
+local LINK_EDITBOX_DESC_FORMAT = "Copy the highlighted text and paste it into your browser to visit the comments for %s."
+
+local URL_BASE = "http://www.wowdb.com/"
+
+local URL_TYPE_MAP = {
+    ITEM = "items",
+    OBJECT = "objects",
+    NPC = "npcs",
+    VEHICLE = "npcs",
+}
+
+Dialog:Register("WDP_CommentLink", {
+    text = "",
+    editboxes = {
+        {
+            text = _G.UNKNOWN,
+            on_escape_pressed = function(self)
+                self:ClearFocus()
+            end,
+        },
+    },
+    buttons = {
+        {
+            text = _G.OKAY,
+        }
+    },
+    show_while_dead = true,
+    hide_on_escape = true,
+    is_exclusive = true,
+    on_show = function(self, data)
+        local editbox = self.editboxes[1]
+        editbox:SetWidth(self:GetWidth() - 20)
+        editbox:SetText(("%s%s/%d#related:comments"):format(URL_BASE, URL_TYPE_MAP[data.type_name], data.id))
+        editbox:HighlightText()
+        editbox:SetFocus()
+
+        self.text:SetFormattedText(LINK_EDITBOX_DESC_FORMAT:format(data.label))
+    end,
+})
+
+local comment_subject = {}
 
 -- HELPERS ------------------------------------------------------------
 
@@ -116,6 +159,28 @@ do
     edit_container:SetBackdropBorderColor(_G.TOOLTIP_DEFAULT_COLOR.r, _G.TOOLTIP_DEFAULT_COLOR.g, _G.TOOLTIP_DEFAULT_COLOR.b)
     edit_container:SetBackdropColor(0, 0, 0)
 
+    local link_button = _G.CreateFrame("Button", "$parentLinkButton", panel)
+    link_button:SetSize(32, 16)
+    link_button:SetPoint("TOPRIGHT", edit_container, "BOTTOMRIGHT", 5, 0)
+
+    link_button:SetNormalTexture([[Interface\TradeSkillFrame\UI-TradeSkill-LinkButton]])
+    link_button:GetNormalTexture():SetTexCoord(0, 1, 0, 0.5)
+
+    link_button:SetHighlightTexture([[Interface\TradeSkillFrame\UI-TradeSkill-LinkButton]])
+    link_button:GetHighlightTexture():SetTexCoord(0, 1, 0.5, 1)
+
+    link_button:SetScript("OnClick", function(self)
+        Dialog:Spawn("WDP_CommentLink", { type_name = comment_subject.type_name, id = comment_subject.id, label = comment_subject.label })
+    end)
+
+    link_button:SetScript("OnEnter", function(self)
+        _G.GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+        _G.GameTooltip:SetText(LINK_COMMENT_TOOLTIP, nil, nil, nil, nil, 1)
+        _G.GameTooltip:Show()
+    end)
+
+    link_button:SetScript("OnLeave", _G.GameTooltip_Hide)
+
     local edit_description = edit_container:CreateFontString("MUFASA", "ARTWORK", "GameFontHighlight")
     edit_description:SetHeight(36)
     edit_description:SetPoint("BOTTOMLEFT", edit_container, "TOPLEFT", 5, 3)
@@ -196,8 +261,15 @@ do
 end
 
 local function CreateUnitComment(unit_id, unit_type, unit_idnum)
-    comment_frame.subject_name:SetText(_G.UnitName(unit_id))
-    comment_frame.subject_data:SetFormattedText("(%s #%d)", private.UNIT_TYPE_NAMES[unit_type + 1], unit_idnum)
+    local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
+    local unit_name = _G.UnitName(unit_id)
+
+    comment_subject.type_name = type_name
+    comment_subject.id = unit_idnum
+    comment_subject.label = unit_name
+
+    comment_frame.subject_name:SetText(unit_name)
+    comment_frame.subject_data:SetFormattedText("(%s #%d)", type_name, unit_idnum)
     comment_frame.scroll_frame.edit_box:SetText("")
     comment_frame:Show()
 end
