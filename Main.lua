@@ -940,21 +940,19 @@ do
         local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
         local level_data = encounter_data[npc_level]
 
-        Debug("Target npc_level is %s", npc_level)
-
         if not level_data then
             level_data = {}
             encounter_data[npc_level] = level_data
         end
-        Debug("level_data is %s", _G.tostring(level_data))
-        level_data.max_health = _G.UnitHealthMax("target")
-        Debug("max_health is %s", level_data and level_data.max_health or "nil")
+        level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
 
-        local max_power = _G.UnitManaMax("target")
+        if not level_data.power then
+            local max_power = _G.UnitManaMax("target")
 
-        if max_power > 0 then
-            local power_type = _G.UnitPowerType("target")
-            level_data.power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+            if max_power > 0 then
+                local power_type = _G.UnitPowerType("target")
+                level_data.power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+            end
         end
         name_to_id_map[_G.UnitName("target")] = unit_idnum
         return npc, unit_idnum
