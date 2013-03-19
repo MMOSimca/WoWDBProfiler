@@ -14,6 +14,7 @@ local Dialog = LibStub("LibDialog-1.0")
 
 local ParseGUID = private.ParseGUID
 local ItemLinkToID = private.ItemLinkToID
+local DBEntry = private.DBEntry
 
 -- CONSTANTS ----------------------------------------------------------
 
@@ -257,7 +258,15 @@ do
     submit:Enable(false)
 
     submit:SetScript("OnClick", function()
-    -- TODO: Make this assign the comment to the correct SavedVariables entry.
+        local entry = DBEntry(URL_TYPE_MAP[comment_subject.type_name], comment_subject.id)
+
+        if not entry then
+            WDP:Print("An error has occurred; please report at http://wow.curseforge.com/addons/wowdb-profiler/create-ticket/")
+            return
+        end
+        entry.comments = entry.comments or {}
+        entry.comments[#entry.comments + 1] = edit_box:GetText()
+
         edit_box:SetText("")
         _G.HideUIPanel(panel)
     end)

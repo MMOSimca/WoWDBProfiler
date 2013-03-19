@@ -299,6 +299,7 @@ local function DBEntry(data_type, unit_id)
     end
     return unit
 end
+private.DBEntry = DBEntry
 
 local NPCEntry
 do
@@ -778,6 +779,7 @@ function WDP:OnEnable()
         local _, item_link = _G.GetItemInfo(identifier)
         HandleItemUse(item_link)
     end)
+
     self:SetCurrentAreaID("OnEnable")
     self:GROUP_ROSTER_CHANGE()
 end
