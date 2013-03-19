@@ -20,7 +20,7 @@ local ItemLinkToID = private.ItemLinkToID
 local EDIT_MAXCHARS = 3000
 local EDIT_DESCRIPTION_FORMAT = "Enter your comment below, being as descriptive as possible. Comments are limited to %s characters, including newlines and spaces."
 local LINK_COMMENT_TOOLTIP = "Click here to create a link to the comment page on WoWDB."
-local LINK_EDITBOX_DESC_FORMAT = "Copy the highlighted text and paste it into your browser to visit the comments for %s."
+local LINK_EDITBOX_DESC_FORMAT = "Copy the highlighted text and paste it into your browser to visit the comments for |cffffd200%s|r."
 
 local URL_BASE = "http://www.wowdb.com/"
 
@@ -28,6 +28,7 @@ local URL_TYPE_MAP = {
     ITEM = "items",
     OBJECT = "objects",
     NPC = "npcs",
+    QUEST = "quests",
     SPELL = "spells",
     VEHICLE = "npcs",
 }
@@ -57,6 +58,7 @@ Dialog:Register("WDP_CommentLink", {
         editbox:HighlightText()
         editbox:SetFocus()
 
+        self.text:SetJustifyH("LEFT")
         self.text:SetFormattedText(LINK_EDITBOX_DESC_FORMAT:format(data.label))
     end,
 })
@@ -333,6 +335,29 @@ local function CreateCursorComment()
     comment_frame:Show()
 end
 
+local function CreateQuestComment()
+    local index = _G.GetQuestLogSelection()
+
+    if not index or not _G.QuestLogFrame:IsShown() then
+        WDP:Print("You must select a quest from the Quest frame.")
+        return
+    end
+    local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
+
+    if is_header then
+        WDP:Print("You must select a quest from the Quest frame.")
+        return
+    end
+    comment_subject.type_name = "QUEST"
+    comment_subject.id = idnum
+    comment_subject.label = title
+
+    comment_frame.subject_name:SetText(title)
+    comment_frame.subject_data:SetFormattedText("(%s #%d)", "QUEST", idnum)
+    comment_frame.scroll_frame.edit_box:SetText("")
+    comment_frame:Show()
+end
+
 -- METHODS ------------------------------------------------------------
 
 function private.ProcessCommentCommand(arg)
@@ -343,6 +368,9 @@ function private.ProcessCommentCommand(arg)
 
     if arg == "cursor" then
         CreateCursorComment()
+        return
+    elseif arg == "quest" then
+        CreateQuestComment()
         return
     end
     CreateUnitComment(arg)
