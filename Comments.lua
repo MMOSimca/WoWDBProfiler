@@ -284,7 +284,7 @@ local function CreateUnitComment(unit_id)
     comment_frame.subject_name:SetText(unit_name)
     comment_frame.subject_data:SetFormattedText("(%s #%d)", type_name, unit_idnum)
     comment_frame.scroll_frame.edit_box:SetText("")
-    comment_frame:Show()
+    _G.ShowUIPanel(comment_frame)
 end
 
 local DATA_TYPE_MAPPING = {
@@ -332,7 +332,7 @@ local function CreateCursorComment()
     end
     CURSOR_DATA_FUNCS[data_type](DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
     comment_frame.scroll_frame.edit_box:SetText("")
-    comment_frame:Show()
+    _G.ShowUIPanel(comment_frame)
 end
 
 local function CreateQuestComment()
@@ -355,7 +355,7 @@ local function CreateQuestComment()
     comment_frame.subject_name:SetText(title)
     comment_frame.subject_data:SetFormattedText("(%s #%d)", "QUEST", idnum)
     comment_frame.scroll_frame.edit_box:SetText("")
-    comment_frame:Show()
+    _G.ShowUIPanel(comment_frame)
 end
 
 -- METHODS ------------------------------------------------------------
