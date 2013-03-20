@@ -156,6 +156,11 @@ do
         _G.ScrollFrameTemplate_OnMouseWheel(self, delta)
     end)
 
+    -- This is needed because the EditBox starts with a height of a single line, so getting focus on click would require finding the EditBox blindly.
+    scroll_frame:SetScript("OnMouseUp", function(self)
+        _G.EditBox_SetFocus(self.edit_box)
+    end)
+
     panel.scroll_frame = scroll_frame
 
     local edit_container = _G.CreateFrame("Frame", nil, scroll_frame)
@@ -201,7 +206,7 @@ do
 
     link_button:SetScript("OnLeave", _G.GameTooltip_Hide)
 
-    local edit_description = edit_container:CreateFontString("MUFASA", "ARTWORK", "GameFontHighlight")
+    local edit_description = edit_container:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     edit_description:SetHeight(36)
     edit_description:SetPoint("BOTTOMLEFT", edit_container, "TOPLEFT", 5, 3)
     edit_description:SetPoint("BOTTOMRIGHT", edit_container, "TOPRIGHT", 5, 3)
@@ -209,7 +214,7 @@ do
     edit_description:SetWordWrap(true)
     edit_description:SetJustifyH("LEFT")
 
-    local edit_box = _G.CreateFrame("EditBox", nil, scroll_frame)
+    local edit_box = _G.CreateFrame("EditBox", "$parentEditBox", scroll_frame)
     edit_box:SetMultiLine(true)
     edit_box:SetMaxLetters(EDIT_MAXCHARS)
     edit_box:EnableMouse(true)
@@ -217,7 +222,7 @@ do
     edit_box:SetFontObject("ChatFontNormal")
     edit_box:SetSize(420, 220)
     edit_box:HighlightText(0)
-    edit_box:SetFrameLevel(scroll_frame:GetFrameLevel() - 1)
+    edit_box:SetFrameLevel(scroll_frame:GetFrameLevel() + 1)
 
     edit_box:SetScript("OnCursorChanged", _G.ScrollingEdit_OnCursorChanged)
     edit_box:SetScript("OnEscapePressed", _G.EditBox_ClearFocus)
@@ -246,10 +251,6 @@ do
 
     edit_box:SetScript("OnUpdate", function(self, elapsed)
         _G.ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
-    end)
-
-    edit_container:SetScript("OnMouseUp", function()
-        _G.EditBox_SetFocus(edit_box)
     end)
 
     scroll_frame.edit_box = edit_box
