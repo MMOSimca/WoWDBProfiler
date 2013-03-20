@@ -343,12 +343,13 @@ do
 
     function CreateCursorComment()
         local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
+        local comment_func = CURSOR_DATA_FUNCS[data_type]
 
-        if not CURSOR_DATA_FUNCS[data_type] then
+        if not comment_func then
             WDP:Print("Unable to determine comment subject from cursor.")
             return
         end
-        CURSOR_DATA_FUNCS[data_type](DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
+        comment_func(DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
     end
 end
 
