@@ -77,6 +77,8 @@ do
     panel.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Rock]], true, true)
     panel.Bg:SetHorizTile(true)
     panel.Bg:SetVertTile(true)
+    panel:EnableMouse(true)
+    panel:SetMovable(true)
     panel:Hide()
     comment_frame = panel
 
@@ -92,6 +94,16 @@ do
     header.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Marble]])
     header.Bg:SetHorizTile(true)
     header.Bg:SetVertTile(true)
+    header:SetMovable(true)
+
+    header:SetScript("OnMouseDown", function()
+        panel:StartMoving()
+    end)
+
+    header:SetScript("OnMouseUp", function()
+        panel:StopMovingOrSizing()
+    end)
+
     panel.header = header
 
     local logo = header:CreateTexture(nil, "ARTWORK")
