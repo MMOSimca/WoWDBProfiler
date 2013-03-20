@@ -42,6 +42,9 @@ Dialog:Register("WDP_CommentLink", {
             on_escape_pressed = function(self)
                 self:ClearFocus()
             end,
+            on_enter_pressed = function(self)
+                self:GetParent().buttons[1]:Click()
+            end,
         },
     },
     buttons = {
