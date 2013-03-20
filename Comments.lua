@@ -4,6 +4,8 @@ local _G = getfenv(0)
 
 local table = _G.table
 
+local next = _G.next
+
 -- ADDON NAMESPACE ----------------------------------------------------
 
 local ADDON_NAME, private = ...
@@ -26,6 +28,7 @@ local LINK_EDITBOX_DESC_FORMAT = "Copy the highlighted text and paste it into yo
 local URL_BASE = "http://www.wowdb.com/"
 
 local URL_TYPE_MAP = {
+    ACHIEVEMENT = "achievements",
     ITEM = "items",
     OBJECT = "objects",
     NPC = "npcs",
@@ -383,6 +386,29 @@ local function CreateQuestComment()
     _G.ShowUIPanel(comment_frame)
 end
 
+local function CreateAchievementComment()
+    if not _G.AchievementFrame or not _G.AchievementFrameAchievements.selection then
+        WDP:Print("You must select an achievement from the Achievement frame.")
+        return
+    end
+
+    for _, button in next, _G.AchievementFrameAchievementsContainer.buttons do
+        if button.selected then
+            local title = button.label:GetText()
+
+            comment_subject.type_name = "ACHIEVEMENT"
+            comment_subject.id = button.id
+            comment_subject.label = title
+
+            comment_frame.subject_name:SetText(title)
+            comment_frame.subject_data:SetFormattedText("(%s #%d)", "ACHIEVEMENT", button.id)
+            comment_frame.scroll_frame.edit_box:SetText("")
+            _G.ShowUIPanel(comment_frame)
+            break
+        end
+    end
+end
+
 -- METHODS ------------------------------------------------------------
 
 function private.ProcessCommentCommand(arg)
@@ -391,7 +417,10 @@ function private.ProcessCommentCommand(arg)
         return
     end
 
-    if arg == "cursor" then
+    if arg == "achievement" then
+        CreateAchievementComment()
+        return
+    elseif arg == "cursor" then
         CreateCursorComment()
         return
     elseif arg == "quest" then
