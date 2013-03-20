@@ -292,6 +292,17 @@ do
     panel.submitButton = submit
 end
 
+local function NewComment(type_name, label, id)
+    comment_subject.id = id
+    comment_subject.label = label
+    comment_subject.type_name = type_name
+
+    comment_frame.subject_name:SetText(label)
+    comment_frame.subject_data:SetFormattedText("(%s #%d)", type_name, id)
+    comment_frame.scroll_frame.edit_box:SetText("")
+    _G.ShowUIPanel(comment_frame)
+end
+
 local function CreateUnitComment(unit_id)
     if not _G.UnitExists(unit_id) then
         WDP:Printf("Unit '%s' does not exist.", unit_id)
@@ -305,62 +316,40 @@ local function CreateUnitComment(unit_id)
     end
     local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
     local unit_name = _G.UnitName(unit_id)
-    comment_subject.type_name = type_name
-    comment_subject.id = unit_idnum
-    comment_subject.label = unit_name
-
-    comment_frame.subject_name:SetText(unit_name)
-    comment_frame.subject_data:SetFormattedText("(%s #%d)", type_name, unit_idnum)
-    comment_frame.scroll_frame.edit_box:SetText("")
-    _G.ShowUIPanel(comment_frame)
+    NewComment(type_name, unit_name, unit_idnum)
 end
 
 local DATA_TYPE_MAPPING = {
     merchant = "ITEM",
 }
 
-local CURSOR_DATA_FUNCS = {
-    item = function(data_type, data, data_subtype)
-        local item_name = _G.GetItemInfo(data)
-        comment_subject.type_name = data_type
-        comment_subject.id = data
-        comment_subject.label = item_name
+local CreateCursorComment
+do
+    local CURSOR_DATA_FUNCS = {
+        item = function(type_name, id_num, data_subtype)
+            local item_name = _G.GetItemInfo(id_num)
+            NewComment(type_name, item_name, id_num)
+        end,
+        merchant = function(type_name, item_index)
+            local item_link = _G.GetMerchantItemLink(item_index)
+            local item_name = _G.GetItemInfo(item_link)
+            NewComment(type_name, item_name, ItemLinkToID(item_link))
+        end,
+        spell = function(type_name, data, data_subtype, spell_id)
+            local spell_name = _G.GetSpellInfo(spell_id)
+            NewComment(type_name, spell_name, spell_id)
+        end,
+    }
 
-        comment_frame.subject_name:SetText(item_name)
-        comment_frame.subject_data:SetFormattedText("(%s #%d)", data_type, data)
-    end,
-    merchant = function(data_type, data)
-        local item_link = _G.GetMerchantItemLink(data)
-        local item_name = _G.GetItemInfo(item_link)
-        local item_id = ItemLinkToID(item_link)
-        comment_subject.type_name = data_type
-        comment_subject.id = item_id
-        comment_subject.label = item_name
+    function CreateCursorComment()
+        local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
 
-        comment_frame.subject_name:SetText(item_name)
-        comment_frame.subject_data:SetFormattedText("(%s #%d)", data_type, item_id)
-    end,
-    spell = function(data_type, data, data_subtype, subdata)
-        local spell_name = _G.GetSpellInfo(subdata)
-        comment_subject.type_name = data_type
-        comment_subject.id = subdata
-        comment_subject.label = spell_name
-
-        comment_frame.subject_name:SetText(spell_name)
-        comment_frame.subject_data:SetFormattedText("(%s #%d)", data_type, subdata)
-    end,
-}
-
-local function CreateCursorComment()
-    local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
-
-    if not CURSOR_DATA_FUNCS[data_type] then
-        WDP:Print("Unable to determine comment subject from cursor.")
-        return
+        if not CURSOR_DATA_FUNCS[data_type] then
+            WDP:Print("Unable to determine comment subject from cursor.")
+            return
+        end
+        CURSOR_DATA_FUNCS[data_type](DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
     end
-    CURSOR_DATA_FUNCS[data_type](DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
-    comment_frame.scroll_frame.edit_box:SetText("")
-    _G.ShowUIPanel(comment_frame)
 end
 
 local function CreateQuestComment()
@@ -376,14 +365,7 @@ local function CreateQuestComment()
         WDP:Print("You must select a quest from the Quest frame.")
         return
     end
-    comment_subject.type_name = "QUEST"
-    comment_subject.id = idnum
-    comment_subject.label = title
-
-    comment_frame.subject_name:SetText(title)
-    comment_frame.subject_data:SetFormattedText("(%s #%d)", "QUEST", idnum)
-    comment_frame.scroll_frame.edit_box:SetText("")
-    _G.ShowUIPanel(comment_frame)
+    NewComment("QUEST", title, idnum)
 end
 
 local function CreateAchievementComment()
@@ -394,16 +376,7 @@ local function CreateAchievementComment()
 
     for _, button in next, _G.AchievementFrameAchievementsContainer.buttons do
         if button.selected then
-            local title = button.label:GetText()
-
-            comment_subject.type_name = "ACHIEVEMENT"
-            comment_subject.id = button.id
-            comment_subject.label = title
-
-            comment_frame.subject_name:SetText(title)
-            comment_frame.subject_data:SetFormattedText("(%s #%d)", "ACHIEVEMENT", button.id)
-            comment_frame.scroll_frame.edit_box:SetText("")
-            _G.ShowUIPanel(comment_frame)
+            NewComment("ACHIEVEMENT", button.label:GetText(), button.id)
             break
         end
     end
