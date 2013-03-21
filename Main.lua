@@ -50,6 +50,11 @@ local ALLOWED_LOCALES = {
 local DATABASE_DEFAULTS = {
     char = {},
     global = {
+        config = {
+            minimap_icon = {
+                hide = true,
+            },
+        },
         items = {},
         npcs = {},
         objects = {},
@@ -299,6 +304,7 @@ local function DBEntry(data_type, unit_id)
     end
     return unit
 end
+
 private.DBEntry = DBEntry
 
 local NPCEntry
@@ -373,6 +379,7 @@ local function ItemLinkToID(item_link)
     end
     return tonumber(item_link:match("item:(%d+)"))
 end
+
 private.ItemLinkToID = ItemLinkToID
 
 local function UnitTypeIsNPC(unit_type)
@@ -710,10 +717,11 @@ end
 
 function WDP:OnInitialize()
     local db = LibStub("AceDB-3.0"):New("WoWDBProfilerData", DATABASE_DEFAULTS, "Default")
+    private.db = db
     global_db = db.global
     char_db = db.char
 
-    local raw_db = _G["WoWDBProfilerData"]
+    local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
 
     if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
@@ -725,6 +733,7 @@ function WDP:OnInitialize()
     raw_db.version = DB_VERSION
 
     if DEBUGGING then -- TODO: Remove this when comment subsystem is finished.
+        private.InitializeCommentSystem()
         self:RegisterChatCommand("comment", private.ProcessCommentCommand)
     end
 end

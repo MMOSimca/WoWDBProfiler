@@ -5,6 +5,7 @@ local _G = getfenv(0)
 local table = _G.table
 
 local next = _G.next
+local pairs = _G.pairs
 
 -- ADDON NAMESPACE ----------------------------------------------------
 
@@ -13,6 +14,7 @@ local ADDON_NAME, private = ...
 local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):GetAddon(ADDON_NAME)
 local Dialog = LibStub("LibDialog-1.0")
+local LQT = LibStub("LibQTip-1.0")
 
 local ParseGUID = private.ParseGUID
 local ItemLinkToID = private.ItemLinkToID
@@ -70,12 +72,246 @@ Dialog:Register("WDP_CommentLink", {
     end,
 })
 
+-- VARIABLES ----------------------------------------------------------
+
 local comment_subject = {}
+local comment_frame
 
 -- HELPERS ------------------------------------------------------------
 
-local comment_frame
+local function NewComment(type_name, label, id)
+    comment_subject.id = id
+    comment_subject.label = label
+    comment_subject.type_name = type_name
+
+    comment_frame.subject_name:SetText(label)
+    comment_frame.subject_data:SetFormattedText("(%s #%d)", type_name, id)
+    comment_frame.scroll_frame.edit_box:SetText("")
+    _G.ShowUIPanel(comment_frame)
+end
+
+local function CreateUnitComment(unit_id)
+    if not _G.UnitExists(unit_id) then
+        WDP:Printf("Unit '%s' does not exist.", unit_id)
+        return
+    end
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
+
+    if not unit_idnum then
+        WDP:Printf("Unable to determine unit from '%s'", unit_id)
+        return
+    end
+    local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
+    local unit_name = _G.UnitName(unit_id)
+    NewComment(type_name, unit_name, unit_idnum)
+end
+
+local DATA_TYPE_MAPPING = {
+    merchant = "ITEM",
+}
+
+local CreateCursorComment
 do
+    local CURSOR_DATA_FUNCS = {
+        item = function(type_name, id_num, data_subtype)
+            local item_name = _G.GetItemInfo(id_num)
+            NewComment(type_name, item_name, id_num)
+        end,
+        merchant = function(type_name, item_index)
+            local item_link = _G.GetMerchantItemLink(item_index)
+            local item_name = _G.GetItemInfo(item_link)
+            NewComment(type_name, item_name, ItemLinkToID(item_link))
+        end,
+        spell = function(type_name, data, data_subtype, spell_id)
+            local spell_name = _G.GetSpellInfo(spell_id)
+            NewComment(type_name, spell_name, spell_id)
+        end,
+    }
+
+    function CreateCursorComment()
+        local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
+        local comment_func = CURSOR_DATA_FUNCS[data_type]
+
+        if not comment_func then
+            WDP:Print("Unable to determine comment subject from cursor.")
+            return
+        end
+        comment_func(DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
+    end
+end -- do-block
+
+local function CreateQuestComment()
+    local index = _G.GetQuestLogSelection()
+
+    if not index or not _G.QuestLogFrame:IsShown() then
+        WDP:Print("You must select a quest from the Quest frame.")
+        return
+    end
+    local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
+
+    if is_header then
+        WDP:Print("You must select a quest from the Quest frame.")
+        return
+    end
+    NewComment("QUEST", title, idnum)
+end
+
+local function CreateAchievementComment()
+    if not _G.AchievementFrame or not _G.AchievementFrame:IsShown() or not _G.AchievementFrameAchievements.selection then
+        WDP:Print("You must select an achievement from the Achievement frame.")
+        return
+    end
+
+    for _, button in next, _G.AchievementFrameAchievementsContainer.buttons do
+        if button.selected then
+            NewComment("ACHIEVEMENT", button.label:GetText(), button.id)
+            break
+        end
+    end
+end
+
+local ShowPossibleSubjects
+do
+    local display
+    local old_x, old_y, click_time
+
+    _G.WorldFrame:HookScript("OnMouseDown", function(frame, ...)
+        old_x, old_y = _G.GetCursorPosition()
+        click_time = _G.GetTime()
+    end)
+
+    _G.WorldFrame:HookScript("OnMouseUp", function(frame, ...)
+        if not display then
+            return
+        end
+        local x, y = _G.GetCursorPosition()
+
+        if not old_x or not old_y or not x or not y or not click_time then
+            display = display:Release()
+            return
+        end
+
+        if (_G.math.abs(x - old_x) + _G.math.abs(y - old_y)) <= 5 and _G.GetTime() - click_time < 1 then
+            display = display:Release()
+        end
+    end)
+
+    local function CreateComment(cell, func)
+        func()
+        display = display:Release()
+    end
+
+    local CURSOR_NAME_FUNCS = {
+        item = function(id_num)
+            return _G.GetItemInfo(id_num)
+        end,
+        merchant = function(item_index)
+            return _G.GetItemInfo(_G.GetMerchantItemLink(item_index))
+        end,
+        spell = function(data, data_subtype, spell_id)
+            return _G.GetSpellInfo(spell_id)
+        end,
+    }
+
+    local VALID_UNITS = {
+        boss1 = true,
+        boss2 = true,
+        boss3 = true,
+        boss4 = true,
+        focus = true,
+        mouseover = true,
+        npc = true,
+        target = true,
+    }
+
+    function ShowPossibleSubjects(anchor)
+        if not display then
+            display = LQT:Acquire(ADDON_NAME, 1, "LEFT")
+            display:EnableMouse(true)
+        end
+
+        if anchor then
+            display:SmartAnchorTo(anchor)
+            display:SetAutoHideDelay(0.2, anchor)
+        else
+            display:SetPoint("CENTER", _G.UIParent, "CENTER", 0, 0)
+        end
+        display:Clear()
+        display:AddHeader("Choose comment subject:", "CENTER")
+        display:AddSeparator()
+        display:AddSeparator()
+
+        local line
+
+        for unit_id in pairs(VALID_UNITS) do
+            if _G.UnitExists(unit_id) then
+                local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
+
+                if unit_idnum then
+                    line = display:AddLine(("%s: %s"):format(unit_id:gsub("^%l", _G.string.upper), _G.UnitName(unit_id)))
+                    display:SetLineScript(line, "OnMouseUp", CreateComment, CreateUnitComment)
+                end
+            end
+        end
+
+        if _G.AchievementFrame and _G.AchievementFrame:IsShown() and _G.AchievementFrameAchievements.selection then
+            for _, button in next, _G.AchievementFrameAchievementsContainer.buttons do
+                if button.selected then
+                    line = display:AddLine(("Achievement: %s"):format(button.label:GetText()))
+                    display:SetLineScript(line, "OnMouseUp", CreateComment, CreateAchievementComment)
+                    break
+                end
+            end
+        end
+        local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
+        local name_func = CURSOR_NAME_FUNCS[data_type]
+
+        if name_func then
+            line = display:AddLine(("Cursor: %s"):format(name_func(data, data_subtype, subdata)))
+            display:SetLineScript(line, "OnMouseUp", CreateComment, CreateCursorComment)
+        end
+
+        local quest_index = _G.GetQuestLogSelection()
+
+        if quest_index and _G.QuestLogFrame:IsShown() then
+            local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(quest_index)
+
+            if not is_header then
+                line = display:AddLine(("Quest: %s"):format(title))
+                display:SetLineScript(line, "OnMouseUp", CreateComment, CreateQuestComment)
+            end
+        end
+
+        if display:GetLineCount() == 3 then
+            WDP:Print("There are no possible comment subjects.")
+            return
+        end
+        display:Show()
+    end
+end -- do-block
+
+-- METHODS ------------------------------------------------------------
+
+function private.ProcessCommentCommand(arg)
+    if not arg or arg == "" then
+        ShowPossibleSubjects(nil)
+        return
+    end
+
+    if arg == "achievement" then
+        CreateAchievementComment()
+        return
+    elseif arg == "cursor" then
+        CreateCursorComment()
+        return
+    elseif arg == "quest" then
+        CreateQuestComment()
+        return
+    end
+    CreateUnitComment(arg)
+end
+
+function private.InitializeCommentSystem()
     local panel = _G.CreateFrame("Frame", "WDP_CommentFrame", _G.UIParent, "TranslucentFrameTemplate")
     panel:SetSize(480, 350)
     panel:SetPoint("CENTER", _G.UIParent, "CENTER")
@@ -290,116 +526,20 @@ do
         _G.HideUIPanel(panel)
     end)
     panel.submitButton = submit
-end
 
-local function NewComment(type_name, label, id)
-    comment_subject.id = id
-    comment_subject.label = label
-    comment_subject.type_name = type_name
-
-    comment_frame.subject_name:SetText(label)
-    comment_frame.subject_data:SetFormattedText("(%s #%d)", type_name, id)
-    comment_frame.scroll_frame.edit_box:SetText("")
-    _G.ShowUIPanel(comment_frame)
-end
-
-local function CreateUnitComment(unit_id)
-    if not _G.UnitExists(unit_id) then
-        WDP:Printf("Unit '%s' does not exist.", unit_id)
-        return
-    end
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
-
-    if not unit_idnum then
-        WDP:Printf("Unable to determine unit from '%s'", unit_id)
-        return
-    end
-    local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
-    local unit_name = _G.UnitName(unit_id)
-    NewComment(type_name, unit_name, unit_idnum)
-end
-
-local DATA_TYPE_MAPPING = {
-    merchant = "ITEM",
-}
-
-local CreateCursorComment
-do
-    local CURSOR_DATA_FUNCS = {
-        item = function(type_name, id_num, data_subtype)
-            local item_name = _G.GetItemInfo(id_num)
-            NewComment(type_name, item_name, id_num)
+    local data_obj = LibStub("LibDataBroker-1.1"):NewDataObject(ADDON_NAME, {
+        type = "data source",
+        label = ADDON_NAME,
+        text = " ",
+        icon = [[Interface\CHATFRAME\UI-ChatIcon-Chat-Up]],
+        OnClick = function(self, button, down)
+            ShowPossibleSubjects(self)
         end,
-        merchant = function(type_name, item_index)
-            local item_link = _G.GetMerchantItemLink(item_index)
-            local item_name = _G.GetItemInfo(item_link)
-            NewComment(type_name, item_name, ItemLinkToID(item_link))
+        OnTooltipShow = function(self)
+            self:AddLine(_G.CLICK_TO_ENTER_COMMENT)
         end,
-        spell = function(type_name, data, data_subtype, spell_id)
-            local spell_name = _G.GetSpellInfo(spell_id)
-            NewComment(type_name, spell_name, spell_id)
-        end,
-    }
+    })
 
-    function CreateCursorComment()
-        local data_type, data, data_subtype, subdata = _G.GetCursorInfo()
-        local comment_func = CURSOR_DATA_FUNCS[data_type]
-
-        if not comment_func then
-            WDP:Print("Unable to determine comment subject from cursor.")
-            return
-        end
-        comment_func(DATA_TYPE_MAPPING[data_type] or data_type:upper(), data, data_subtype, subdata)
-    end
-end
-
-local function CreateQuestComment()
-    local index = _G.GetQuestLogSelection()
-
-    if not index or not _G.QuestLogFrame:IsShown() then
-        WDP:Print("You must select a quest from the Quest frame.")
-        return
-    end
-    local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
-
-    if is_header then
-        WDP:Print("You must select a quest from the Quest frame.")
-        return
-    end
-    NewComment("QUEST", title, idnum)
-end
-
-local function CreateAchievementComment()
-    if not _G.AchievementFrame or not _G.AchievementFrameAchievements.selection then
-        WDP:Print("You must select an achievement from the Achievement frame.")
-        return
-    end
-
-    for _, button in next, _G.AchievementFrameAchievementsContainer.buttons do
-        if button.selected then
-            NewComment("ACHIEVEMENT", button.label:GetText(), button.id)
-            break
-        end
-    end
-end
-
--- METHODS ------------------------------------------------------------
-
-function private.ProcessCommentCommand(arg)
-    if not arg or arg == "" then
-        WDP:Print("You must supply a valid comment type.")
-        return
-    end
-
-    if arg == "achievement" then
-        CreateAchievementComment()
-        return
-    elseif arg == "cursor" then
-        CreateCursorComment()
-        return
-    elseif arg == "quest" then
-        CreateQuestComment()
-        return
-    end
-    CreateUnitComment(arg)
+    private.data_obj = data_obj
+    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
 end
