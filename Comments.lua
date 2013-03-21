@@ -197,7 +197,11 @@ do
     end)
 
     local function CreateComment(cell, func)
-        func()
+        if _G.type(func) == "table" then
+            func[1](func[2])
+        else
+            func()
+        end
         display = display:Release()
     end
 
@@ -249,7 +253,7 @@ do
 
                 if unit_idnum then
                     line = display:AddLine(("%s: %s"):format(unit_id:gsub("^%l", _G.string.upper), _G.UnitName(unit_id)))
-                    display:SetLineScript(line, "OnMouseUp", CreateComment, CreateUnitComment)
+                    display:SetLineScript(line, "OnMouseUp", CreateComment, { CreateUnitComment, unit_id })
                 end
             end
         end
