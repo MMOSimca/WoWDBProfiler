@@ -287,11 +287,14 @@ do
         end
 
         if display:GetLineCount() == 3 then
+            display = display:Release()
             WDP:Print("There are no possible comment subjects.")
             return
         end
         display:Show()
     end
+
+    WDP.ShowPossibleSubjects = ShowPossibleSubjects -- For Keybinding.
 end -- do-block
 
 -- METHODS ------------------------------------------------------------
@@ -531,19 +534,21 @@ function private.InitializeCommentSystem()
     end)
     panel.submitButton = submit
 
-    local data_obj = LibStub("LibDataBroker-1.1"):NewDataObject(ADDON_NAME, {
-        type = "data source",
-        label = ADDON_NAME,
-        text = " ",
-        icon = [[Interface\CHATFRAME\UI-ChatIcon-Chat-Up]],
-        OnClick = function(self, button, down)
-            ShowPossibleSubjects(self)
-        end,
-        OnTooltipShow = function(self)
-            self:AddLine(_G.CLICK_TO_ENTER_COMMENT)
-        end,
-    })
+--    local data_obj = LibStub("LibDataBroker-1.1"):NewDataObject(ADDON_NAME, {
+--        type = "data source",
+--        label = ADDON_NAME,
+--        text = " ",
+--        icon = [[Interface\CHATFRAME\UI-ChatIcon-Chat-Up]],
+--        OnClick = function(self, button, down)
+--            ShowPossibleSubjects(self)
+--        end,
+--        OnTooltipShow = function(self)
+--            self:AddLine(_G.CLICK_TO_ENTER_COMMENT)
+--        end,
+--    })
+--
+--    private.data_obj = data_obj
+--    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
 
-    private.data_obj = data_obj
-    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
+    _G["BINDING_HEADER_WOWDB_PROFILER"] = "WoWDB Profiler"
 end
