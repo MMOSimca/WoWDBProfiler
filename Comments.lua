@@ -146,6 +146,25 @@ local function CreateItemComment(is_command)
     NewComment("ITEM", item_name, item_id)
 end
 
+local function CreateSpellComment(is_command)
+    local spell_name, spell_rank, spell_id
+
+    if is_command then
+        spell_name, spell_rank, spell_id = _G.GameTooltip:GetSpell()
+
+        if not spell_name and not spell_id then
+            WDP:Print("Your mouse is not over a spell.")
+            return
+        end
+    else
+        local spell_rank = comment_units.spell.rank
+        spell_id = comment_units.spell.id
+        spell_name = ("%s%s"):format(comment_units.spell.name, (spell_rank ~= "") and (" (%s)"):format(spell_rank) or "")
+    end
+    table.wipe(comment_units)
+    NewComment("SPELL", spell_name, spell_id)
+end
+
 local CreateCursorComment
 do
     local CURSOR_DATA_FUNCS = {
@@ -316,6 +335,19 @@ do
             line = display:AddLine(("Cursor: %s"):format(name_func(data, data_subtype, subdata)))
             display:SetLineScript(line, "OnMouseUp", CreateComment, CreateCursorComment)
         end
+        local spell_name, spell_rank, spell_id = _G.GameTooltip:GetSpell()
+
+        if spell_name and spell_rank and spell_id then
+            comment_units.spell = {
+                id = spell_id,
+                name = spell_name,
+                rank = spell_rank,
+            }
+
+            line = display:AddLine(("Spell: %s%s"):format(spell_name, (spell_rank ~= "") and (" (%s)"):format(spell_rank) or ""))
+            display:SetLineScript(line, "OnMouseUp", CreateComment, CreateSpellComment)
+        end
+
         local item_name, item_link = _G.GameTooltip:GetItem()
 
         if item_name and item_link then
@@ -323,6 +355,7 @@ do
                 link = item_link,
                 name = item_name,
             }
+
             line = display:AddLine(("Item: %s"):format(item_name))
             display:SetLineScript(line, "OnMouseUp", CreateComment, CreateItemComment)
         end
@@ -368,6 +401,9 @@ function private.ProcessCommentCommand(arg)
         return
     elseif arg == "quest" then
         CreateQuestComment()
+        return
+    elseif arg == "spell" then
+        CreateSpellComent(true)
         return
     end
     CreateUnitComment(arg, true)
