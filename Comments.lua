@@ -76,6 +76,7 @@ Dialog:Register("WDP_CommentLink", {
 
 local comment_subject = {}
 local comment_frame
+local comment_units = {}
 
 -- HELPERS ------------------------------------------------------------
 
@@ -90,19 +91,34 @@ local function NewComment(type_name, label, id)
     _G.ShowUIPanel(comment_frame)
 end
 
-local function CreateUnitComment(unit_id)
-    if not _G.UnitExists(unit_id) then
-        WDP:Printf("Unit '%s' does not exist.", unit_id)
-        return
+local function CreateUnitComment(unit_id, is_command)
+    local unit_type, unit_idnum
+
+    if is_command then
+        if not _G.UnitExists(unit_id) then
+            WDP:Printf("Unit '%s' does not exist.", unit_id)
+            return
+        end
+        unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
+    else
+        local unit_data = comment_units[unit_id]
+
+        if not unit_data then
+            WDP:Printf("Unit '%s' does not exist.", unit_id)
+            return
+        end
+        unit_type = unit_data.type
+        unit_idnum = unit_data.idnum
     end
-    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
 
     if not unit_idnum then
         WDP:Printf("Unable to determine unit from '%s'", unit_id)
         return
     end
     local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
-    local unit_name = _G.UnitName(unit_id)
+    local unit_name = is_command and _G.UnitName(unit_id) or comment_units[unit_id].name
+
+    table.wipe(comment_units)
     NewComment(type_name, unit_name, unit_idnum)
 end
 
@@ -250,9 +266,15 @@ do
         for unit_id in pairs(VALID_UNITS) do
             if _G.UnitExists(unit_id) then
                 local unit_type, unit_idnum = ParseGUID(_G.UnitGUID(unit_id))
+                local unit_name = _G.UnitName(unit_id)
 
                 if unit_idnum then
-                    line = display:AddLine(("%s: %s"):format(unit_id:gsub("^%l", _G.string.upper), _G.UnitName(unit_id)))
+                    comment_units[unit_id] = {
+                        idnum = unit_idnum,
+                        name = unit_name,
+                        type = unit_type,
+                    }
+                    line = display:AddLine(("%s: %s"):format(unit_id:gsub("^%l", _G.string.upper), unit_name))
                     display:SetLineScript(line, "OnMouseUp", CreateComment, { CreateUnitComment, unit_id })
                 end
             end
@@ -315,7 +337,7 @@ function private.ProcessCommentCommand(arg)
         CreateQuestComment()
         return
     end
-    CreateUnitComment(arg)
+    CreateUnitComment(arg, true)
 end
 
 function private.InitializeCommentSystem()
@@ -534,21 +556,21 @@ function private.InitializeCommentSystem()
     end)
     panel.submitButton = submit
 
---    local data_obj = LibStub("LibDataBroker-1.1"):NewDataObject(ADDON_NAME, {
---        type = "data source",
---        label = ADDON_NAME,
---        text = " ",
---        icon = [[Interface\CHATFRAME\UI-ChatIcon-Chat-Up]],
---        OnClick = function(self, button, down)
---            ShowPossibleSubjects(self)
---        end,
---        OnTooltipShow = function(self)
---            self:AddLine(_G.CLICK_TO_ENTER_COMMENT)
---        end,
---    })
---
---    private.data_obj = data_obj
---    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
+    --    local data_obj = LibStub("LibDataBroker-1.1"):NewDataObject(ADDON_NAME, {
+    --        type = "data source",
+    --        label = ADDON_NAME,
+    --        text = " ",
+    --        icon = [[Interface\CHATFRAME\UI-ChatIcon-Chat-Up]],
+    --        OnClick = function(self, button, down)
+    --            ShowPossibleSubjects(self)
+    --        end,
+    --        OnTooltipShow = function(self)
+    --            self:AddLine(_G.CLICK_TO_ENTER_COMMENT)
+    --        end,
+    --    })
+    --
+    --    private.data_obj = data_obj
+    --    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
 
     _G["BINDING_HEADER_WOWDB_PROFILER"] = "WoWDB Profiler"
 end
