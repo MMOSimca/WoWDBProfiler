@@ -126,6 +126,26 @@ local DATA_TYPE_MAPPING = {
     merchant = "ITEM",
 }
 
+local function CreateItemComment(is_command)
+    local item_name, item_id
+
+    if is_command then
+        local item_link
+        item_name, item_link = _G.GameTooltip:GetItem()
+
+        if not item_name and not item_link then
+            WDP:Print("Your mouse is not over an item.")
+            return
+        end
+        item_id = ItemLinkToID(item_link)
+    else
+        item_id = ItemLinkToID(comment_units.item.link)
+        item_name = comment_units.item.name
+    end
+    table.wipe(comment_units)
+    NewComment("ITEM", item_name, item_id)
+end
+
 local CreateCursorComment
 do
     local CURSOR_DATA_FUNCS = {
@@ -296,6 +316,16 @@ do
             line = display:AddLine(("Cursor: %s"):format(name_func(data, data_subtype, subdata)))
             display:SetLineScript(line, "OnMouseUp", CreateComment, CreateCursorComment)
         end
+        local item_name, item_link = _G.GameTooltip:GetItem()
+
+        if item_name and item_link then
+            comment_units.item = {
+                link = item_link,
+                name = item_name,
+            }
+            line = display:AddLine(("Item: %s"):format(item_name))
+            display:SetLineScript(line, "OnMouseUp", CreateComment, CreateItemComment)
+        end
 
         local quest_index = _G.GetQuestLogSelection()
 
@@ -332,6 +362,9 @@ function private.ProcessCommentCommand(arg)
         return
     elseif arg == "cursor" then
         CreateCursorComment()
+        return
+    elseif arg == "item" then
+        CreateItemComment(true)
         return
     elseif arg == "quest" then
         CreateQuestComment()
@@ -571,6 +604,9 @@ function private.InitializeCommentSystem()
     --
     --    private.data_obj = data_obj
     --    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
+
+    _G.GameTooltip:HookScript("OnTooltipSetItem", function(self)
+    end)
 
     _G["BINDING_HEADER_WOWDB_PROFILER"] = "WoWDB Profiler"
 end
