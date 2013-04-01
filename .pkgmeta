@@ -27,12 +27,6 @@ externals:
     Libs/LibDialog-1.0:
         url: http://hg.wowace.com/wow/libdialog-1-0/mainline
         tag: latest
-    Libs/LibDataBroker-1.1:
-        url: https://github.com/tekkub/libdatabroker-1-1.git
-        tag: latest
-    Libs/LibDBIcon-1.0:
-        url: svn://svn.wowace.com/wow/libdbicon-1-0/mainline/trunk
-        tag: latest
     Libs/LibQTip-1.0:
         url: svn://svn.wowace.com/wow/libqtip-1-0/mainline/trunk
         tag: latest
