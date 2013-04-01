@@ -392,6 +392,11 @@ do
     local UNIT_TYPES = private.UNIT_TYPES
     local UNIT_TYPE_BITMASK = 0x007
 
+    local NPC_ID_MAPPING = {
+        [62164] = 63191, -- Garalon
+    }
+
+
     function ParseGUID(guid)
         if not guid then
             return
@@ -404,7 +409,13 @@ do
         local unit_type = _G.bit.band(bitfield, UNIT_TYPE_BITMASK)
 
         if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET then
-            return unit_type, tonumber(guid:sub(6, 10), 16)
+            local unit_idnum = tonumber(guid:sub(6, 10), 16)
+            local id_mapping = NPC_ID_MAPPING[unit_idnum]
+
+            if id_mapping and UnitTypeIsNPC(unit_type) then
+                unit_idnum = id_mapping
+            end
+            return unit_type, unit_idnum
         end
         return unit_type
     end
