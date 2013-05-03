@@ -1031,7 +1031,7 @@ function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] then
         return
     end
-    local num_items = _G.C_BlackMarket.GetNumItems()
+    local num_items = _G.C_BlackMarket.GetNumItems() or 0
 
     for index = 1, num_items do
         local name, texture, quantity, item_type, is_usable, level, level_type, seller_name, min_bid, min_increment, current_bid, has_high_bid, num_bids, time_left, item_link, market_id = _G.C_BlackMarket.GetItemInfoByIndex(index);
