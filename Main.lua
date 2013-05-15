@@ -1295,6 +1295,7 @@ do
             local killer_name = source_name or previous_combat_event.source_name
 
             if not group_member_uids[killer_guid] and not group_pet_guids[killer_guid] then
+                Debug("%s: %s was killed by %s (not group member or pet).", dest_name or _G.UNKNOWN, killer_name)
                 ClearKilledNPC()
                 ClearKilledBossID()
                 return
