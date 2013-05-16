@@ -1300,6 +1300,7 @@ do
                 ClearKilledBossID()
                 return
             end
+            Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name)
 
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
                 Debug("%s: Matching boss %s.", sub_event, dest_name)
