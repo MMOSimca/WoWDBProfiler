@@ -1050,8 +1050,14 @@ function WDP:GROUP_ROSTER_CHANGE()
 
     table.wipe(group_member_uids)
 
+    Debug("GROUP_ROSTER_CHANGE: %s group - %d members.", unit_type, group_size)
+
     for index = 1, group_size do
-        group_member_uids[_G.UnitGUID(unit_type .. index)] = true
+        local group_unit = unit_type .. index
+        local unit_guid = _G.UnitGUID(group_unit)
+
+        Debug("%s (%s) added as GUID %s", group_unit, _G.UnitName(group_unit), unit_guid)
+        group_member_uids[unit_guid] = true
     end
     group_member_uids[_G.UnitGUID("player")] = true
 end
