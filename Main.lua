@@ -1295,12 +1295,12 @@ do
             local killer_name = source_name or previous_combat_event.source_name
 
             if not group_member_uids[killer_guid] and not group_pet_guids[killer_guid] then
-                Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name)
+                Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
                 ClearKilledNPC()
                 ClearKilledBossID()
                 return
             end
-            Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name)
+            Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
 
             if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
                 Debug("%s: Matching boss %s.", sub_event, dest_name)
