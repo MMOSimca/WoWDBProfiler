@@ -296,11 +296,17 @@ local function DBEntry(data_type, unit_id)
     if not data_type or not unit_id then
         return
     end
-    local unit = global_db[data_type][unit_id]
+    local category = global_db[data_type]
+
+    if not category then
+        category = {}
+        global_db[data_type] = category
+    end
+    local unit = category[unit_id]
 
     if not unit then
         unit = {}
-        global_db[data_type][unit_id] = unit
+        category[unit_id] = unit
     end
     return unit
 end
