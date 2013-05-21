@@ -79,7 +79,7 @@ local EVENT_MAPPING = {
     CURSOR_UPDATE = true,
     FORGE_MASTER_OPENED = true,
     GOSSIP_SHOW = true,
-    GROUP_ROSTER_CHANGE = true,
+    GROUP_ROSTER_UPDATE = true,
     GUILDBANKFRAME_OPENED = true,
     ITEM_TEXT_BEGIN = true,
     ITEM_UPGRADE_MASTER_OPENED = true,
@@ -807,7 +807,7 @@ function WDP:OnEnable()
     end)
 
     self:SetCurrentAreaID("OnEnable")
-    self:GROUP_ROSTER_CHANGE()
+    self:GROUP_ROSTER_UPDATE()
 end
 
 
@@ -1049,14 +1049,14 @@ function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
 end
 
 
-function WDP:GROUP_ROSTER_CHANGE()
+function WDP:GROUP_ROSTER_UPDATE()
     local is_raid = _G.IsInRaid()
     local unit_type = is_raid and "raid" or "party"
     local group_size = is_raid and _G.GetNumGroupMembers() or _G.GetNumSubgroupMembers()
 
     table.wipe(group_member_uids)
 
-    Debug("GROUP_ROSTER_CHANGE: %s group - %d members.", unit_type, group_size)
+    Debug("GROUP_ROSTER_UPDATE: %s group - %d members.", unit_type, group_size)
 
     for index = 1, group_size do
         local group_unit = unit_type .. index
