@@ -31,7 +31,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 
 local AF = private.ACTION_TYPE_FLAGS
 local CLIENT_LOCALE = _G.GetLocale()
-local DB_VERSION = 16
+local DB_VERSION = 17
 local DEBUGGING = false
 local EVENT_DEBUG = false
 local OBJECT_ID_ANVIL = 192628
