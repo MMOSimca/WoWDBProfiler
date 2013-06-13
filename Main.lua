@@ -824,10 +824,10 @@ do
         table.wipe(intermediary)
 
         for line_index = 1, DatamineTT:NumLines() do
-            local left_text = _G["WDPDatamineTTTextLeft" .. line_index]:GetText()
+            local left_text = _G["WDPDatamineTTTextLeft" .. line_index]:GetText():trim()
 
-            if not left_text then
-                return
+            if not left_text or left_text == "" or left_text:find("Socket") or left_text:find("Set:") then
+                break
             end
             local amount, stat = left_text:match("+(.-) (.*)")
 
