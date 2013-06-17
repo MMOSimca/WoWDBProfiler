@@ -1082,7 +1082,7 @@ function WDP:UNIT_PET(event_name, unit_id)
 
     if pet_guid then
         Debug("Adding new pet GUID for %s.", _G.UnitName(unit_id))
-        group_owner_guids_to_pet_guids[unit_id] = pet_guid
+        group_owner_guids_to_pet_guids[unit_guid] = pet_guid
         group_pet_guids[pet_guid] = true
     end
 end
