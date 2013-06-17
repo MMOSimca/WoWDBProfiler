@@ -1306,6 +1306,8 @@ do
             local killer_guid = source_guid or previous_combat_event.source_guid
             local killer_name = source_name or previous_combat_event.source_name
 
+            table.wipe(previous_combat_event)
+
             if not group_member_uids[killer_guid] and not group_pet_guids[killer_guid] then
                 Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
                 ClearKilledNPC()
@@ -1351,13 +1353,14 @@ do
                 --                Debug("Recording for %s", sub_event)
                 previous_combat_event.source_guid = source_guid
                 previous_combat_event.source_name = source_name
-                previous_combat_event.dest_guid = dest_guid
-                previous_combat_event.dest_name = dest_name
             end
             return
         end
         combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, ...)
-        table.wipe(previous_combat_event)
+
+        if NON_DAMAGE_EVENTS[sub_event] then
+            table.wipe(previous_combat_event)
+        end
     end
 
     local DIPLOMACY_SPELL_ID = 20599
