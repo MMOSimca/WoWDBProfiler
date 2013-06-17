@@ -841,7 +841,7 @@ do
                     end
                 end
                 create_entry = true
-                intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber(amount)
+                intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber((amount:gsub(",", "")))
             end
         end
 
