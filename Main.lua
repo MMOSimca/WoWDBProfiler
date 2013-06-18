@@ -1049,28 +1049,7 @@ function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
 end
 
 
-function WDP:GROUP_ROSTER_UPDATE()
-    local is_raid = _G.IsInRaid()
-    local unit_type = is_raid and "raid" or "party"
-    local group_size = is_raid and _G.GetNumGroupMembers() or _G.GetNumSubgroupMembers()
-
-    table.wipe(group_member_uids)
-
-    Debug("GROUP_ROSTER_UPDATE: %s group - %d members.", unit_type, group_size)
-
-    for index = 1, group_size do
-        local group_unit = unit_type .. index
-        local unit_guid = _G.UnitGUID(group_unit)
-
-        Debug("%s (%s) added as GUID %s", group_unit, _G.UnitName(group_unit), unit_guid)
-        group_member_uids[unit_guid] = true
-    end
-    group_member_uids[_G.UnitGUID("player")] = true
-end
-
-
-function WDP:UNIT_PET(event_name, unit_id)
-    local unit_guid = _G.UnitGUID(unit_id)
+local function UpdateUnitPet(unit_guid, unit_id)
     local current_pet_guid = group_owner_guids_to_pet_guids[unit_guid]
 
     if current_pet_guid then
@@ -1085,6 +1064,32 @@ function WDP:UNIT_PET(event_name, unit_id)
         group_owner_guids_to_pet_guids[unit_guid] = pet_guid
         group_pet_guids[pet_guid] = true
     end
+end
+
+
+function WDP:GROUP_ROSTER_UPDATE(event_name)
+    local is_raid = _G.IsInRaid()
+    local unit_type = is_raid and "raid" or "party"
+    local group_size = is_raid and _G.GetNumGroupMembers() or _G.GetNumSubgroupMembers()
+
+    table.wipe(group_member_uids)
+
+    Debug("GROUP_ROSTER_UPDATE: %s group - %d members.", unit_type, group_size)
+
+    for index = 1, group_size do
+        local unit_id = unit_type .. index
+        local unit_guid = _G.UnitGUID(unit_id)
+
+        group_member_uids[unit_guid] = true
+        Debug("%s (%s) added as GUID %s", unit_id, _G.UnitName(unit_id), unit_guid)
+        UpdateUnitPet(unit_guid, unit_id)
+    end
+    group_member_uids[_G.UnitGUID("player")] = true
+end
+
+
+function WDP:UNIT_PET(event_name, unit_id)
+    UpdateUnitPet(_G.UnitGUID(unit_id), unit_id)
 end
 
 
