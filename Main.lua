@@ -735,6 +735,23 @@ do
     end
 end
 
+local function InitializeCurrentLoot()
+    current_loot = {
+        list = {},
+        sources = {},
+        identifier = current_action.identifier,
+        label = current_action.loot_label or "drops",
+        map_level = current_action.map_level,
+        object_name = current_action.object_name,
+        spell_label = current_action.spell_label,
+        target_type = current_action.target_type,
+        x = current_action.x,
+        y = current_action.y,
+        zone_data = current_action.zone_data,
+    }
+
+    table.wipe(current_action)
+end
 
 -- METHODS ------------------------------------------------------------
 
@@ -1102,30 +1119,44 @@ end
 
 
 function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
-    if loot_type ~= "item" then
-        return
-    end
+    local container_id = private.loot_toast_container_id
+    local item_id = ItemLinkToID(item_link)
     local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
     ClearKilledBossID()
 
-    if not npc then
-        Debug("%s: NPC is nil.", event_name)
-        return
-    end
-    local item_id = ItemLinkToID(item_link)
+    if npc then
+        if not item_id then
+            Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
+            return
+        end
+        local loot_type = "drops"
+        local encounter_data = npc:EncounterData(InstanceDifficultyToken())
+        encounter_data[loot_type] = encounter_data[loot_type] or {}
+        encounter_data.loot_counts = encounter_data.loot_counts or {}
+        encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
 
-    if not item_id then
-        Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
-        return
-    end
-    local loot_type = "drops"
-    local encounter_data = npc:EncounterData(InstanceDifficultyToken())
-    encounter_data[loot_type] = encounter_data[loot_type] or {}
-    encounter_data.loot_counts = encounter_data.loot_counts or {}
-    encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
+        table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
+        Debug("%s: %sX%d (%d)", event_name, item_link, quantity, item_id)
+    elseif container_id then
+        private.loot_toast_container_id = nil
 
-    table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
-    Debug("%s: %sX%d (%d)", event_name, item_link, quantity, item_id)
+        if loot_type == "item" then
+            if not item_id then
+                Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
+                return
+            end
+            InitializeCurrentLoot()
+            current_loot.sources[container_id] = {
+                [item_id] = quantity,
+            }
+        elseif loot_type == "money" then
+            table.insert(current_loot.list, ("money:%d"):format(quantity))
+        end
+        GenericLootUpdate("items")
+        current_loot = nil
+    else
+        Debug("%s: NPC and Container are nil.", event_name)
+    end
 end
 
 
@@ -1695,21 +1726,7 @@ do
         end
         local guids_used = {}
 
-        current_loot = {
-            list = {},
-            sources = {},
-            identifier = current_action.identifier,
-            label = current_action.loot_label or "drops",
-            map_level = current_action.map_level,
-            object_name = current_action.object_name,
-            spell_label = current_action.spell_label,
-            target_type = current_action.target_type,
-            x = current_action.x,
-            y = current_action.y,
-            zone_data = current_action.zone_data,
-        }
-        table.wipe(current_action)
-
+        InitializeCurrentLoot()
         loot_guid_registry[current_loot.label] = loot_guid_registry[current_loot.label] or {}
 
         for loot_slot = 1, _G.GetNumLootItems() do
@@ -2211,24 +2228,36 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
 end
 
 
-function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
-    if unit_id ~= "player" then
-        return
-    end
-    private.tracked_line = nil
-    private.previous_spell_id = spell_id
+do
+    local LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
+        [142397] = 98134, -- Heroic Cache of Treasures
+        [143506] = 98095, -- Brawler's Pet Supplies
+        [143507] = 94207, -- Fabled Pandaren Pet Supplies
+        [143512] = 93148, -- Pandaren Spirit Pet Supplies
+        [143511] = 93149, -- Pandaren Spirit Pet Supplies
+        [143510] = 93147, -- Pandaren Spirit Pet Supplies
+        [143509] = 93146, -- Pandaren Spirit Pet Supplies
+        [143508] = 89125, -- Sack of Pet Supplies
+    }
 
-    if spell_name:match("^Harvest.+") then
-        killed_npc_id = current_target_id
-        private.harvesting = true
-    end
+    function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
+        if unit_id ~= "player" then
+            return
+        end
+        private.tracked_line = nil
+        private.previous_spell_id = spell_id
+        private.loot_toast_container_id = LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
 
-    if anvil_spell_ids[spell_id] then
-        UpdateDBEntryLocation("objects", OBJECT_ID_ANVIL)
-    elseif forge_spell_ids[spell_id] then
-        UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
+        if anvil_spell_ids[spell_id] then
+            UpdateDBEntryLocation("objects", OBJECT_ID_ANVIL)
+        elseif forge_spell_ids[spell_id] then
+            UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
+        elseif spell_name:match("^Harvest.+") then
+            killed_npc_id = current_target_id
+            private.harvesting = true
+        end
     end
-end
+end -- do-block
 
 
 function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
