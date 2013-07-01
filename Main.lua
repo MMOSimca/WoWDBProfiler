@@ -38,7 +38,7 @@ local OBJECT_ID_ANVIL = 192628
 local OBJECT_ID_FORGE = 1685
 local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
 local PLAYER_FACTION = _G.UnitFactionGroup("player")
-local PLAYER_GUID = _G.UnitGUID("player")
+local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
@@ -783,6 +783,8 @@ end
 
 
 function WDP:OnEnable()
+    PLAYER_GUID = _G.UnitGUID("player")
+
     for event_name, mapping in pairs(EVENT_MAPPING) do
         if EVENT_DEBUG then
             self:RegisterEvent(event_name, "EventDispatcher")
