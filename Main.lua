@@ -112,9 +112,9 @@ local EVENT_MAPPING = {
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
     VOID_STORAGE_OPEN = true,
-    ZONE_CHANGED = "SetCurrentAreaID",
-    ZONE_CHANGED_INDOORS = "SetCurrentAreaID",
-    ZONE_CHANGED_NEW_AREA = "SetCurrentAreaID",
+    ZONE_CHANGED = "HandleZoneChange",
+    ZONE_CHANGED_INDOORS = "HandleZoneChange",
+    ZONE_CHANGED_NEW_AREA = "HandleZoneChange",
 }
 
 
@@ -124,9 +124,10 @@ local anvil_spell_ids = {}
 local currently_drunk
 local char_db
 local global_db
-local group_member_uids = {}
+local group_member_guids = {}
 local group_owner_guids_to_pet_guids = {}
 local group_pet_guids = {}
+local in_instance
 local item_process_timer_handle
 local faction_standings = {}
 local forge_spell_ids = {}
@@ -692,7 +693,7 @@ do
         ShrineofSevenStars = 905,
     }
 
-    function WDP:SetCurrentAreaID(event_name)
+    local function SetCurrentAreaID()
         if private.in_combat then
             private.set_area_id = true
             return
@@ -726,6 +727,11 @@ do
             world_map:Hide()
             _G.SetCVar("Sound_EnableSFX", sfx_value)
         end
+    end
+
+    function WDP:HandleZoneChange(event_name)
+        in_instance = _G.IsInInstance()
+        SetCurrentAreaID()
     end
 end
 
@@ -806,7 +812,7 @@ function WDP:OnEnable()
         HandleItemUse(item_link)
     end)
 
-    self:SetCurrentAreaID("OnEnable")
+    self:HandleZoneChange("OnEnable")
     self:GROUP_ROSTER_UPDATE()
 end
 
@@ -1072,7 +1078,7 @@ function WDP:GROUP_ROSTER_UPDATE(event_name)
     local unit_type = is_raid and "raid" or "party"
     local group_size = is_raid and _G.GetNumGroupMembers() or _G.GetNumSubgroupMembers()
 
-    table.wipe(group_member_uids)
+    table.wipe(group_member_guids)
 
     Debug("GROUP_ROSTER_UPDATE: %s group - %d members.", unit_type, group_size)
 
@@ -1080,11 +1086,11 @@ function WDP:GROUP_ROSTER_UPDATE(event_name)
         local unit_id = unit_type .. index
         local unit_guid = _G.UnitGUID(unit_id)
 
-        group_member_uids[unit_guid] = true
+        group_member_guids[unit_guid] = true
         Debug("%s (%s) added as GUID %s", unit_id, _G.UnitName(unit_id), unit_guid)
         UpdateUnitPet(unit_guid, unit_id)
     end
-    group_member_uids[_G.UnitGUID("player")] = true
+    group_member_guids[PLAYER_GUID] = true
 end
 
 
@@ -1311,10 +1317,9 @@ do
             local killer_guid = source_guid or previous_combat_event.source_guid
             local killer_name = source_name or previous_combat_event.source_name
 
-            table.wipe(previous_combat_event)
-
-            if not group_member_uids[killer_guid] and not group_pet_guids[killer_guid] then
+            if not previous_combat_event.party_damage then
                 Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
+                table.wipe(previous_combat_event)
                 ClearKilledNPC()
                 ClearKilledBossID()
                 return
@@ -1329,10 +1334,7 @@ do
                 Debug("%s: Matching world boss %s.", sub_event, dest_name)
                 ClearKilledBossID()
                 private.world_boss_id = unit_idnum
-            else
-                Debug("%s: Killed NPC %s (ID: %d) is not in LFG or World boss list.", sub_event, dest_name, unit_idnum)
             end
-
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
             WDP:ScheduleTimer(ClearKilledBossID, 1)
@@ -1348,16 +1350,26 @@ do
         SWING_MISSED = true,
     }
 
+    local DAMAGE_EVENTS = {
+        RANGE_DAMAGE = true,
+        SPELL_BUILDING_DAMAGE = true,
+        SPELL_DAMAGE = true,
+        SPELL_PERIODIC_DAMAGE = true,
+        SWING_DAMAGE = true,
+    }
+
 
     function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, ...)
         local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
 
         if not combat_log_func then
-            if not NON_DAMAGE_EVENTS[sub_event] then
-                -- Uncomment to look for other sub-events to blacklist.
-                --                Debug("Recording for %s", sub_event)
-                previous_combat_event.source_guid = source_guid
+            if DAMAGE_EVENTS[sub_event] then
+                table.wipe(previous_combat_event)
                 previous_combat_event.source_name = source_name
+
+                if source_guid ~= dest_guid and (in_instance or group_member_guids[source_guid] or group_pet_guids[source_guid]) then
+                    previous_combat_event.party_damage = true
+                end
             end
             return
         end
@@ -1939,7 +1951,7 @@ function WDP:PLAYER_REGEN_ENABLED(event_name)
     private.in_combat = nil
 
     if private.set_area_id then
-        self:SetCurrentAreaID(event_name)
+        self:HandleZoneChange(event_name)
         private.set_area_id = nil
     end
 end
