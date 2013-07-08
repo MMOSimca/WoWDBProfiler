@@ -1078,14 +1078,12 @@ local function UpdateUnitPet(unit_guid, unit_id)
     local current_pet_guid = group_owner_guids_to_pet_guids[unit_guid]
 
     if current_pet_guid then
-        Debug("Removing existing pet GUID for %s", _G.UnitName(unit_id))
         group_owner_guids_to_pet_guids[unit_guid] = nil
         group_pet_guids[current_pet_guid] = nil
     end
     local pet_guid = _G.UnitGUID(unit_id .. "pet")
 
     if pet_guid then
-        Debug("Adding new pet GUID for %s.", _G.UnitName(unit_id))
         group_owner_guids_to_pet_guids[unit_guid] = pet_guid
         group_pet_guids[pet_guid] = true
     end
@@ -1099,14 +1097,11 @@ function WDP:GROUP_ROSTER_UPDATE(event_name)
 
     table.wipe(group_member_guids)
 
-    Debug("GROUP_ROSTER_UPDATE: %s group - %d members.", unit_type, group_size)
-
     for index = 1, group_size do
         local unit_id = unit_type .. index
         local unit_guid = _G.UnitGUID(unit_id)
 
         group_member_guids[unit_guid] = true
-        Debug("%s (%s) added as GUID %s", unit_id, _G.UnitName(unit_id), unit_guid)
         UpdateUnitPet(unit_guid, unit_id)
     end
     group_member_guids[PLAYER_GUID] = true
