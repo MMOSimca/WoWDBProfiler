@@ -594,30 +594,28 @@ do
 
         if current_loot.sources then
             for source_guid, loot_data in pairs(current_loot.sources) do
-                local entry, source_id
+                local source_id
 
                 if current_loot.target_type == AF.ITEM then
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
-                    entry = DBEntry(data_type, source_id)
                 elseif current_loot.target_type == AF.OBJECT then
                     source_id = ("%s:%s"):format(current_loot.spell_label, select(2, ParseGUID(source_guid)))
-                    entry = DBEntry(data_type, source_id)
                 else
                     source_id = select(2, ParseGUID(source_guid))
-                    entry = DBEntry(data_type, source_id)
                 end
+                local entry = DBEntry(data_type, source_id)
 
                 if entry then
                     local loot_table = LootTable(entry, loot_type, top_field)
 
-                    if not source_list[source_guid] then
+                    if not source_list[source_id] then
                         if top_field then
                             entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
                         else
                             entry[loot_count] = (entry[loot_count] or 0) + 1
                         end
-                        source_list[source_guid] = true
+                        source_list[source_id] = true
                     end
                     UpdateDBEntryLocation(data_type, source_id)
 
@@ -652,6 +650,7 @@ do
             else
                 entry[loot_count] = (entry[loot_count] or 0) + 1
             end
+            source_list[current_loot.identifier] = true
         end
 
         for index = 1, #current_loot.list do
