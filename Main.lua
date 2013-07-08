@@ -1134,12 +1134,13 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     elseif container_id then
         private.loot_toast_container_id = nil
 
+        InitializeCurrentLoot()
+
         if loot_type == "item" then
             if not item_id then
                 Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
                 return
             end
-            InitializeCurrentLoot()
             current_loot.sources[container_id] = {
                 [item_id] = quantity,
             }
