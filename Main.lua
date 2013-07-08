@@ -1730,7 +1730,7 @@ do
         loot_guid_registry[current_loot.label] = loot_guid_registry[current_loot.label] or {}
 
         for loot_slot = 1, _G.GetNumLootItems() do
-            local icon_texture, item_text, quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+            local icon_texture, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
             local loot_info = {
                 _G.GetLootSourceInfo(loot_slot)
@@ -1744,19 +1744,19 @@ do
                     local loot_quantity = loot_info[loot_index + 1]
                     local source_type, source_id = ParseGUID(source_guid)
                     local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                    Debug("GUID: %s - Type:ID: %s - Amount: %d", loot_info[loot_index], source_key, loot_quantity)
+                    Debug("GUID: %s - Type:ID: %s - Amount: %d (%d)", loot_info[loot_index], source_key, loot_quantity, slot_quantity)
 
                     if slot_type == _G.LOOT_SLOT_ITEM then
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                         current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                        current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
+                        current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + slot_quantity
                         guids_used[source_guid] = true
                     elseif slot_type == _G.LOOT_SLOT_MONEY then
                         Debug("money:%d", _toCopper(item_text))
                         table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
                     elseif slot_type == _G.LOOT_SLOT_CURRENCY then
                         Debug("Found currency: %s", icon_texture)
-                        table.insert(current_loot.list, ("currency:%d:%s"):format(quantity, icon_texture:match("[^\\]+$"):lower()))
+                        table.insert(current_loot.list, ("currency:%d:%s"):format(slot_quantity, icon_texture:match("[^\\]+$"):lower()))
                     end
                 end
             end
