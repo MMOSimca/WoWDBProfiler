@@ -10,6 +10,7 @@ local math = _G.math
 local table = _G.table
 
 local select = _G.select
+local unpack = _G.unpack
 
 
 -- ADDON NAMESPACE ----------------------------------------------------
@@ -99,6 +100,7 @@ local EVENT_MAPPING = {
     QUEST_LOG_UPDATE = true,
     QUEST_PROGRESS = true,
     SHOW_LOOT_TOAST = true,
+    SPELL_CONFIRMATION_PROMPT = true,
     TAXIMAP_OPENED = true,
     TRADE_SKILL_SHOW = true,
     TRAINER_CLOSED = true,
@@ -132,7 +134,9 @@ local item_process_timer_handle
 local faction_standings = {}
 local forge_spell_ids = {}
 local languages_known = {}
+local loot_toast_container_timer_handle
 local name_to_id_map = {}
+local killed_boss_id_timer_handle
 local killed_npc_id
 local target_location_timer_handle
 local current_target_id
@@ -157,10 +161,17 @@ local current_action = {
 -- HELPERS ------------------------------------------------------------
 
 local function Debug(message, ...)
-    if not DEBUGGING then
+    if not DEBUGGING or not message or not ... then
         return
     end
-    _G.print(message:format(...))
+    local args = { ... }
+
+    for index = 1, #args do
+        if args[index] == nil then
+            args[index] = "nil"
+        end
+    end
+    _G.print(message:format(unpack(args)))
 end
 
 
@@ -168,7 +179,6 @@ local TradeSkillExecutePer
 do
     local header_list = {}
 
-    -- iter_func returns true to indicate that the loop should be broken
     function TradeSkillExecutePer(iter_func)
         if not _G.TradeSkillFrame or not _G.TradeSkillFrame:IsVisible() then
             return
@@ -278,8 +288,23 @@ end
 
 
 local function ClearKilledBossID()
+    if killed_boss_id_timer_handle then
+        WDP:CancelTimer(killed_boss_id_timer_handle)
+    end
+    private.boss_loot_toasting = false
     private.raid_finder_boss_id = nil
     private.world_boss_id = nil
+    killed_boss_id_timer_handle = nil
+end
+
+
+local function ClearLootToastContainerID()
+    if loot_toast_container_timer_handle then
+        WDP:CancelTimer(loot_toast_container_timer_handle)
+    end
+    private.container_loot_toasting = false
+    private.loot_toast_container_id = nil
+    loot_toast_container_timer_handle = nil
 end
 
 
@@ -515,9 +540,8 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         if not current_line then
             break
         end
-        local is_ptr = select(4, _G.GetBuildInfo()) ~= 50100
 
-        if is_ptr or current_line:GetText() == _G.ITEM_OPENABLE then
+        if current_line:GetText() == _G.ITEM_OPENABLE then
             table.wipe(current_action)
             current_action.target_type = AF.ITEM
             current_action.identifier = item_id
@@ -612,7 +636,7 @@ do
                     if not source_list[source_id] then
                         if top_field then
                             entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
-                        else
+                        elseif not private.container_loot_toasting then
                             entry[loot_count] = (entry[loot_count] or 0) + 1
                         end
                         source_list[source_id] = true
@@ -1113,28 +1137,43 @@ end
 
 
 function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
+    if not loot_type or (loot_type ~= "item" and loot_type ~= "money") then
+        Debug("%s: loot_type is %s. Item link is %s, and quantity is %d.", event_name, loot_type, item_link, quantity)
+        return
+    end
     local container_id = private.loot_toast_container_id
     local item_id = ItemLinkToID(item_link)
     local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
-    ClearKilledBossID()
 
     if npc then
         if not item_id then
             Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
             return
         end
-        local loot_type = "drops"
+        local loot_label = "drops"
         local encounter_data = npc:EncounterData(InstanceDifficultyToken())
-        encounter_data[loot_type] = encounter_data[loot_type] or {}
+        encounter_data[loot_label] = encounter_data[loot_label] or {}
         encounter_data.loot_counts = encounter_data.loot_counts or {}
-        encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
 
-        table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
-        Debug("%s: %sX%d (%d)", event_name, item_link, quantity, item_id)
+        if not private.boss_loot_toasting then
+            encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
+        end
+
+        if loot_type == "item" then
+            Debug("%s: %sX%d (%d)", event_name, item_link, quantity, item_id)
+            table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
+        elseif loot_type == "money" then
+            Debug("%s: money - %d", event_name, quantity)
+            table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
+        end
+        private.boss_loot_toasting = true -- Do not count further loots until timer expires or another boss is killed
     elseif container_id then
-        private.loot_toast_container_id = nil
-
         InitializeCurrentLoot()
+
+        -- Fake the loot characteristics to match that of an actual container item
+        current_loot.identifier = container_id
+        current_loot.label = "contains"
+        current_loot.target_type = AF.ITEM
 
         if loot_type == "item" then
             if not item_id then
@@ -1149,6 +1188,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         end
         GenericLootUpdate("items")
         current_loot = nil
+        private.container_loot_toasting = true -- do not count further loots until timer expires or another container is opened
     else
         Debug("%s: NPC and Container are nil.", event_name)
     end
@@ -1349,23 +1389,11 @@ do
                 Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
                 table.wipe(previous_combat_event)
                 ClearKilledNPC()
-                ClearKilledBossID()
-                return
-            end
-            Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
-
-            if private.RAID_FINDER_BOSS_IDS[unit_idnum] then
-                Debug("%s: Matching boss %s.", sub_event, dest_name)
-                ClearKilledBossID()
-                private.raid_finder_boss_id = unit_idnum
-            elseif private.WORLD_BOSS_IDS[unit_idnum] then
-                Debug("%s: Matching world boss %s.", sub_event, dest_name)
-                ClearKilledBossID()
-                private.world_boss_id = unit_idnum
+            else
+                Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
             end
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
-            WDP:ScheduleTimer(ClearKilledBossID, 1)
         end,
     }
 
@@ -2171,6 +2199,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     if not spell_label then
         return
     end
+
     local item_name, item_link = _G.GameTooltip:GetItem()
     local unit_name, unit_id = _G.GameTooltip:GetUnit()
 
@@ -2223,36 +2252,48 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
 end
 
 
-do
-    local LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
-        [142397] = 98134, -- Heroic Cache of Treasures
-        [143506] = 98095, -- Brawler's Pet Supplies
-        [143507] = 94207, -- Fabled Pandaren Pet Supplies
-        [143512] = 93148, -- Pandaren Spirit Pet Supplies
-        [143511] = 93149, -- Pandaren Spirit Pet Supplies
-        [143510] = 93147, -- Pandaren Spirit Pet Supplies
-        [143509] = 93146, -- Pandaren Spirit Pet Supplies
-        [143508] = 89125, -- Sack of Pet Supplies
-    }
-
-    function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
-        if unit_id ~= "player" then
-            return
-        end
-        private.tracked_line = nil
-        private.previous_spell_id = spell_id
-        private.loot_toast_container_id = LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
-
-        if anvil_spell_ids[spell_id] then
-            UpdateDBEntryLocation("objects", OBJECT_ID_ANVIL)
-        elseif forge_spell_ids[spell_id] then
-            UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
-        elseif spell_name:match("^Harvest.+") then
-            killed_npc_id = current_target_id
-            private.harvesting = true
-        end
+function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text, duration, currency_id)
+    if private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
+        ClearKilledBossID()
+        ClearLootToastContainerID()
+        private.raid_finder_boss_id = private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
+    elseif private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
+        ClearKilledBossID()
+        ClearLootToastContainerID()
+        private.world_boss_id = private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
+    else
+        Debug("%s: Spell ID %d is not a known raid or world boss 'Bonus' spell.", event_name, spell_id)
+        return
     end
-end -- do-block
+
+    killed_boss_id_timer_handle = WDP:ScheduleTimer(ClearKilledBossID, 1) -- we need to assign a handle here to cancel it later
+end
+
+
+function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
+    if unit_id ~= "player" then
+        return
+    end
+    private.tracked_line = nil
+    private.previous_spell_id = spell_id
+
+    if private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
+        ClearKilledBossID()
+        ClearLootToastContainerID()
+
+        private.loot_toast_container_id = private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
+        loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later
+    end
+
+    if anvil_spell_ids[spell_id] then
+        UpdateDBEntryLocation("objects", OBJECT_ID_ANVIL)
+    elseif forge_spell_ids[spell_id] then
+        UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
+    elseif spell_name:match("^Harvest.+") then
+        killed_npc_id = current_target_id
+        private.harvesting = true
+    end
+end
 
 
 function WDP:HandleSpellFailure(event_name, unit_id, spell_name, spell_rank, spell_line, spell_id)
