@@ -135,6 +135,8 @@ local faction_standings = {}
 local forge_spell_ids = {}
 local languages_known = {}
 local loot_toast_container_timer_handle
+local loot_toast_data
+local loot_toast_data_timer_handle
 local name_to_id_map = {}
 local killed_boss_id_timer_handle
 local killed_npc_id
@@ -305,6 +307,17 @@ local function ClearLootToastContainerID()
     private.container_loot_toasting = false
     private.loot_toast_container_id = nil
     loot_toast_container_timer_handle = nil
+end
+
+
+local function ClearLootToastData()
+    -- cancel existing timer if found
+    if loot_toast_data_timer_handle then
+        WDP:CancelTimer(loot_toast_data_timer_handle)
+    end
+
+    if loot_toast_data then table.wipe(loot_toast_data) end
+    loot_toast_data_timer_handle = nil
 end
 
 
@@ -668,13 +681,15 @@ do
         end
         local loot_table = LootTable(entry, loot_type, top_field)
 
-        if not source_list[current_loot.identifier] then
-            if top_field then
-                entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
-            else
-                entry[loot_count] = (entry[loot_count] or 0) + 1
+        if current_loot.identifier then
+            if not source_list[current_loot.identifier] then
+                if top_field then
+                    entry[top_field][loot_count] = (entry[top_field][loot_count] or 0) + 1
+                else
+                    entry[loot_count] = (entry[loot_count] or 0) + 1
+                end
+                source_list[current_loot.identifier] = true
             end
-            source_list[current_loot.identifier] = true
         end
 
         for index = 1, #current_loot.list do
@@ -1146,7 +1161,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
     local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
 
     if npc then
-        if not item_id then
+        if loot_type == "item" and not item_id then
             Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
             return
         end
@@ -1188,9 +1203,18 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         end
         GenericLootUpdate("items")
         current_loot = nil
-        private.container_loot_toasting = true -- do not count further loots until timer expires or another container is opened
+        private.container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
     else
-        Debug("%s: NPC and Container are nil.", event_name)
+        if loot_type == "item" and not item_id then
+            Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
+            return
+        end
+        Debug("%s: NPC and Container are nil, storing loot toast data for 5 seconds.", event_name)
+
+        loot_toast_data = loot_toast_data or {}
+        loot_toast_data[#loot_toast_data + 1] = {loot_type, item_link, quantity, item_id}
+
+        loot_toast_data_timer_handle = WDP:ScheduleTimer(ClearLootToastData, 5)
     end
 end
 
@@ -1328,9 +1352,8 @@ do
     end
 end
 
--- do-block
 
-do
+do -- do-block
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
@@ -2266,7 +2289,42 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
         return
     end
 
-    killed_boss_id_timer_handle = WDP:ScheduleTimer(ClearKilledBossID, 1) -- we need to assign a handle here to cancel it later
+    -- assign existing loot data to boss if it exists
+    if loot_toast_data then
+        local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
+
+        if npc then
+            -- create needed npc fields if required
+            local loot_label = "drops"
+            local encounter_data = npc:EncounterData(InstanceDifficultyToken())
+            encounter_data[loot_label] = encounter_data[loot_label] or {}
+            encounter_data.loot_counts = encounter_data.loot_counts or {}
+            encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
+
+            for index = 1, #loot_toast_data do
+                local data = loot_toast_data[index]
+                local loot_type = data[1]
+                local quantity = data[3]
+
+                if loot_type == "item" then
+                    local item_id = data[4]
+
+                    Debug("%s: Stored loot data - %sX%d (%d)", event_name, data[2], quantity, item_id)
+                    table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
+                elseif loot_type == "money" then
+                    Debug("%s: Stored loot data - money - %d", event_name, quantity)
+                    table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
+                end
+            end
+            private.boss_loot_toasting = true
+        else
+            Debug("%s: NPC is nil, but we have stored loot data...", event_name)
+        end
+    end
+
+    ClearLootToastData()
+
+    killed_boss_id_timer_handle = WDP:ScheduleTimer(ClearKilledBossID, 5) -- we need to assign a handle here to cancel it later
 end
 
 
@@ -2280,6 +2338,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     if private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
+        ClearLootToastData()
 
         private.loot_toast_container_id = private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later

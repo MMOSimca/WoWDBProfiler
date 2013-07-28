@@ -283,9 +283,6 @@ private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [132206] = 62346, -- Galleon Bonus (Galleon)
     [136381] = 69099, -- Nalak Bonus (Nalak)
     [137554] = 69161, -- Oondasta Bonus (Oondasta)
-    --[NYI] = 71952, -- Chi-Ji
-    --[NYI] = 71953, -- Xuen
-    --[NYI] = 71954, -- Niuzao
-    --[NYI] = 71955, -- Yu'lon
-    --[NYI] = 72057, -- Ordos
+    [148317] = 71952, -- Celestials Bonus (Chi-Ji)
+    [148316] = 72057, -- Ordos Bonus (Ordos)
 }
