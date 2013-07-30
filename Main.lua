@@ -656,8 +656,22 @@ do
                     end
                     UpdateDBEntryLocation(data_type, source_id)
 
-                    for item_id, quantity in pairs(loot_data) do
-                        table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                    if current_loot.target_type == AF.OBJECT then
+                        for loot_token, quantity in pairs(loot_data) do
+                            local label, currency_texture = (":"):split(loot_token)
+
+                            if label == "currency" and currency_texture then
+                                table.insert(loot_table, ("currency:%d:%s"):format(quantity, currency_texture))
+                            elseif loot_token == "money" then
+                                table.insert(loot_table, ("money:%d"):format(quantity))
+                            else
+                                table.insert(loot_table, ("%d:%d"):format(loot_token, quantity))
+                            end
+                        end
+                    else
+                        for item_id, quantity in pairs(loot_data) do
+                            table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                        end
                     end
                 end
             end
@@ -1212,7 +1226,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         Debug("%s: NPC and Container are nil, storing loot toast data for 5 seconds.", event_name)
 
         loot_toast_data = loot_toast_data or {}
-        loot_toast_data[#loot_toast_data + 1] = {loot_type, item_link, quantity, item_id}
+        loot_toast_data[#loot_toast_data + 1] = { loot_type, item_link, quantity, item_id }
 
         loot_toast_data_timer_handle = WDP:ScheduleTimer(ClearLootToastData, 5)
     end
@@ -1798,11 +1812,25 @@ do
                         current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + slot_quantity
                         guids_used[source_guid] = true
                     elseif slot_type == _G.LOOT_SLOT_MONEY then
-                        Debug("money:%d", _toCopper(item_text))
-                        table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
+                        if current_loot.target_type == AF.OBJECT then
+                            Debug("money:%d", _toCopper(item_text))
+                            current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                            current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + _toCopper(item_text)
+                        else
+                            Debug("money:%d", _toCopper(item_text))
+                            table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
+                        end
                     elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                        Debug("Found currency: %s", icon_texture)
-                        table.insert(current_loot.list, ("currency:%d:%s"):format(slot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                        if current_loot.target_type == AF.OBJECT then
+                            local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
+                            Debug("Found currency: %s", icon_texture)
+
+                            current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                            current_loot.sources[source_guid][currency_token] = current_loot.sources[source_guid][currency_token] or 0 + slot_quantity
+                        else
+                            Debug("Found currency: %s", icon_texture)
+                            table.insert(current_loot.list, ("currency:%d:%s"):format(slot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                        end
                     end
                 end
             end
