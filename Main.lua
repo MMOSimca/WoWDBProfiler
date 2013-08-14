@@ -656,7 +656,11 @@ do
                     end
                     UpdateDBEntryLocation(data_type, source_id)
 
-                    if current_loot.target_type == AF.OBJECT then
+                    if current_loot.target_type == AF.ZONE then
+                        for item_id, quantity in pairs(loot_data) do
+                            table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                        end
+                    else
                         for loot_token, quantity in pairs(loot_data) do
                             local label, currency_texture = (":"):split(loot_token)
 
@@ -667,10 +671,6 @@ do
                             else
                                 table.insert(loot_table, ("%d:%d"):format(loot_token, quantity))
                             end
-                        end
-                    else
-                        for item_id, quantity in pairs(loot_data) do
-                            table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
                         end
                     end
                 end
@@ -1696,31 +1696,18 @@ do
                         source_list[source_id] = true
                     end
 
-                    for item_id, quantity in pairs(loot_data) do
-                        table.insert(encounter_data[loot_type], ("%d:%d"):format(item_id, quantity))
+                    for loot_token, quantity in pairs(loot_data) do
+                        local label, currency_texture = (":"):split(loot_token)
+
+                        if label == "currency" and currency_texture then
+                            table.insert(encounter_data[loot_type], ("currency:%d:%s"):format(quantity, currency_texture))
+                        elseif loot_token == "money" then
+                            table.insert(encounter_data[loot_type], ("money:%d"):format(quantity))
+                        else
+                            table.insert(encounter_data[loot_type], ("%d:%d"):format(loot_token, quantity))
+                        end
                     end
                 end
-            end
-
-            -- TODO: Remove this when GetLootSourceInfo() has values for money
-            if #current_loot.list <= 0 then
-                return
-            end
-            local npc = NPCEntry(current_loot.identifier)
-
-            if not npc then
-                return
-            end
-            local encounter_data = npc:EncounterData(difficulty_token)
-            encounter_data[loot_type] = encounter_data[loot_type] or {}
-
-            if not source_list[current_loot.identifier] then
-                encounter_data.loot_counts = encounter_data.loot_counts or {}
-                encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
-            end
-
-            for index = 1, #current_loot.list do
-                table.insert(encounter_data[loot_type], current_loot.list[index])
             end
         end,
         [AF.OBJECT] = function()
@@ -1802,34 +1789,37 @@ do
 
                 if not loot_guid_registry[current_loot.label][source_guid] then
                     local loot_quantity = loot_info[loot_index + 1]
+                    if #loot_info == 2 and slot_quantity > loot_quantity then
+                        loot_quantity = slot_quantity
+                    end
                     local source_type, source_id = ParseGUID(source_guid)
                     local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                    Debug("GUID: %s - Type:ID: %s - Amount: %d (%d)", loot_info[loot_index], source_key, loot_quantity, slot_quantity)
+                    Debug("GUID: %s - Type:ID: %s - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
 
                     if slot_type == _G.LOOT_SLOT_ITEM then
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                         current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                        current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + slot_quantity
+                        current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                         guids_used[source_guid] = true
                     elseif slot_type == _G.LOOT_SLOT_MONEY then
-                        if current_loot.target_type == AF.OBJECT then
-                            Debug("money:%d", _toCopper(item_text))
-                            current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                            current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + _toCopper(item_text)
-                        else
-                            Debug("money:%d", _toCopper(item_text))
+                        Debug("money:%d", loot_quantity)
+                        if current_loot.target_type == AF.ZONE then
                             table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
+                        else
+                            current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                            current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + loot_quantity
+                            guids_used[source_guid] = true
                         end
                     elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                        if current_loot.target_type == AF.OBJECT then
+                        Debug("Found currency - %s:%d", icon_texture, loot_quantity)
+                        if current_loot.target_type == AF.ZONE then
+                            table.insert(current_loot.list, ("currency:%d:%s"):format(slot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                        else
                             local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
-                            Debug("Found currency: %s", icon_texture)
 
                             current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                            current_loot.sources[source_guid][currency_token] = current_loot.sources[source_guid][currency_token] or 0 + slot_quantity
-                        else
-                            Debug("Found currency: %s", icon_texture)
-                            table.insert(current_loot.list, ("currency:%d:%s"):format(slot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                            current_loot.sources[source_guid][currency_token] = current_loot.sources[source_guid][currency_token] or 0 + loot_quantity
+                            guids_used[source_guid] = true
                         end
                     end
                 end
@@ -2009,6 +1999,11 @@ end
 
 
 function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
+    -- this function produces data currently unused by wowdb.com and it makes debugging errors in the .lua output nearly impossible due to the massive bloat
+    if DEBUGGING then
+        return
+    end
+
     local num_pets = LPJ:NumPets()
 
     for index, pet_id in LPJ:IteratePetIDs() do
