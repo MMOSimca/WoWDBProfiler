@@ -97,12 +97,15 @@ private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
     [143506] = 98095, -- Brawler's Pet Supplies
     [143507] = 94207, -- Fabled Pandaren Pet Supplies
-    [143512] = 93148, -- Pandaren Spirit Pet Supplies
-    [143511] = 93149, -- Pandaren Spirit Pet Supplies
-    [143510] = 93147, -- Pandaren Spirit Pet Supplies
-    [143509] = 93146, -- Pandaren Spirit Pet Supplies
     [143508] = 89125, -- Sack of Pet Supplies
-    --[??????] = 104014, -- Pouch of Timeless Coins
+    [143509] = 93146, -- Pandaren Spirit Pet Supplies
+    [143510] = 93147, -- Pandaren Spirit Pet Supplies
+    [143511] = 93149, -- Pandaren Spirit Pet Supplies
+    [143512] = 93148, -- Pandaren Spirit Pet Supplies
+    [146885] = 103535, -- Bulging Bag of Charms
+    [147598] = 104014, -- Pouch of Timeless Coins
+    [149222] = 105911, -- Pouch of Enduring Wisdom
+    [149223] = 105912, -- Oversized Pouch of Enduring Wisdom
 }
 
 
