@@ -3,6 +3,7 @@
 local _G = getfenv(0)
 
 local pairs = _G.pairs
+local tostring = _G.tostring
 local tonumber = _G.tonumber
 
 local bit = _G.bit
@@ -144,6 +145,7 @@ local target_location_timer_handle
 local current_target_id
 local current_area_id
 local current_loot
+
 
 -- Data for our current action. Including possible values as a reference.
 local current_action = {
@@ -327,7 +329,7 @@ local function InstanceDifficultyToken()
     if not instance_type or instance_type == "" then
         instance_type = "NONE"
     end
-    return ("%s:%d:%s"):format(instance_type:upper(), instance_difficulty, _G.tostring(is_dynamic))
+    return ("%s:%d:%s"):format(instance_type:upper(), instance_difficulty, tostring(is_dynamic))
 end
 
 
@@ -415,6 +417,15 @@ local function CurrentLocationData()
         y = y + 1
     end
     return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
+end
+
+
+local function CurrencyLinkToTexture(currency_link)
+    if not currency_link then
+        return
+    end
+    local _, _, texture_path = _G.GetCurrencyInfo(tonumber(currency_link:match("currency:(%d+)")))
+    return texture_path:match("[^\\]+$"):lower()
 end
 
 
@@ -556,6 +567,8 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 
         if current_line:GetText() == _G.ITEM_OPENABLE then
             table.wipe(current_action)
+            current_loot = nil
+
             current_action.target_type = AF.ITEM
             current_action.identifier = item_id
             current_action.loot_label = "contains"
@@ -757,7 +770,7 @@ do
         end
         local world_map = _G.WorldMapFrame
         local map_visible = world_map:IsVisible()
-        local sfx_value = _G.tonumber(_G.GetCVar("Sound_EnableSFX"))
+        local sfx_value = tonumber(_G.GetCVar("Sound_EnableSFX"))
 
         if not map_visible then
             _G.SetCVar("Sound_EnableSFX", 0)
@@ -824,10 +837,8 @@ function WDP:OnInitialize()
     raw_db.build_num = build_num
     raw_db.version = DB_VERSION
 
-    if DEBUGGING then -- TODO: Remove this when comment subsystem is finished.
-        private.InitializeCommentSystem()
-        self:RegisterChatCommand("comment", private.ProcessCommentCommand)
-    end
+    private.InitializeCommentSystem()
+    self:RegisterChatCommand("comment", private.ProcessCommentCommand)
 end
 
 
@@ -1056,7 +1067,7 @@ do
 
             if max_power > 0 then
                 local power_type = _G.UnitPowerType("target")
-                level_data.power = ("%s:%d"):format(POWER_TYPE_NAMES[_G.tostring(power_type)] or power_type, max_power)
+                level_data.power = ("%s:%d"):format(POWER_TYPE_NAMES[tostring(power_type)] or power_type, max_power)
             end
         end
         name_to_id_map[_G.UnitName("target")] = unit_idnum
@@ -1166,35 +1177,46 @@ end
 
 
 function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
-    if not loot_type or (loot_type ~= "item" and loot_type ~= "money") then
+    if not loot_type or (loot_type ~= "item" and loot_type ~= "money" and loot_type ~= "currency") then
         Debug("%s: loot_type is %s. Item link is %s, and quantity is %d.", event_name, loot_type, item_link, quantity)
         return
     end
     local container_id = private.loot_toast_container_id
-    local item_id = ItemLinkToID(item_link)
     local npc = NPCEntry(private.raid_finder_boss_id or private.world_boss_id)
 
     if npc then
-        if loot_type == "item" and not item_id then
-            Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
-            return
-        end
         local loot_label = "drops"
         local encounter_data = npc:EncounterData(InstanceDifficultyToken())
         encounter_data[loot_label] = encounter_data[loot_label] or {}
         encounter_data.loot_counts = encounter_data.loot_counts or {}
 
+        if loot_type == "item" then
+            local item_id = ItemLinkToID(item_link)
+            if item_id then
+                Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
+            else
+                Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
+                return
+            end
+        elseif loot_type == "money" then
+            Debug("%s: money X %d", event_name, quantity)
+            table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
+        elseif loot_type == "currency" then
+            local currency_texture = CurrencyLinkToTexture(item_link)
+            if currency_texture and currency_texture ~= "" then
+                Debug("%s: %s X %d", event_name, currency_texture, quantity)
+                table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
+            else
+                Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+                return
+            end
+        end
+
         if not private.boss_loot_toasting then
             encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
         end
 
-        if loot_type == "item" then
-            Debug("%s: %sX%d (%d)", event_name, item_link, quantity, item_id)
-            table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
-        elseif loot_type == "money" then
-            Debug("%s: money - %d", event_name, quantity)
-            table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
-        end
         private.boss_loot_toasting = true -- Do not count further loots until timer expires or another boss is killed
     elseif container_id then
         InitializeCurrentLoot()
@@ -1204,29 +1226,42 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         current_loot.label = "contains"
         current_loot.target_type = AF.ITEM
 
+        current_loot.sources[container_id] = current_loot.sources[container_id] or {}
+
         if loot_type == "item" then
-            if not item_id then
+            local item_id = ItemLinkToID(item_link)
+            if item_id then
+                Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
+            else
                 Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
+                current_loot = nil
                 return
             end
-            current_loot.sources[container_id] = {
-                [item_id] = quantity,
-            }
         elseif loot_type == "money" then
-            table.insert(current_loot.list, ("money:%d"):format(quantity))
+            Debug("%s: money X %d", event_name, quantity)
+            current_loot.sources[container_id]["money"] = current_loot.sources[container_id]["money"] or 0 + quantity
+        elseif loot_type == "currency" then
+            local currency_texture = CurrencyLinkToTexture(item_link)
+            if currency_texture and currency_texture ~= "" then
+                Debug("%s: %s X %d", event_name, currency_texture, quantity)
+                local currency_token = ("currency:%s"):format(currency_texture)
+                current_loot.sources[container_id][currency_token] = current_loot.sources[container_id][currency_token] or 0 + quantity
+            else
+                Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+                current_loot = nil
+                return
+            end
         end
+
         GenericLootUpdate("items")
         current_loot = nil
         private.container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
     else
-        if loot_type == "item" and not item_id then
-            Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
-            return
-        end
         Debug("%s: NPC and Container are nil, storing loot toast data for 5 seconds.", event_name)
 
         loot_toast_data = loot_toast_data or {}
-        loot_toast_data[#loot_toast_data + 1] = { loot_type, item_link, quantity, item_id }
+        loot_toast_data[#loot_toast_data + 1] = { loot_type, item_link, quantity }
 
         loot_toast_data_timer_handle = WDP:ScheduleTimer(ClearLootToastData, 5)
     end
@@ -1239,22 +1274,10 @@ do
             Debug("CHAT_MSG_LOOT: %d (%d)", item_id, quantity)
         end,
         [AF.ZONE] = function(item_id, quantity)
-            current_loot = {
-                list = {
-                    ("%d:%d"):format(item_id, quantity)
-                },
-                identifier = current_action.identifier,
-                label = current_action.loot_label or "drops",
-                map_level = current_action.map_level,
-                object_name = current_action.object_name,
-                spell_label = current_action.spell_label,
-                target_type = current_action.target_type,
-                x = current_action.x,
-                y = current_action.y,
-                zone_data = current_action.zone_data,
-            }
-            table.wipe(current_action)
+            InitializeCurrentLoot()
+            current_loot.list[1] = ("%d:%d"):format(item_id, quantity)
             GenericLootUpdate("zones")
+            current_loot = nil
         end,
     }
 
@@ -1285,6 +1308,7 @@ do
         update_func(item_id, quantity)
     end
 end
+
 
 function WDP:RecordQuote(event_name, message, source_name, language_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] or not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
@@ -1411,7 +1435,6 @@ do -- do-block
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 Debug("%s: %s is not an NPC, or has no ID.", sub_event, dest_name or _G.UNKNOWN)
                 ClearKilledNPC()
-                ClearKilledBossID()
                 private.harvesting = nil
                 return
             end
@@ -1423,11 +1446,11 @@ do -- do-block
             local killer_name = source_name or previous_combat_event.source_name
 
             if not previous_combat_event.party_damage then
-                Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
+                --Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN) -- broken in Patch 5.4
                 table.wipe(previous_combat_event)
                 ClearKilledNPC()
             else
-                Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN)
+               --Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN) -- broken in Patch 5.4
             end
             killed_npc_id = unit_idnum
             WDP:ScheduleTimer(ClearKilledNPC, 0.1)
@@ -1611,24 +1634,6 @@ end
 
 
 do
-    local RE_GOLD = _G.GOLD_AMOUNT:gsub("%%d", "(%%d+)")
-    local RE_SILVER = _G.SILVER_AMOUNT:gsub("%%d", "(%%d+)")
-    local RE_COPPER = _G.COPPER_AMOUNT:gsub("%%d", "(%%d+)")
-
-
-    local function _moneyMatch(money, re)
-        return money:match(re) or 0
-    end
-
-
-    local function _toCopper(money)
-        if not money then
-            return 0
-        end
-        return _moneyMatch(money, RE_GOLD) * 10000 + _moneyMatch(money, RE_SILVER) * 100 + _moneyMatch(money, RE_COPPER)
-    end
-
-
     local LOOT_OPENED_VERIFY_FUNCS = {
         [AF.ITEM] = function()
             local locked_item_id
@@ -1679,7 +1684,7 @@ do
         end,
         [AF.NPC] = function()
             local difficulty_token = InstanceDifficultyToken()
-            local loot_type = current_loot.label
+            local loot_label = current_loot.label
             local source_list = {}
 
             for source_guid, loot_data in pairs(current_loot.sources) do
@@ -1688,23 +1693,23 @@ do
 
                 if npc then
                     local encounter_data = npc:EncounterData(difficulty_token)
-                    encounter_data[loot_type] = encounter_data[loot_type] or {}
+                    encounter_data[loot_label] = encounter_data[loot_label] or {}
 
                     if not source_list[source_guid] then
                         encounter_data.loot_counts = encounter_data.loot_counts or {}
-                        encounter_data.loot_counts[loot_type] = (encounter_data.loot_counts[loot_type] or 0) + 1
-                        source_list[source_id] = true
+                        encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
+                        source_list[source_guid] = true
                     end
 
                     for loot_token, quantity in pairs(loot_data) do
-                        local label, currency_texture = (":"):split(loot_token)
+                        local loot_type, currency_texture = (":"):split(loot_token)
 
-                        if label == "currency" and currency_texture then
-                            table.insert(encounter_data[loot_type], ("currency:%d:%s"):format(quantity, currency_texture))
+                        if loot_type == "currency" and currency_texture then
+                            table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
                         elseif loot_token == "money" then
-                            table.insert(encounter_data[loot_type], ("money:%d"):format(quantity))
+                            table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
                         else
-                            table.insert(encounter_data[loot_type], ("%d:%d"):format(loot_token, quantity))
+                            table.insert(encounter_data[loot_label], ("%d:%d"):format(loot_token, quantity))
                         end
                     end
                 end
@@ -1755,10 +1760,12 @@ do
 
     function WDP:LOOT_OPENED(event_name)
         if current_loot then
+            Debug("%s: Previous loot did not process.", event_name)
             return
         end
 
         if not current_action.target_type then
+            Debug("%s: No target type found.", event_name)
             return
         end
         local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
@@ -1794,26 +1801,26 @@ do
                     end
                     local source_type, source_id = ParseGUID(source_guid)
                     local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
-                    Debug("GUID: %s - Type:ID: %s - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
 
                     if slot_type == _G.LOOT_SLOT_ITEM then
                         local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                        Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
                         current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
                         current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                         guids_used[source_guid] = true
                     elseif slot_type == _G.LOOT_SLOT_MONEY then
-                        Debug("money:%d", loot_quantity)
+                        Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
                         if current_loot.target_type == AF.ZONE then
-                            table.insert(current_loot.list, ("money:%d"):format(_toCopper(item_text)))
+                            table.insert(current_loot.list, ("money:%d"):format(loot_quantity))
                         else
                             current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
                             current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + loot_quantity
                             guids_used[source_guid] = true
                         end
                     elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                        Debug("Found currency - %s:%d", icon_texture, loot_quantity)
+                        Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
                         if current_loot.target_type == AF.ZONE then
-                            table.insert(current_loot.list, ("currency:%d:%s"):format(slot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                            table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture:match("[^\\]+$"):lower()))
                         else
                             local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
 
@@ -1955,15 +1962,12 @@ do
                     price_string = ("%s:%s:%s"):format(price_string, personal_rating, required_season_amount or 0)
 
                     for cost_index = 1, item_count do
-                        local icon_texture, amount_required, currency_link = _G.GetMerchantItemCostItem(item_index, cost_index)
-                        local currency_id = currency_link and ItemLinkToID(currency_link) or nil
+                        -- (after some testing, the DB/Parser doesn't even support currency_ids -at all-, so vendor data submitted with the correct format will ironically be destroyed. that's why I removed the code here for currency_ids)
+                        -- the third return ("currency_link") of GetMerchantItemCostItem is broken as of Patch 5.4.0
+                        local currency_texture, amount_required = _G.GetMerchantItemCostItem(item_index, cost_index)
 
-                        if (not currency_id or currency_id < 1) and icon_texture then
-                            currency_id = icon_texture:match("[^\\]+$"):lower()
-                        end
-
-                        if currency_id then
-                            currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_id)
+                        if currency_texture then
+                            currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_texture:match("[^\\]+$"):lower())
                         end
                     end
 
@@ -2298,7 +2302,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
 end
 
 
-function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text, duration, currency_id)
+function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text, duration, currency_id_cost)
     if private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
@@ -2327,16 +2331,20 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
             for index = 1, #loot_toast_data do
                 local data = loot_toast_data[index]
                 local loot_type = data[1]
+                local hyperlink = data[2]
                 local quantity = data[3]
 
                 if loot_type == "item" then
-                    local item_id = data[4]
-
-                    Debug("%s: Stored loot data - %sX%d (%d)", event_name, data[2], quantity, item_id)
+                    local item_id = ItemLinkToID(hyperlink)
+                    Debug("%s: Assigned stored item loot data - %s - %d:%d", event_name, hyperlink, item_id, quantity)
                     table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
                 elseif loot_type == "money" then
-                    Debug("%s: Stored loot data - money - %d", event_name, quantity)
+                    Debug("%s: Assigned stored money loot data - money:%d", event_name, quantity)
                     table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
+                elseif loot_type == "currency" then
+                    local currency_texture = CurrencyLinkToTexture(hyperlink)
+                    Debug("%s: Assigned stored currency loot data - %s - currency:%d:%s", event_name, hyperlink, currency_texture, quantity)
+                    table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
                 end
             end
             private.boss_loot_toasting = true
