@@ -2575,14 +2575,31 @@ do
     end
 
 
-    function WDP:GOSSIP_SHOW(event_name)
-        local gossip_options = { _G.GetGossipOptions() }
+    local GOSSIP_SHOW_FUNCS = {
+        [private.UNIT_TYPES.NPC] = function(unit_idnum)
+            local gossip_options = { _G.GetGossipOptions() }
 
-        for index = 2, #gossip_options, 2 do
-            if gossip_options[index] == "binder" then
-                SetUnitField("innkeeper", private.UNIT_TYPES.NPC)
-                return
+            for index = 2, #gossip_options, 2 do
+                if gossip_options[index] == "binder" then
+                    SetUnitField("innkeeper", private.UNIT_TYPES.NPC)
+                    return
+                end
             end
+        end,
+        [private.UNIT_TYPES.OBJECT] = function(unit_idnum)
+            UpdateDBEntryLocation("objects", unit_idnum)
+        end,
+    }
+
+
+    function WDP:GOSSIP_SHOW(event_name)
+        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
+        if not unit_idnum then
+            return
+        end
+
+        if GOSSIP_SHOW_FUNCS[unit_type] then
+            GOSSIP_SHOW_FUNCS[unit_type](unit_idnum)
         end
     end
 
