@@ -36,8 +36,11 @@ local CLIENT_LOCALE = _G.GetLocale()
 local DB_VERSION = 18
 local DEBUGGING = false
 local EVENT_DEBUG = false
+
 local OBJECT_ID_ANVIL = 192628
+local OBJECT_ID_FISHING_BOBBER = 35591
 local OBJECT_ID_FORGE = 1685
+
 local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
 local PLAYER_FACTION = _G.UnitFactionGroup("player")
 local PLAYER_GUID
@@ -1688,17 +1691,7 @@ do
             current_action.identifier = locked_item_id
             return true
         end,
-        [AF.NPC] = function()
-            if not _G.UnitExists("target") or _G.UnitIsFriend("player", "target") or _G.UnitIsPlayer("target") or _G.UnitPlayerControlled("target") then
-                return false
-            end
-
-            if not current_action.identifier then
-                local unit_type, id_num = ParseGUID(_G.UnitGUID("target"))
-                current_action.identifier = id_num
-            end
-            return true
-        end,
+        [AF.NPC] = true,
         [AF.OBJECT] = true,
         [AF.ZONE] = function()
             current_action.zone_data = UpdateDBEntryLocation("zones", current_action.identifier)
@@ -1787,24 +1780,116 @@ do
     end
 
 
-    function WDP:LOOT_OPENED(event_name)
-        if current_loot then
-            Debug("%s: Previous loot did not process.", event_name)
-            return
+    local function ExtrapolatedCurrentActionFromLootData(event_name)
+        local extrapolated_guid_registry = {}
+        local num_guids = 0
+
+        table.wipe(current_action)
+
+        for loot_slot = 1, _G.GetNumLootItems() do
+            local loot_info = {
+                _G.GetLootSourceInfo(loot_slot)
+            }
+
+            for loot_index = 1, #loot_info, 2 do
+                local source_guid = loot_info[loot_index]
+
+                if not extrapolated_guid_registry[source_guid] then
+                    local unit_type, unit_idnum = ParseGUID(source_guid)
+
+                    if unit_type and unit_idnum then
+                        extrapolated_guid_registry[source_guid] = {
+                            unit_type,
+                            unit_idnum
+                        }
+
+                        num_guids = num_guids + 1
+                    end
+                end
+            end
+        end
+        local log_source = event_name .. "- ExtrapolatedCurrentActionFromLootData"
+
+        if num_guids == 0 then
+            Debug("%s: No GUIDs found in loot. Blank loot window?", log_source)
+            return false
+        end
+        local num_npcs = 0
+        local num_objects = 0
+
+        for source_guid, guid_data in pairs(extrapolated_guid_registry) do
+            local unit_type = guid_data[1]
+            local loot_label = (unit_type == private.UNIT_TYPES.OBJECT) and "opening" or (UnitTypeIsNPC(unit_type) and "drops" or nil)
+
+            if loot_label then
+                local unit_idnum = guid_data[2]
+
+                if loot_guid_registry[loot_label] and loot_guid_registry[loot_label][source_guid] then
+                    Debug("%s: Previously scanned loot for unit with GUID %s and identifier %s.", log_source, source_guid, unit_idnum)
+                elseif unit_type == private.UNIT_TYPES.OBJECT and unit_idnum ~= OBJECT_ID_FISHING_BOBBER then
+                    current_action.loot_label = loot_label
+                    current_action.spell_label = "OPENING"
+                    current_action.target_type = AF.OBJECT
+                    current_action.identifier = unit_idnum
+                    num_objects = num_objects + 1
+                elseif UnitTypeIsNPC(unit_type) then
+                    current_action.loot_label = loot_label
+                    current_action.target_type = AF.NPC
+                    current_action.identifier = unit_idnum
+                    num_npcs = num_npcs + 1
+                end
+            else
+                -- Bail here; not only do we not know what this unit is, but we don't want to attribute loot to something that doesn't actually drop it.
+                Debug("%s: Unit with GUID %s has unsupported type for looting.", log_source, source_guid)
+                return false
+            end
         end
 
         if not current_action.target_type then
-            Debug("%s: No target type found.", event_name)
-            return
+            Debug("%s: Failure to obtain target_type.", log_source)
+            return false
+        end
+
+        -- We can't figure out what dropped the loot. This shouldn't ever happen, but hey - Blizzard does some awesome stuff on occasion.
+        if num_npcs ~= 0 and num_objects ~= 0 then
+            Debug("%s: Mixed target types are not supported.", log_source)
+            return false
+        end
+
+        Debug("%s: Successfully extrapolated information for current_action.", log_source)
+        return true
+    end
+
+
+    function WDP:LOOT_OPENED(event_name)
+        if current_loot then
+            current_loot = nil
+            Debug("%s: Previous loot did not process in time for this event. Attempting to extrapolate current_action from loot data.", event_name)
+
+            if not ExtrapolatedCurrentActionFromLootData(event_name) then
+                Debug("%s: Unable to extrapolate current_action. Aborting attempts to handle loot for now.", event_name)
+                return
+            end
+        end
+
+        if not current_action.target_type then
+            Debug("%s: No target type found. Attempting to extrapolate current_action from loot data.", event_name)
+
+            if not ExtrapolatedCurrentActionFromLootData(event_name) then
+                Debug("%s: Unable to extrapolate current_action. Aborting attempts to handle loot for now.", event_name)
+                return
+            end
         end
         local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
         local update_func = LOOT_OPENED_UPDATE_FUNCS[current_action.target_type]
 
         if not verify_func or not update_func then
+            Debug("%s: The current action's target type is unsupported or nil.", event_name)
             return
         end
 
         if _G.type(verify_func) == "function" and not verify_func() then
+            Debug("%s: The current action type, %s, is supported but has failed loot verification.", event_name, current_action.target_type)
             return
         end
         local guids_used = {}
