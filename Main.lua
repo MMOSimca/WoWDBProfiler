@@ -301,21 +301,21 @@ end
 local function ClearKilledBossID()
     if killed_boss_id_timer_handle then
         WDP:CancelTimer(killed_boss_id_timer_handle)
+        killed_boss_id_timer_handle = nil
     end
     table.wipe(boss_loot_toasting)
     private.raid_finder_boss_id = nil
     private.world_boss_id = nil
-    killed_boss_id_timer_handle = nil
 end
 
 
 local function ClearLootToastContainerID()
     if loot_toast_container_timer_handle then
         WDP:CancelTimer(loot_toast_container_timer_handle)
+        killed_boss_id_timer_handle = nil
     end
     private.container_loot_toasting = false
     private.loot_toast_container_id = nil
-    loot_toast_container_timer_handle = nil
 end
 
 
@@ -323,10 +323,12 @@ local function ClearLootToastData()
     -- cancel existing timer if found
     if loot_toast_data_timer_handle then
         WDP:CancelTimer(loot_toast_data_timer_handle)
+        loot_toast_data_timer_handle = nil
     end
 
-    if loot_toast_data then table.wipe(loot_toast_data) end
-    loot_toast_data_timer_handle = nil
+    if loot_toast_data then
+        table.wipe(loot_toast_data)
+    end
 end
 
 
