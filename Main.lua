@@ -571,6 +571,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
         if not current_line then
+            Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)
             break
         end
 
