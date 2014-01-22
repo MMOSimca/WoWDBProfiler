@@ -306,6 +306,7 @@ local function ClearKilledBossID()
         WDP:CancelTimer(killed_boss_id_timer_handle)
         killed_boss_id_timer_handle = nil
     end
+
     table.wipe(boss_loot_toasting)
     private.raid_finder_boss_id = nil
     private.world_boss_id = nil
@@ -315,8 +316,9 @@ end
 local function ClearLootToastContainerID()
     if loot_toast_container_timer_handle then
         WDP:CancelTimer(loot_toast_container_timer_handle)
-        killed_boss_id_timer_handle = nil
+        loot_toast_container_timer_handle = nil
     end
+
     private.container_loot_toasting = false
     private.loot_toast_container_id = nil
 end
@@ -574,8 +576,8 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
         if not current_line then
-            Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)
-            break
+            Debug("HandleItemUse: Item with ID %d and link %s had an invalid tooltip.", item_id, item_link, _G.ITEM_OPENABLE)
+            return
         end
 
         if current_line:GetText() == _G.ITEM_OPENABLE then
@@ -585,9 +587,11 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             current_action.target_type = AF.ITEM
             current_action.identifier = item_id
             current_action.loot_label = "contains"
-            break
+            return
         end
     end
+
+    Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)
 end
 
 
@@ -1667,14 +1671,15 @@ end
 
 do
     local LOOT_OPENED_VERIFY_FUNCS = {
+        -- Item containers can be AOE-looted in Patch 5.4.2 if the user clicks fast enough, but this verification still works as long as they both have loot.
         [AF.ITEM] = function()
             local locked_item_id
 
             for bag_index = 0, _G.NUM_BAG_FRAMES do
                 for slot_index = 1, _G.GetContainerNumSlots(bag_index) do
-                    local _, _, is_locked = _G.GetContainerItemInfo(bag_index, slot_index)
+                    local _, _, is_locked, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
 
-                    if is_locked then
+                    if is_locked and is_lootable then
                         locked_item_id = ItemLinkToID(_G.GetContainerItemLink(bag_index, slot_index))
                         break
                     end
@@ -1816,10 +1821,11 @@ do
         end
         local num_npcs = 0
         local num_objects = 0
+        local num_itemcontainers = 0
 
         for source_guid, guid_data in pairs(extrapolated_guid_registry) do
             local unit_type = guid_data[1]
-            local loot_label = (unit_type == private.UNIT_TYPES.OBJECT) and "opening" or (UnitTypeIsNPC(unit_type) and "drops" or nil)
+            local loot_label = (unit_type == private.UNIT_TYPES.OBJECT) and "opening" or (UnitTypeIsNPC(unit_type) and "drops") or ((unit_type == private.UNIT_TYPES.PLAYER) and "contains")
 
             if loot_label then
                 local unit_idnum = guid_data[2]
@@ -1837,6 +1843,12 @@ do
                     current_action.target_type = AF.NPC
                     current_action.identifier = unit_idnum
                     num_npcs = num_npcs + 1
+                -- Item container GUIDs are currently of the 'PLAYER' type; this may be unintended and could change in the future.
+                elseif unit_type == private.UNIT_TYPES.PLAYER then
+                    current_action.loot_label = loot_label
+                    current_action.target_type = AF.ITEM
+                    -- current_action.identifier assigned during loot verification.
+                    num_itemcontainers = num_itemcontainers + 1
                 end
             else
                 -- Bail here; not only do we not know what this unit is, but we don't want to attribute loot to something that doesn't actually drop it.
@@ -1851,8 +1863,8 @@ do
         end
 
         -- We can't figure out what dropped the loot. This shouldn't ever happen, but hey - Blizzard does some awesome stuff on occasion.
-        if num_npcs ~= 0 and num_objects ~= 0 then
-            Debug("%s: Mixed target types are not supported.", log_source)
+        if (num_npcs > 0 and num_objects + num_itemcontainers > 0) or (num_objects > 0 and num_npcs + num_itemcontainers > 0) or (num_itemcontainers > 0 and num_npcs + num_objects > 0) then
+            Debug("%s: Mixed target types are not supported. NPCs - %d, Objects - %d, Item Containers - %d.", log_source, num_npcs, num_objects, num_itemcontainers)
             return false
         end
 
@@ -1889,7 +1901,7 @@ do
         end
 
         if _G.type(verify_func) == "function" and not verify_func() then
-            Debug("%s: The current action type, %s, is supported but has failed loot verification.", event_name, current_action.target_type)
+            Debug("%s: The current action type, %s, is supported but has failed loot verification.", event_name, private.ACTION_TYPE_NAMES[current_action.target_type])
             return
         end
         local guids_used = {}
@@ -1910,38 +1922,52 @@ do
 
                 if not loot_guid_registry[current_loot.label][source_guid] then
                     local loot_quantity = loot_info[loot_index + 1]
-                    if #loot_info == 2 and slot_quantity > loot_quantity then
-                        loot_quantity = slot_quantity
-                    end
-                    local source_type, source_id = ParseGUID(source_guid)
-                    local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
 
-                    if slot_type == _G.LOOT_SLOT_ITEM then
-                        local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                        Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
-                        current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                        current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
-                        guids_used[source_guid] = true
-                    elseif slot_type == _G.LOOT_SLOT_MONEY then
-                        Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
-                        if current_loot.target_type == AF.ZONE then
-                            table.insert(current_loot.list, ("money:%d"):format(loot_quantity))
-                        else
-                            current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                            current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + loot_quantity
-                            guids_used[source_guid] = true
+                    -- There is a new bug in 5.4.0 that causes GetLootSlotInfo() to (rarely) return nil values for slot_quantity.
+                    if slot_quantity then
+                        -- We need slot_quantity to account for an old bug where loot_quantity is sometimes '1' for stacks of items, such as cloth.
+                        if slot_quantity > loot_quantity then
+                            loot_quantity = slot_quantity
                         end
-                    elseif slot_type == _G.LOOT_SLOT_CURRENCY then
-                        Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
-                        if current_loot.target_type == AF.ZONE then
-                            table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture:match("[^\\]+$"):lower()))
-                        else
-                            local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
 
+                        local source_type, source_id = ParseGUID(source_guid)
+                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+
+                        if slot_type == _G.LOOT_SLOT_ITEM then
+                            local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
+                            Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
                             current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                            current_loot.sources[source_guid][currency_token] = current_loot.sources[source_guid][currency_token] or 0 + loot_quantity
+                            current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                             guids_used[source_guid] = true
+                        elseif slot_type == _G.LOOT_SLOT_MONEY then
+                            Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
+                            if current_loot.target_type == AF.ZONE then
+                                table.insert(current_loot.list, ("money:%d"):format(loot_quantity))
+                            else
+                                current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                                current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + loot_quantity
+                                guids_used[source_guid] = true
+                            end
+                        elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                            -- Same bug with GetLootSlotInfo() will screw up currency when it happens, so we won't process this slot's loot.
+                            if icon_texture then
+                                Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
+                                if current_loot.target_type == AF.ZONE then
+                                    table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                                else
+                                    local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
+
+                                    current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                                    current_loot.sources[source_guid][currency_token] = current_loot.sources[source_guid][currency_token] or 0 + loot_quantity
+                                    guids_used[source_guid] = true
+                                end
+                            else
+                                Debug("%s: Slot quantity is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
+                            end
                         end
+                    else
+                        -- If this is nil, then the item's quantity could be wrong if loot_quantity is wrong, so we won't process this slot's loot.
+                        Debug("%s: Slot quantity is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
                     end
                 end
             end
@@ -2008,11 +2034,17 @@ do
             local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.GetMerchantItemInfo(item_index)
             local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
 
+            DatamineTT:ClearLines()
+            DatamineTT:SetMerchantItem(item_index)
+
+            if not item_id then
+                local item_name, item_link = DatamineTT:GetItem()
+                item_id = ItemLinkToID(item_link)
+                Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - %s", event_name, item_id)
+            end
+
             if item_id and item_id > 0 then
                 local price_string = ActualCopperCost(copper_price, merchant_standing)
-
-                DatamineTT:ClearLines()
-                DatamineTT:SetMerchantItem(item_index)
 
                 local num_lines = DatamineTT:NumLines()
 
@@ -2076,7 +2108,7 @@ do
                     price_string = ("%s:%s:%s"):format(price_string, personal_rating, required_season_amount or 0)
 
                     for cost_index = 1, item_count do
-                        -- the third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0
+                        -- The third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0.
                         local icon_texture, amount_required, item_link = _G.GetMerchantItemCostItem(item_index, cost_index)
                         local currency_identifier = item_link and ItemLinkToID(item_link) or nil
 
@@ -2121,7 +2153,7 @@ end
 
 
 function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
-    -- this function produces data currently unused by wowdb.com and it makes debugging errors in the .lua output nearly impossible due to the massive bloat
+    -- This function produces data currently unused by wowdb.com and it makes debugging errors in the .lua output nearly impossible due to the massive bloat.
     if DEBUGGING then
         return
     end
@@ -2434,11 +2466,11 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
         return
     end
 
-    -- assign existing loot data to boss if it exists
+    -- Assign existing loot data to boss if it exists
     if loot_toast_data then
         local npc_id = private.raid_finder_boss_id or private.world_boss_id
 
-        -- slightly messy hack to workaround duplicate world bosses
+        -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
         if DUPLICATE_WORLD_BOSS_IDS[npc_id] then
             upper_limit = #DUPLICATE_WORLD_BOSS_IDS[npc_id]
@@ -2453,7 +2485,7 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
 
             local npc = NPCEntry(temp_npc_id)
             if npc then
-                -- create needed npc fields if required
+                -- Create needed npc fields if required
                 local loot_label = "drops"
                 local encounter_data = npc:EncounterData(InstanceDifficultyToken())
                 encounter_data[loot_label] = encounter_data[loot_label] or {}
@@ -2475,7 +2507,7 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
                     elseif loot_type == "currency" then
                         local currency_texture = CurrencyLinkToTexture(hyperlink)
                         Debug("%s: Assigned stored currency loot data - %s - currency:%d:%s", event_name, hyperlink, currency_texture, quantity)
-                        -- workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
+                        -- Workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
                         if quantity > 1000 and currency_texture == "pvecurrency-valor" then
                             quantity = math.floor(quantity / 100)
                         end
