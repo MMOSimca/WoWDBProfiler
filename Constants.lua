@@ -52,6 +52,22 @@ for name, bit in _G.pairs(private.ACTION_TYPE_FLAGS) do
 end
 
 
+private.EXTRAPOLATION_BANNED_SPELL_IDS = {
+    [13262] = "DISENCHANT",
+    [4036] = "ENGINEERING",
+    [30427] = "EXTRACT_GAS",
+    [131476] = "FISHING",
+    [2366] = "HERB_GATHERING",
+    [51005] = "MILLING",
+    [605] = "MIND_CONTROL",
+    [2575] = "MINING",
+    [921] = "PICK_POCKET",
+    [31252] = "PROSPECTING",
+    [73979] = "SEARCHING_FOR_ARTIFACTS",
+    [8613] = "SKINNING",
+}
+
+
 private.SPELL_LABELS_BY_NAME = {
     [_G.GetSpellInfo(13262)] = "DISENCHANT",
     [_G.GetSpellInfo(4036)] = "ENGINEERING",
@@ -279,7 +295,6 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [145921] = 71161, -- Klaxxi Paragons Bonus (Kil'ruk the Wind-Reaver)
     [145922] = 71865, -- Garrosh Hellscream Bonus (Garrosh Hellscream)
 }
-
 
 private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [132205] = 60491, -- Sha of Anger Bonus (Sha of Anger)

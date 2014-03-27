@@ -47,6 +47,8 @@ local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
+local SPELL_ID_DISGUISE = 121308
+
 local ALLOWED_LOCALES = {
     enUS = true,
     enGB = true,
@@ -1432,7 +1434,7 @@ do -- do-block
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
-        if not spell_id then
+        if not spell_id or spell_id == SPELL_ID_DISGUISE then
             return
         end
         local source_type, source_id = ParseGUID(source_guid)
@@ -1819,6 +1821,12 @@ do
             Debug("%s: No GUIDs found in loot. Blank loot window?", log_source)
             return false
         end
+
+        if private.previous_spell_id and private.EXTRAPOLATION_BANNED_SPELL_IDS[private.previous_spell_id] then
+            Debug("%s: Problematic spell id %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
+            return false
+        end
+
         local num_npcs = 0
         local num_objects = 0
         local num_itemcontainers = 0
