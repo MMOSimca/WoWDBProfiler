@@ -47,6 +47,7 @@ local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
+local SPELL_ID_CHI_WAVE = 132464
 local SPELL_ID_DISGUISE = 121308
 
 local ALLOWED_LOCALES = {
@@ -515,6 +516,10 @@ do
             return
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+        if not (zone_name and area_id and x and y and map_level) then
+            Debug("UpdateDBEntryLocation: Missing current location data - %s, %d, %d, %d, %d.", zone_name, area_id, x, y, map_level)
+            return
+        end
         local entry = DBEntry(entry_type, identifier)
         entry[difficulty_token] = entry[difficulty_token] or {}
         entry[difficulty_token].locations = entry[difficulty_token].locations or {}
@@ -668,10 +673,15 @@ do
                 if current_loot.target_type == AF.ITEM then
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
-                elseif current_loot.target_type == AF.OBJECT then
-                    source_id = ("%s:%s"):format(current_loot.spell_label, select(2, ParseGUID(source_guid)))
                 else
-                    source_id = select(2, ParseGUID(source_guid))
+                    local unit_ID = select(2, ParseGUID(source_guid))
+                    if unit_ID then
+                        if current_loot.target_type == AF.OBJECT then
+                            source_id = ("%s:%s"):format(current_loot.spell_label, unit_ID)
+                        else
+                            source_id = unit_ID
+                        end
+                    end
                 end
                 local entry = DBEntry(data_type, source_id)
 
@@ -1114,6 +1124,10 @@ do
             return
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+        if not (zone_name and area_id and x and y and map_level) then
+            Debug("UpdateTargetLocation: Missing current location data - %s, %d, %d, %d, %d.", zone_name, area_id, x, y, map_level)
+            return
+        end
         local npc_data = npc:EncounterData(difficulty_token).stats[("level_%d"):format(_G.UnitLevel("target"))]
         local zone_token = ("%s:%d"):format(zone_name, area_id)
         npc_data.locations = npc_data.locations or {} -- TODO: Fix this. It is broken. Possibly something to do with the timed updates.
@@ -1434,7 +1448,7 @@ do -- do-block
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
-        if not spell_id or spell_id == SPELL_ID_DISGUISE then
+        if not spell_id or spell_id == SPELL_ID_CHI_WAVE or spell_id == SPELL_ID_DISGUISE then
             return
         end
         local source_type, source_id = ParseGUID(source_guid)
@@ -1748,6 +1762,9 @@ do
             GenericLootUpdate("objects", InstanceDifficultyToken())
         end,
         [AF.ZONE] = function()
+            if not (current_loot.map_level and current_loot.x and current_loot.y and current_loot.zone_data) then
+                return
+            end
             local location_token = ("%d:%d:%d"):format(current_loot.map_level, current_loot.x, current_loot.y)
 
             -- This will start life as a boolean true.
@@ -2048,7 +2065,11 @@ do
             if not item_id then
                 local item_name, item_link = DatamineTT:GetItem()
                 item_id = ItemLinkToID(item_link)
-                Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - %s", event_name, item_id)
+                if item_id then
+                    Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - %s", event_name, item_id)
+                else
+                    Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - nil", event_name)
+                end
             end
 
             if item_id and item_id > 0 then
@@ -2417,6 +2438,10 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     end
     local spell_flags = private.SPELL_FLAGS_BY_LABEL[spell_label]
     local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
+    if not (zone_name and area_id and x and y and map_level) then
+        Debug("%s: Missing current location data - %s, %d, %d, %d, %d.", event_name, zone_name, area_id, x, y, map_level)
+        return
+    end
 
     table.wipe(current_action)
     current_action.instance_token = instance_token
