@@ -115,7 +115,7 @@ local function CreateUnitComment(unit_id, is_command)
         WDP:Printf("Unable to determine unit from '%s'", unit_id)
         return
     end
-    local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
+    local type_name = private.UNIT_TYPE_NAMES[unit_type]
     local unit_name = is_command and _G.UnitName(unit_id) or comment_units[unit_id].name
 
     table.wipe(comment_units)

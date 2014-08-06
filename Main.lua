@@ -92,7 +92,7 @@ local EVENT_MAPPING = {
     ITEM_TEXT_BEGIN = true,
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
-    LOOT_OPENED = true,
+    LOOT_READY = true,
     MAIL_SHOW = true,
     MERCHANT_CLOSED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
@@ -463,26 +463,37 @@ end
 local ParseGUID
 do
     local UNIT_TYPES = private.UNIT_TYPES
-    local UNIT_TYPE_BITMASK = 0x007
 
     local NPC_ID_MAPPING = {
         [62164] = 63191, -- Garalon
     }
 
 
+    function MatchUnitTypes(unit_type_name)
+        if not unit_type_name then
+            return UNIT_TYPES.UNKNOWN
+        end
+
+        for def, text in next, UNIT_TYPES do
+            if unit_type_name == text then
+                return UNIT_TYPES[def]
+            end
+        end
+        return UNIT_TYPES.UNKNOWN
+    end
+
+
     function ParseGUID(guid)
         if not guid then
             return
         end
-        local bitfield = tonumber(guid:sub(1, 5))
 
-        if not bitfield then
-            return UNIT_TYPES.UNKNOWN
-        end
-        local unit_type = _G.bit.band(bitfield, UNIT_TYPE_BITMASK)
+        -- We might want to use some of this new information later, but leaving the returns alone for now
+        local unit_type_name, unk_id1, server_id, instance_id, unk_id2, unit_idnum, spawn_id = (":"):split(guid)
 
-        if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET then
-            local unit_idnum = tonumber(guid:sub(6, 10), 16)
+        unit_type = MatchUnitTypes(unit_type_name)
+        if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET and unit_type ~= UNIT_TYPES.ITEM then
+
             local id_mapping = NPC_ID_MAPPING[unit_idnum]
 
             if id_mapping and UnitTypeIsNPC(unit_type) then
@@ -597,7 +608,6 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             return
         end
     end
-
     Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)
 end
 
@@ -949,14 +959,6 @@ do
             local amount, stat = left_text:match("+(.-) (.*)")
 
             if amount and stat then
-                if reforge_id and reforge_id ~= 0 then
-                    local reforge_string = stat:find("Reforged")
-
-                    if reforge_string then
-                        stat = stat:sub(0, reforge_string - 3)
-                        intermediary.reforge_id = reforge_id
-                    end
-                end
                 create_entry = true
                 intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber((amount:gsub(",", "")))
             end
@@ -984,19 +986,41 @@ local function RecordItemData(item_id, item_link, durability)
     local item
 
     if item_string then
-        local _, _, _, _, _, _, _, suffix_id, unique_id, _, reforge_id, upgrade_id = (":"):split(item_string)
-        suffix_id = tonumber(suffix_id)
+        local _, _, _, _, _, _, _, suffix_id, unique_id, _, upgrade_id, instance_difficulty_id, num_bonus_ids = (":"):split(item_string)
+        local bonus_ids = {select(14, (":"):split(item_string))}
         upgrade_id = tonumber(upgrade_id)
-
-        if suffix_id and suffix_id ~= 0 then
+        instance_difficulty_id = tonumber(instance_difficulty_id)
+        num_bonus_ids = tonumber(num_bonus_ids)
+        if (not num_bonus_ids) or (num_bonus_ids == 0) then
+            if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
+                item = DBEntry("items", item_id)
+                item.unique_id = bit.band(unique_id, 0xFFFF)
+                if (suffix_id and suffix_id ~= 0) then
+                    item.suffix_id = suffix_id
+                end
+                if (instance_difficulty_id and instance_difficulty_id ~= 0) then
+                    item.instance_difficulty_id = instance_difficulty_id
+                end
+            end
+        elseif num_bonus_ids > 0 then
             item = DBEntry("items", item_id)
-            item.suffix_id = suffix_id
-            item.unique_id = bit.band(unique_id, 0xFFFF)
-        end
 
+            item.unique_id = bit.band(unique_id, 0xFFFF)
+            item.instance_difficulty_id = instance_difficulty_id
+            
+            if not item.bonus_ids then
+                item.bonus_ids = {}
+            end
+            
+            for bonus_index = 1, num_bonus_ids do
+                item.bonus_ids[bonus_ids[bonus_index]] = true
+            end
+        else
+            Debug("RecordItemData: Item_system is supposed to be 0 or positive, instead it was %s.", item_system)
+        end
         if upgrade_id and upgrade_id ~= 0 then
             DatamineTT:SetHyperlink(item_link)
-            ScrapeItemUpgradeStats(item_id, upgrade_id, reforge_id)
+            ScrapeItemUpgradeStats(item_id, upgrade_id)
         end
     end
 
@@ -1686,7 +1710,7 @@ end
 
 
 do
-    local LOOT_OPENED_VERIFY_FUNCS = {
+    local LOOT_READY_VERIFY_FUNCS = {
         -- Item containers can be AOE-looted in Patch 5.4.2 if the user clicks fast enough, but this verification still works as long as they both have loot.
         [AF.ITEM] = function()
             local locked_item_id
@@ -1721,7 +1745,7 @@ do
     }
 
 
-    local LOOT_OPENED_UPDATE_FUNCS = {
+    local LOOT_READY_UPDATE_FUNCS = {
         [AF.ITEM] = function()
             GenericLootUpdate("items")
         end,
@@ -1838,7 +1862,6 @@ do
             Debug("%s: No GUIDs found in loot. Blank loot window?", log_source)
             return false
         end
-
         if private.previous_spell_id and private.EXTRAPOLATION_BANNED_SPELL_IDS[private.previous_spell_id] then
             Debug("%s: Problematic spell id %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
             return false
@@ -1898,7 +1921,7 @@ do
     end
 
 
-    function WDP:LOOT_OPENED(event_name)
+    function WDP:LOOT_READY(event_name)
         if current_loot then
             current_loot = nil
             Debug("%s: Previous loot did not process in time for this event. Attempting to extrapolate current_action from loot data.", event_name)
@@ -1917,8 +1940,8 @@ do
                 return
             end
         end
-        local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
-        local update_func = LOOT_OPENED_UPDATE_FUNCS[current_action.target_type]
+        local verify_func = LOOT_READY_VERIFY_FUNCS[current_action.target_type]
+        local update_func = LOOT_READY_UPDATE_FUNCS[current_action.target_type]
 
         if not verify_func or not update_func then
             Debug("%s: The current action's target type is unsupported or nil.", event_name)
@@ -1947,16 +1970,14 @@ do
 
                 if not loot_guid_registry[current_loot.label][source_guid] then
                     local loot_quantity = loot_info[loot_index + 1]
-
                     -- There is a new bug in 5.4.0 that causes GetLootSlotInfo() to (rarely) return nil values for slot_quantity.
                     if slot_quantity then
                         -- We need slot_quantity to account for an old bug where loot_quantity is sometimes '1' for stacks of items, such as cloth.
                         if slot_quantity > loot_quantity then
                             loot_quantity = slot_quantity
                         end
-
                         local source_type, source_id = ParseGUID(source_guid)
-                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                        local source_key = ("%s:%d"):format(source_type, source_id)
 
                         if slot_type == _G.LOOT_SLOT_ITEM then
                             local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
@@ -2251,7 +2272,7 @@ do
         end
         local quest = DBEntry("quests", _G.GetQuestID())
         quest[point] = quest[point] or {}
-        quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
+        quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type], unit_id)] = true
 
         return quest
     end
@@ -2289,7 +2310,7 @@ function WDP:QUEST_LOG_UPDATE(event_name)
     local _, num_quests = _G.GetNumQuestLogEntries()
 
     while processed_quests <= num_quests do
-        local _, _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
+        local _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
 
         if quest_id == 0 then
             processed_quests = processed_quests + 1

@@ -18,24 +18,24 @@ local ADDON_NAME, private = ...
 private.wow_version, private.build_num = _G.GetBuildInfo()
 
 private.UNIT_TYPES = {
-    PLAYER = 0,
-    OBJECT = 1,
-    UNKNOWN = 2,
-    NPC = 3,
-    PET = 4,
-    VEHICLE = 5,
+    PLAYER = "Player",
+    OBJECT = "GameObject",
+    UNKNOWN = "Unknown",
+    NPC = "Creature",
+    PET = "Pet",
+    VEHICLE = "Vehicle",
+    ITEM = "Item",
 }
-
 
 private.UNIT_TYPE_NAMES = {
-    "PLAYER",
-    "OBJECT",
-    "UNKNOWN",
-    "NPC",
-    "PET",
-    "VEHICLE",
+    ["Player"] = "PLAYER",
+    ["GameObject"] = "OBJECT",
+    ["Unknown"] = "UNKNOWN",
+    ["Creature"] = "NPC",
+    ["Pet"] = "PET",
+    ["Vehicle"] = "VEHICLE",
+    ["Item"] = "ITEM",
 }
-
 
 private.ACTION_TYPE_FLAGS = {
     ITEM = 0x00000001,
@@ -44,13 +44,11 @@ private.ACTION_TYPE_FLAGS = {
     ZONE = 0x00000008,
 }
 
-
 private.ACTION_TYPE_NAMES = {}
 
 for name, bit in _G.pairs(private.ACTION_TYPE_FLAGS) do
     private.ACTION_TYPE_NAMES[bit] = name
 end
-
 
 private.EXTRAPOLATION_BANNED_SPELL_IDS = {
     [13262] = "DISENCHANT",
@@ -66,7 +64,6 @@ private.EXTRAPOLATION_BANNED_SPELL_IDS = {
     [73979] = "SEARCHING_FOR_ARTIFACTS",
     [8613] = "SKINNING",
 }
-
 
 private.SPELL_LABELS_BY_NAME = {
     [_G.GetSpellInfo(13262)] = "DISENCHANT",
@@ -84,11 +81,9 @@ private.SPELL_LABELS_BY_NAME = {
     [_G.GetSpellInfo(8613)] = "SKINNING",
 }
 
-
 private.NON_LOOT_SPELL_LABELS = {
     MIND_CONTROL = true,
 }
-
 
 local AF = private.ACTION_TYPE_FLAGS
 
@@ -108,7 +103,6 @@ private.SPELL_FLAGS_BY_LABEL = {
     SKINNING = AF.NPC,
 }
 
-
 private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
     [143506] = 98095, -- Brawler's Pet Supplies
@@ -123,7 +117,6 @@ private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [149222] = 105911, -- Pouch of Enduring Wisdom
     [149223] = 105912, -- Oversized Pouch of Enduring Wisdom
 }
-
 
 private.RAID_FINDER_BOSS_IDS = {
     -----------------------------------------------------------------------
@@ -216,7 +209,6 @@ private.RAID_FINDER_BOSS_IDS = {
     [71865] = true, -- Garrosh Hellscream
 }
 
-
 private.WORLD_BOSS_IDS = {
     [60491] = true, -- Sha of Anger
     [62346] = true, -- Galleon
@@ -228,7 +220,6 @@ private.WORLD_BOSS_IDS = {
     [71955] = true, -- Yu'lon
     [72057] = true, -- Ordos
 }
-
 
 private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     -----------------------------------------------------------------------
