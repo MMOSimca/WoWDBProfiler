@@ -217,7 +217,7 @@ do
             _G.TradeSkillFrame.filterTbl.hasSkillUp = false
             _G.TradeSkillOnlyShowSkillUps(false)
         end
-        _G.SetTradeSkillInvSlotFilter(0, 1, 1)
+        _G.SetTradeSkillInvSlotFilter(0, true, true)
         _G.TradeSkillUpdateFilterBar()
         _G.TradeSkillFrame_Update()
 
@@ -292,7 +292,7 @@ do
 end -- do-block
 
 
--- constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
+-- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
 local DUPLICATE_WORLD_BOSS_IDS = {
     [71952] = { 71953, 71954, 71955, },
 }
@@ -874,6 +874,7 @@ function WDP:OnInitialize()
         end
     end
     raw_db.build_num = build_num
+    raw_db.region = private.region
     raw_db.version = DB_VERSION
 
     private.InitializeCommentSystem()
@@ -991,6 +992,7 @@ local function RecordItemData(item_id, item_link, durability)
         upgrade_id = tonumber(upgrade_id)
         instance_difficulty_id = tonumber(instance_difficulty_id)
         num_bonus_ids = tonumber(num_bonus_ids)
+        suffix_id = tonumber(suffix_id)
         if (not num_bonus_ids) or (num_bonus_ids == 0) then
             if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
                 item = DBEntry("items", item_id)
@@ -1013,7 +1015,7 @@ local function RecordItemData(item_id, item_link, durability)
             end
             
             for bonus_index = 1, num_bonus_ids do
-                item.bonus_ids[bonus_ids[bonus_index]] = true
+                item.bonus_ids[tonumber(bonus_ids[bonus_index])] = true
             end
         else
             Debug("RecordItemData: Item_system is supposed to be 0 or positive, instead it was %s.", item_system)
@@ -2400,9 +2402,9 @@ function WDP:TRAINER_SHOW(event_name)
     local used = _G.GetTrainerServiceTypeFilter("used")
 
     -- Clear the trainer filters
-    _G.SetTrainerServiceTypeFilter("available", 1)
-    _G.SetTrainerServiceTypeFilter("unavailable", 1)
-    _G.SetTrainerServiceTypeFilter("used", 1)
+    _G.SetTrainerServiceTypeFilter("available", true)
+    _G.SetTrainerServiceTypeFilter("unavailable", true)
+    _G.SetTrainerServiceTypeFilter("used", true)
 
     for index = 1, _G.GetNumTrainerServices(), 1 do
         local spell_name, rank_name, _, _, required_level = _G.GetTrainerServiceInfo(index)
@@ -2434,9 +2436,9 @@ function WDP:TRAINER_SHOW(event_name)
         end
     end
     -- Reset the filters to what they were before
-    _G.SetTrainerServiceTypeFilter("available", available or 0)
-    _G.SetTrainerServiceTypeFilter("unavailable", unavailable or 0)
-    _G.SetTrainerServiceTypeFilter("used", used or 0)
+    _G.SetTrainerServiceTypeFilter("available", available or false)
+    _G.SetTrainerServiceTypeFilter("unavailable", unavailable or false)
+    _G.SetTrainerServiceTypeFilter("used", used or false)
 end
 
 
