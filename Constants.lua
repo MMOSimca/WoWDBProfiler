@@ -16,6 +16,9 @@ local ADDON_NAME, private = ...
 -- Constants.
 -----------------------------------------------------------------------
 private.wow_version, private.build_num = _G.GetBuildInfo()
+private.region = GetCVar("portal"):sub(0,2):upper()
+-- PTR/Beta return "public-test", but they are properly called "XX"
+if private.region == "PU" then private.region = "XX" end
 
 private.UNIT_TYPES = {
     PLAYER = "Player",
@@ -105,6 +108,7 @@ private.SPELL_FLAGS_BY_LABEL = {
 
 private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
+    [142901] = 98546, -- Bulging Heroic Cache of Treasures
     [143506] = 98095, -- Brawler's Pet Supplies
     [143507] = 94207, -- Fabled Pandaren Pet Supplies
     [143508] = 89125, -- Sack of Pet Supplies
@@ -116,6 +120,11 @@ private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [147598] = 104014, -- Pouch of Timeless Coins
     [149222] = 105911, -- Pouch of Enduring Wisdom
     [149223] = 105912, -- Oversized Pouch of Enduring Wisdom
+    [168178] = 114116, -- Bag of Salvaged Goods
+    [168179] = 114119, -- Heafty Salvaged Crate
+    [168180] = 114120, -- Lofty Salvaged Chest
+    [171513] = 116414, -- Pet Supplies
+    [175767] = 118697, -- Big Bag of Pet Supplies
 }
 
 private.RAID_FINDER_BOSS_IDS = {
