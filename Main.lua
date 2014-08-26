@@ -991,7 +991,8 @@ local function RecordItemData(item_id, item_link, durability)
         instance_difficulty_id = tonumber(instance_difficulty_id)
         num_bonus_ids = tonumber(num_bonus_ids)
         suffix_id = tonumber(suffix_id)
-        if (not num_bonus_ids) or (num_bonus_ids == 0) then
+
+        if not num_bonus_ids or num_bonus_ids == 0 then
             if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
                 item = DBEntry("items", item_id)
                 item.unique_id = bit.band(unique_id, 0xFFFF)
