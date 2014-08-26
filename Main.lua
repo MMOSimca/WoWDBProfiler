@@ -380,11 +380,7 @@ do
 
     function NPCEntry(identifier)
         local npc = DBEntry("npcs", identifier)
-
-        if not npc then
-            return
-        end
-        return _G.setmetatable(npc, npc_meta)
+        return npc and _G.setmetatable(npc, npc_meta) or nil
     end
 
     function npc_prototype:EncounterData(difficulty_token)
@@ -684,7 +680,7 @@ do
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
                 else
-                    local unit_ID = select(2, ParseGUID(source_guid))
+                    local _, unit_ID = ParseGUID(source_guid)
                     if unit_ID then
                         if current_loot.target_type == AF.OBJECT then
                             source_id = ("%s:%s"):format(current_loot.spell_label, unit_ID)
@@ -815,7 +811,8 @@ do
             _G.SetCVar("Sound_EnableSFX", 0)
             world_map:Show()
         end
-        local micro_dungeon_id = MICRO_DUNGEON_IDS[select(5, _G.GetMapInfo())]
+        local _, _, _, _, micro_dungeon_map_name = _G.GetMapInfo()
+        local micro_dungeon_id = MICRO_DUNGEON_IDS[micro_dungeon_map_name]
 
         _G.SetMapToCurrentZone()
 
@@ -982,23 +979,27 @@ end
 
 
 local function RecordItemData(item_id, item_link, durability)
-    local item_string = select(3, item_link:find("^|%x+|H(.+)|h%[.+%]"))
+    local _, _, item_string = item_link:find("^|%x+|H(.+)|h%[.+%]")
     local item
 
     if item_string then
         local _, _, _, _, _, _, _, suffix_id, unique_id, _, upgrade_id, instance_difficulty_id, num_bonus_ids = (":"):split(item_string)
-        local bonus_ids = {select(14, (":"):split(item_string))}
+        local _, _, _, _, _, _, _, _, _, _, _, _, _, bonus_ids = (":"):split(item_string)
+
         upgrade_id = tonumber(upgrade_id)
         instance_difficulty_id = tonumber(instance_difficulty_id)
         num_bonus_ids = tonumber(num_bonus_ids)
-        if (not num_bonus_ids) or (num_bonus_ids == 0) then
+
+        if not num_bonus_ids or num_bonus_ids == 0 then
             if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
                 item = DBEntry("items", item_id)
                 item.unique_id = bit.band(unique_id, 0xFFFF)
-                if (suffix_id and suffix_id ~= 0) then
+
+                if suffix_id and suffix_id ~= 0 then
                     item.suffix_id = suffix_id
                 end
-                if (instance_difficulty_id and instance_difficulty_id ~= 0) then
+
+                if instance_difficulty_id and instance_difficulty_id ~= 0 then
                     item.instance_difficulty_id = instance_difficulty_id
                 end
             end
@@ -1007,11 +1008,11 @@ local function RecordItemData(item_id, item_link, durability)
 
             item.unique_id = bit.band(unique_id, 0xFFFF)
             item.instance_difficulty_id = instance_difficulty_id
-            
+
             if not item.bonus_ids then
                 item.bonus_ids = {}
             end
-            
+
             for bonus_index = 1, num_bonus_ids do
                 item.bonus_ids[bonus_ids[bonus_index]] = true
             end
@@ -1467,7 +1468,7 @@ do
 end
 
 
-do -- do-block
+do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
@@ -1755,7 +1756,7 @@ do
             local source_list = {}
 
             for source_guid, loot_data in pairs(current_loot.sources) do
-                local source_id = select(2, ParseGUID(source_guid))
+                local _, source_id = ParseGUID(source_guid)
                 local npc = NPCEntry(source_id)
 
                 if npc then
@@ -1891,8 +1892,8 @@ do
                     current_action.target_type = AF.NPC
                     current_action.identifier = unit_idnum
                     num_npcs = num_npcs + 1
-                -- Item container GUIDs are currently of the 'PLAYER' type; this may be unintended and could change in the future.
                 elseif unit_type == private.UNIT_TYPES.PLAYER then
+                    -- Item container GUIDs are currently of the 'PLAYER' type; this may be unintended and could change in the future.
                     current_action.loot_label = loot_label
                     current_action.target_type = AF.ITEM
                     -- current_action.identifier assigned during loot verification.
@@ -2066,7 +2067,8 @@ do
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 return
             end
-            merchant_standing = select(2, UnitFactionStanding("npc"))
+            local _, faction_standing = UnitFactionStanding("npc")
+            merchant_standing = faction_standing
             current_merchant = NPCEntry(unit_idnum)
             current_merchant.sells = current_merchant.sells or {}
         end
@@ -2389,7 +2391,7 @@ function WDP:TRAINER_SHOW(event_name)
     if not trainer then
         return
     end
-    local trainer_standing = select(2, UnitFactionStanding("npc"))
+    local _, trainer_standing = UnitFactionStanding("npc")
     trainer.teaches = trainer.teaches or {}
 
     private.trainer_shown = true
@@ -2489,7 +2491,8 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         if item_name and item_name == target_name then
             current_action.identifier = ItemLinkToID(item_link)
         elseif target_name and target_name ~= "" then
-            current_action.identifier = ItemLinkToID(select(2, _G.GetItemInfo(target_name)))
+            local _, item_link = _G.GetItemInfo(target_name)
+            current_action.identifier = ItemLinkToID(item_link)
         end
     elseif not item_name and not unit_name then
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
