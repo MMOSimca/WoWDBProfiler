@@ -10,6 +10,7 @@ local bit = _G.bit
 local math = _G.math
 local table = _G.table
 
+local next = _G.next
 local select = _G.select
 local unpack = _G.unpack
 
@@ -465,7 +466,7 @@ do
     }
 
 
-    function MatchUnitTypes(unit_type_name)
+    local function MatchUnitTypes(unit_type_name)
         if not unit_type_name then
             return UNIT_TYPES.UNKNOWN
         end
@@ -487,7 +488,7 @@ do
         -- We might want to use some of this new information later, but leaving the returns alone for now
         local unit_type_name, unk_id1, server_id, instance_id, unk_id2, unit_idnum, spawn_id = (":"):split(guid)
 
-        unit_type = MatchUnitTypes(unit_type_name)
+        local unit_type = MatchUnitTypes(unit_type_name)
         if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET and unit_type ~= UNIT_TYPES.ITEM then
 
             local id_mapping = NPC_ID_MAPPING[unit_idnum]
