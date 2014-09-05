@@ -48,12 +48,19 @@ local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
-local SPELL_ID_CHI_WAVE = 132464
-local SPELL_ID_DISGUISE = 121308
+local CHI_WAVE_SPELL_ID = 132464
+local DISGUISE_SPELL_ID = 121308
+
+-- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
+local DUPLICATE_WORLD_BOSS_IDS = {
+    [71952] = { 71953, 71954, 71955, },
+}
 
 local ALLOWED_LOCALES = {
     enUS = true,
     enGB = true,
+    enTW = true,
+    enCN = true,
 }
 
 local DATABASE_DEFAULTS = {
@@ -293,12 +300,6 @@ do
 end -- do-block
 
 
--- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
-local DUPLICATE_WORLD_BOSS_IDS = {
-    [71952] = { 71953, 71954, 71955, },
-}
-
-
 -- Called on a timer
 local function ClearKilledNPC()
     killed_npc_id = nil
@@ -312,8 +313,7 @@ local function ClearKilledBossID()
     end
 
     table.wipe(boss_loot_toasting)
-    private.raid_finder_boss_id = nil
-    private.world_boss_id = nil
+    private.raid_boss_id = nil
 end
 
 
@@ -591,7 +591,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
         if not current_line then
-            Debug("HandleItemUse: Item with ID %d and link %s had an invalid tooltip.", item_id, item_link, _G.ITEM_OPENABLE)
+            Debug("HandleItemUse: Item with ID %d and link %s had an invalid tooltip.", item_id, item_link)
             return
         end
 
@@ -975,9 +975,7 @@ do
             item.upgrades[upgrade_id][stat] = amount
         end
     end
-end
-
--- do-block
+end -- do-block
 
 
 local function RecordItemData(item_id, item_link, durability)
@@ -1243,10 +1241,10 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         return
     end
     local container_id = private.loot_toast_container_id
-    local npc_id = private.raid_finder_boss_id or private.world_boss_id
+    local npc_id = private.raid_boss_id
 
     if npc_id then
-        -- slightly messy hack to workaround duplicate world bosses
+        -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
         if DUPLICATE_WORLD_BOSS_IDS[npc_id] then
             upper_limit = #DUPLICATE_WORLD_BOSS_IDS[npc_id]
@@ -1367,7 +1365,7 @@ do
 
         if current_action.spell_label ~= "EXTRACT_GAS" then
             category = AF.ZONE
-        elseif private.raid_finder_boss_id then
+        elseif private.raid_boss_id then
             category = AF.NPC
         end
         local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
@@ -1476,7 +1474,7 @@ do
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
-        if not spell_id or spell_id == SPELL_ID_CHI_WAVE or spell_id == SPELL_ID_DISGUISE then
+        if not spell_id or spell_id == CHI_WAVE_SPELL_ID or spell_id == DISGUISE_SPELL_ID then
             return
         end
         local source_type, source_id = ParseGUID(source_guid)
@@ -2194,7 +2192,7 @@ end -- do-block
 
 
 function WDP:PET_BAR_UPDATE(event_name)
-    if current_action.spell_label ~= "MIND_CONTROL" then
+    if not private.NON_LOOT_SPELL_LABELS[current_action.spell_label] then
         return
     end
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("pet"))
@@ -2516,19 +2514,15 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
     if private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
-        private.raid_finder_boss_id = private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
-    elseif private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
-        ClearKilledBossID()
-        ClearLootToastContainerID()
-        private.world_boss_id = private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
+        private.raid_boss_id = private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
     else
-        Debug("%s: Spell ID %d is not a known raid or world boss 'Bonus' spell.", event_name, spell_id)
+        Debug("%s: Spell ID %d is not a known raid boss 'Bonus' spell.", event_name, spell_id)
         return
     end
 
     -- Assign existing loot data to boss if it exists
     if loot_toast_data then
-        local npc_id = private.raid_finder_boss_id or private.world_boss_id
+        local npc_id = private.raid_boss_id
 
         -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
