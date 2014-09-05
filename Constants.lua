@@ -15,6 +15,58 @@ local ADDON_NAME, private = ...
 -----------------------------------------------------------------------
 -- Game Data Constants.
 -----------------------------------------------------------------------
+private.FACTION_NAMES = { -- Only used for private.REP_BUFFS
+    CENARION_CIRCLE = _G.GetFactionInfoByID(609),
+    HONOR_HOLD = _G.GetFactionInfoByID(946),
+    THE_SHATAR = _G.GetFactionInfoByID(935),
+    THRALLMAR = _G.GetFactionInfoByID(947),
+}
+
+private.REP_BUFFS = {
+    [_G.GetSpellInfo(30754)] = { -- CENARION FAVOR
+        faction = FACTION_NAMES.CENARION_CIRCLE,
+        modifier = 0.25,
+    },
+    [_G.GetSpellInfo(24705)] = { -- GRIM VISAGE
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(32098)] = { -- HONOR HOLD FAVOR
+        faction = FACTION_NAMES.HONOR_HOLD,
+        modifier = 0.25,
+    },
+    [_G.GetSpellInfo(39913)] = { -- NAZGRELS FERVOR
+        faction = FACTION_NAMES.THRALLMAR,
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(39953)] = { -- SONG OF BATTLE
+        faction = FACTION_NAMES.THE_SHATAR,
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(61849)] = { -- SPIRIT OF SHARING
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(32096)] = { -- THRALLMARS FAVOR
+        faction = FACTION_NAMES.THRALLMAR,
+        modifier = 0.25,
+    },
+    [_G.GetSpellInfo(39911)] = { -- TROLLBANES COMMAND
+        faction = FACTION_NAMES.HONOR_HOLD,
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(95987)] = { -- UNBURDENED
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(100951)] = { -- WOW 8TH ANNIVERSARY
+        modifier = 0.08,
+    },
+    [_G.GetSpellInfo(132700)] = { -- WOW 9TH ANNIVERSARY
+        modifier = 0.09,
+    },
+    [_G.GetSpellInfo(150986)] = { -- WOW 10TH ANNIVERSARY
+        modifier = 0.1,
+    }
+}
+
 private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
     [142901] = 98546, -- Bulging Heroic Cache of Treasures

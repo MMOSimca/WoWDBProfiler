@@ -48,6 +48,7 @@ local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
+-- Ignoring NPC casts of the following spells
 local CHI_WAVE_SPELL_ID = 132464
 local DISGUISE_SPELL_ID = 121308
 
@@ -1118,7 +1119,7 @@ do
         level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
 
         if not level_data.power then
-            local max_power = _G.UnitManaMax("target")
+            local max_power = _G.UnitPowerMax("target")
 
             if max_power > 0 then
                 local power_type = _G.UnitPowerType("target")
@@ -1279,7 +1280,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
                     local currency_texture = CurrencyLinkToTexture(item_link)
                     if currency_texture and currency_texture ~= "" then
                         Debug("%s: %s X %d", event_name, currency_texture, quantity)
-                        -- workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
+                        -- Workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
                         if quantity > 1000 and currency_texture == "pvecurrency-valor" then
                             quantity = math.floor(quantity / 100)
                         end
@@ -1574,70 +1575,12 @@ do
         end
     end
 
+    
     local DIPLOMACY_SPELL_ID = 20599
     local MR_POP_RANK1_SPELL_ID = 78634
     local MR_POP_RANK2_SPELL_ID = 78635
-
-    local REP_BUFFS = {
-        [_G.GetSpellInfo(30754)] = "CENARION_FAVOR",
-        [_G.GetSpellInfo(24705)] = "GRIM_VISAGE",
-        [_G.GetSpellInfo(32098)] = "HONOR_HOLD_FAVOR",
-        [_G.GetSpellInfo(39913)] = "NAZGRELS_FERVOR",
-        [_G.GetSpellInfo(39953)] = "SONG_OF_BATTLE",
-        [_G.GetSpellInfo(61849)] = "SPIRIT_OF_SHARING",
-        [_G.GetSpellInfo(32096)] = "THRALLMARS_FAVOR",
-        [_G.GetSpellInfo(39911)] = "TROLLBANES_COMMAND",
-        [_G.GetSpellInfo(95987)] = "UNBURDENED",
-        [_G.GetSpellInfo(100951)] = "WOW_ANNIVERSARY",
-    }
-
-
-    local FACTION_NAMES = {
-        CENARION_CIRCLE = _G.GetFactionInfoByID(609),
-        HONOR_HOLD = _G.GetFactionInfoByID(946),
-        THE_SHATAR = _G.GetFactionInfoByID(935),
-        THRALLMAR = _G.GetFactionInfoByID(947),
-    }
-
-
-    local MODIFIERS = {
-        CENARION_FAVOR = {
-            faction = FACTION_NAMES.CENARION_CIRCLE,
-            modifier = 0.25,
-        },
-        GRIM_VISAGE = {
-            modifier = 0.1,
-        },
-        HONOR_HOLD_FAVOR = {
-            faction = FACTION_NAMES.HONOR_HOLD,
-            modifier = 0.25,
-        },
-        NAZGRELS_FERVOR = {
-            faction = FACTION_NAMES.THRALLMAR,
-            modifier = 0.1,
-        },
-        SONG_OF_BATTLE = {
-            faction = FACTION_NAMES.THE_SHATAR,
-            modifier = 0.1,
-        },
-        SPIRIT_OF_SHARING = {
-            modifier = 0.1,
-        },
-        THRALLMARS_FAVOR = {
-            faction = FACTION_NAMES.THRALLMAR,
-            modifier = 0.25,
-        },
-        TROLLBANES_COMMAND = {
-            faction = FACTION_NAMES.HONOR_HOLD,
-            modifier = 0.1,
-        },
-        UNBURDENED = {
-            modifier = 0.1,
-        },
-        WOW_ANNIVERSARY = {
-            modifier = 0.08,
-        }
-    }
+    local FACTION_NAMES = private.FACTION_NAMES
+    local REP_BUFFS = private.REP_BUFFS
 
 
     function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
@@ -1671,12 +1614,12 @@ do
             modifier = modifier + 0.05
         end
 
-        for buff_name, buff_label in pairs(REP_BUFFS) do
+        for buff_name, rep_data_table in pairs(REP_BUFFS) do
             if _G.UnitBuff("player", buff_name) then
-                local modded_faction = MODIFIERS[buff_label].faction
+                local modded_faction = rep_data_table.faction
 
                 if not modded_faction or faction_name == modded_faction then
-                    modifier = modifier + MODIFIERS[buff_label].modifier
+                    modifier = modifier + rep_data_table.modifier
                 end
             end
         end
