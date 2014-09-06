@@ -24,33 +24,33 @@ private.FACTION_NAMES = { -- Only used for private.REP_BUFFS
 
 private.REP_BUFFS = {
     [_G.GetSpellInfo(30754)] = { -- CENARION FAVOR
-        faction = FACTION_NAMES.CENARION_CIRCLE,
+        faction = private.FACTION_NAMES.CENARION_CIRCLE,
         modifier = 0.25,
     },
     [_G.GetSpellInfo(24705)] = { -- GRIM VISAGE
         modifier = 0.1,
     },
     [_G.GetSpellInfo(32098)] = { -- HONOR HOLD FAVOR
-        faction = FACTION_NAMES.HONOR_HOLD,
+        faction = private.FACTION_NAMES.HONOR_HOLD,
         modifier = 0.25,
     },
     [_G.GetSpellInfo(39913)] = { -- NAZGRELS FERVOR
-        faction = FACTION_NAMES.THRALLMAR,
+        faction = private.FACTION_NAMES.THRALLMAR,
         modifier = 0.1,
     },
     [_G.GetSpellInfo(39953)] = { -- SONG OF BATTLE
-        faction = FACTION_NAMES.THE_SHATAR,
+        faction = private.FACTION_NAMES.THE_SHATAR,
         modifier = 0.1,
     },
     [_G.GetSpellInfo(61849)] = { -- SPIRIT OF SHARING
         modifier = 0.1,
     },
     [_G.GetSpellInfo(32096)] = { -- THRALLMARS FAVOR
-        faction = FACTION_NAMES.THRALLMAR,
+        faction = private.FACTION_NAMES.THRALLMAR,
         modifier = 0.25,
     },
     [_G.GetSpellInfo(39911)] = { -- TROLLBANES COMMAND
-        faction = FACTION_NAMES.HONOR_HOLD,
+        faction = private.FACTION_NAMES.HONOR_HOLD,
         modifier = 0.1,
     },
     [_G.GetSpellInfo(95987)] = { -- UNBURDENED

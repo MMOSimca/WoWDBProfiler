@@ -984,13 +984,13 @@ local function RecordItemData(item_id, item_link, durability)
     local item
 
     if item_string then
-        local _, _, _, _, _, _, _, suffix_id, unique_id, _, upgrade_id, instance_difficulty_id, num_bonus_ids = (":"):split(item_string)
-        local _, _, _, _, _, _, _, _, _, _, _, _, _, bonus_ids = (":"):split(item_string)
+        local item_results = { (":"):split(item_string) }
 
-        upgrade_id = tonumber(upgrade_id)
-        instance_difficulty_id = tonumber(instance_difficulty_id)
-        num_bonus_ids = tonumber(num_bonus_ids)
-        suffix_id = tonumber(suffix_id)
+        local suffix_id = tonumber(item_results[8])
+        local unique_id = item_results[9]
+        local upgrade_id = tonumber(item_results[11])
+        local instance_difficulty_id = tonumber(item_results[12])
+        local num_bonus_ids = tonumber(item_results[13])
 
         if not num_bonus_ids or num_bonus_ids == 0 then
             if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
@@ -1014,9 +1014,9 @@ local function RecordItemData(item_id, item_link, durability)
             if not item.bonus_ids then
                 item.bonus_ids = {}
             end
-
+            
             for bonus_index = 1, num_bonus_ids do
-                item.bonus_ids[tonumber(bonus_ids[bonus_index])] = true
+                item.bonus_ids[tonumber(item_results[13 + bonus_index])] = true
             end
         else
             Debug("RecordItemData: Item_system is supposed to be 0 or positive, instead it was %s.", item_system)
