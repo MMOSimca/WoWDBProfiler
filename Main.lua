@@ -487,7 +487,7 @@ do
         end
 
         -- We might want to use some of this new information later, but leaving the returns alone for now
-        local unit_type_name, unk_id1, server_id, instance_id, unk_id2, unit_idnum, spawn_id = (":"):split(guid)
+        local unit_type_name, unk_id1, server_id, instance_id, unk_id2, unit_idnum, spawn_id = ("-"):split(guid)
 
         local unit_type = MatchUnitTypes(unit_type_name)
         if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET and unit_type ~= UNIT_TYPES.ITEM then

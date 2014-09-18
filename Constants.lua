@@ -86,6 +86,7 @@ private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [168180] = 114120, -- Big Crate of Salvage
     [171513] = 116414, -- Pet Supplies
     [175767] = 118697, -- Big Bag of Pet Supplies
+    [178508] = 120321, -- Mystery Bag
 }
 
 private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
