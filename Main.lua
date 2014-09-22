@@ -979,7 +979,7 @@ do
 end -- do-block
 
 
-local function RecordItemData(item_id, item_link, durability)
+local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
     local _, _, item_string = item_link:find("^|%x+|H(.+)|h%[.+%]")
     local item
 
@@ -992,7 +992,7 @@ local function RecordItemData(item_id, item_link, durability)
         local instance_difficulty_id = tonumber(item_results[12])
         local num_bonus_ids = tonumber(item_results[13])
 
-        if not num_bonus_ids or num_bonus_ids == 0 then
+        if not num_bonus_ids or num_bonus_ids == 0 or not process_bonus_ids then
             if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
                 item = DBEntry("items", item_id)
                 item.unique_id = bit.band(unique_id, 0xFFFF)
@@ -1040,7 +1040,7 @@ function WDP:ProcessItems()
 
         if item_id and item_id > 0 then
             local _, max_durability = _G.GetInventoryItemDurability(slot_index)
-            RecordItemData(item_id, _G.GetInventoryItemLink("player", slot_index), max_durability)
+            RecordItemData(item_id, _G.GetInventoryItemLink("player", slot_index), false, max_durability)
         end
     end
 
@@ -1050,7 +1050,7 @@ function WDP:ProcessItems()
 
             if item_id and item_id > 0 then
                 local _, max_durability = _G.GetContainerItemDurability(bag_index, slot_index)
-                RecordItemData(item_id, _G.GetContainerItemLink(bag_index, slot_index), max_durability)
+                RecordItemData(item_id, _G.GetContainerItemLink(bag_index, slot_index), false, max_durability)
             end
         end
     end
@@ -1268,6 +1268,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
                     local item_id = ItemLinkToID(item_link)
                     if item_id then
                         Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                        RecordItemData(item_id, item_link, true)
                         table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
                     else
                         Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
@@ -1311,6 +1312,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
             local item_id = ItemLinkToID(item_link)
             if item_id then
                 Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                RecordItemData(item_id, item_link, true)
                 current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
             else
                 Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
@@ -1342,6 +1344,11 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         loot_toast_data = loot_toast_data or {}
         loot_toast_data[#loot_toast_data + 1] = { loot_type, item_link, quantity }
 
+        local item_id = ItemLinkToID(item_link)
+        if item_id then
+            RecordItemData(item_id, item_link, true)
+        end
+
         loot_toast_data_timer_handle = WDP:ScheduleTimer(ClearLootToastData, 5)
     end
 end
@@ -1371,9 +1378,6 @@ do
         end
         local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
 
-        if not category or not update_func then
-            return
-        end
         local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
 
         if not item_link then
@@ -1382,6 +1386,12 @@ do
         local item_id = ItemLinkToID(item_link)
 
         if not item_id then
+            return
+        end
+        
+        if not category or not update_func then
+            -- We still want to record the item's data, even if it doesn't need its drop location recorded
+            RecordItemData(item_id, item_link, true)
             return
         end
         update_func(item_id, quantity)
@@ -1579,7 +1589,7 @@ do
     local DIPLOMACY_SPELL_ID = 20599
     local MR_POP_RANK1_SPELL_ID = 78634
     local MR_POP_RANK2_SPELL_ID = 78635
-    local FACTION_NAMES = private.FACTION_NAMES
+    local FACTION_DATA = private.FACTION_DATA
     local REP_BUFFS = private.REP_BUFFS
 
 
@@ -1604,25 +1614,48 @@ do
 
         local modifier = 1
 
+        -- Check for modifiers from known spells
         if _G.IsSpellKnown(DIPLOMACY_SPELL_ID) then
             modifier = modifier + 0.1
         end
-
         if _G.IsSpellKnown(MR_POP_RANK2_SPELL_ID) then
             modifier = modifier + 0.1
         elseif _G.IsSpellKnown(MR_POP_RANK1_SPELL_ID) then
             modifier = modifier + 0.05
         end
 
-        for buff_name, rep_data_table in pairs(REP_BUFFS) do
+        -- Determine faction ID
+        local faction_ID
+        for pseudo_faction_name, faction_data_table in pairs(FACTION_DATA) do
+            if faction_name == faction_data_table[2] then
+                faction_ID = faction_data_table[1]
+            end
+        end
+        if faction_ID and faction_ID > 0 then
+            -- Check for modifiers from Commendations (applied directly to the faction, account-wide)
+            local _, _, _, _, _, _, _, _, _, _, _, _, _, _, has_bonus_rep_gain = GetFactionInfoByID(faction_ID)
+            if has_bonus_rep_gain then
+                modifier = modifier + 1
+            end
+        end
+
+        -- Check for modifiers from buffs
+        for buff_name, buff_data_table in pairs(REP_BUFFS) do
             if _G.UnitBuff("player", buff_name) then
-                local modded_faction = rep_data_table.faction
+                local modded_faction = buff_data_table.faction
 
                 if not modded_faction or faction_name == modded_faction then
-                    modifier = modifier + rep_data_table.modifier
+                    if buff_data_table.ignore then
+                        -- Some buffs from tabards convert all rep of other factions into rep for a specific faction.
+                        -- We can't know what faction the rep was orginally from, so we must ignore the data entirely in these cases.
+                        return
+                    else
+                        modifier = modifier + buff_data_table.modifier
+                    end
                 end
             end
         end
+        
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
