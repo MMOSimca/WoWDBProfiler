@@ -201,7 +201,7 @@ private.REP_BUFFS = {
     },
     [_G.GetSpellInfo(150986)] = { -- WOW 10TH ANNIVERSARY
         modifier = 0.1,
-    }
+    },
 
     -- Situational Buffs
     [_G.GetSpellInfo(39953)] = { -- ADALS SONG OF BATTLE
