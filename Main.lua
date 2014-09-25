@@ -35,7 +35,7 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 local AF = private.ACTION_TYPE_FLAGS
 local CLIENT_LOCALE = _G.GetLocale()
 local DB_VERSION = 18
-local DEBUGGING = false
+WOWDB_DEBUGGING = false
 local EVENT_DEBUG = false
 
 local OBJECT_ID_ANVIL = 192628
@@ -181,7 +181,7 @@ local current_action = {
 -- HELPERS ------------------------------------------------------------
 
 local function Debug(message, ...)
-    if not DEBUGGING or not message or not ... then
+    if not WOWDB_DEBUGGING or not message or not ... then
         return
     end
     local args = { ... }
@@ -884,7 +884,7 @@ end
 function WDP:EventDispatcher(...)
     local event_name = ...
 
-    if DEBUGGING then
+    if WOWDB_DEBUGGING then
         if event_name == "COMBAT_LOG_EVENT_UNFILTERED" then
             Debug(event_name)
         else
@@ -2183,7 +2183,7 @@ end
 
 function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
     -- This function produces data currently unused by wowdb.com and it makes debugging errors in the .lua output nearly impossible due to the massive bloat.
-    if DEBUGGING then
+    if WOWDB_DEBUGGING then
         return
     end
 
