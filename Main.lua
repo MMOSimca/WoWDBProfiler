@@ -101,7 +101,7 @@ local EVENT_MAPPING = {
     ITEM_TEXT_BEGIN = true,
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
-    LOOT_READY = true,
+    LOOT_OPENED = true,
     MAIL_SHOW = true,
     MERCHANT_CLOSED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
@@ -1688,7 +1688,7 @@ end
 
 
 do
-    local LOOT_READY_VERIFY_FUNCS = {
+    local LOOT_OPENED_VERIFY_FUNCS = {
         -- Item containers can be AOE-looted in Patch 5.4.2 if the user clicks fast enough, but this verification still works as long as they both have loot.
         [AF.ITEM] = function()
             local locked_item_id
@@ -1723,7 +1723,7 @@ do
     }
 
 
-    local LOOT_READY_UPDATE_FUNCS = {
+    local LOOT_OPENED_UPDATE_FUNCS = {
         [AF.ITEM] = function()
             GenericLootUpdate("items")
         end,
@@ -1899,7 +1899,7 @@ do
     end
 
 
-    function WDP:LOOT_READY(event_name)
+    function WDP:LOOT_OPENED(event_name)
         if current_loot then
             current_loot = nil
             Debug("%s: Previous loot did not process in time for this event. Attempting to extrapolate current_action from loot data.", event_name)
@@ -1918,8 +1918,8 @@ do
                 return
             end
         end
-        local verify_func = LOOT_READY_VERIFY_FUNCS[current_action.target_type]
-        local update_func = LOOT_READY_UPDATE_FUNCS[current_action.target_type]
+        local verify_func = LOOT_OPENED_VERIFY_FUNCS[current_action.target_type]
+        local update_func = LOOT_OPENED_UPDATE_FUNCS[current_action.target_type]
 
         if not verify_func or not update_func then
             Debug("%s: The current action's target type is unsupported or nil.", event_name)
@@ -2429,6 +2429,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         return
     end
 
+    Debug("UNIT_SPELLCAST_SENT: %s was cast.", spell_name)
     local item_name, item_link = _G.GameTooltip:GetItem()
     local unit_name, unit_id = _G.GameTooltip:GetUnit()
 
@@ -2583,7 +2584,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
     elseif spell_name:match("^Harvest.+") then
         killed_npc_id = current_target_id
-        private.harvesting = true
+        private.harvesting = true -- Used to track which NPCs can be harvested (can we get this from CreatureCache instead?)
     end
 end
 
