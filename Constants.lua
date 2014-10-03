@@ -15,6 +15,39 @@ local ADDON_NAME, private = ...
 -----------------------------------------------------------------------
 -- Game Data Constants.
 -----------------------------------------------------------------------
+-- Map of Alliance Logging NPC Summon spells to all possible Timber objectIDs of the proper tree size
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP = {
+    [167902] = { 233604, 233922, 234021, 234080, 234097, 234109, 234110, 234122, 234126, 234193, 234197, 237727, },
+    [167969] = { 233634, 234000, 234022, 234098, 234111, 234119, 234123, 234127, 234194, 234196, 234198, },
+    [168201] = { 233625, 234007, 234023, 234099, 234120, 234124, 234128, 234195, 234199, },
+}
+-- Account for Horde spell IDs
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167961] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167902]
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168043] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167969]
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168200] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168201]
+
+private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
+    [142397] = 98134, -- Heroic Cache of Treasures
+    [142901] = 98546, -- Bulging Heroic Cache of Treasures
+    [143506] = 98095, -- Brawler's Pet Supplies
+    [143507] = 94207, -- Fabled Pandaren Pet Supplies
+    [143508] = 89125, -- Sack of Pet Supplies
+    [143509] = 93146, -- Pandaren Spirit Pet Supplies
+    [143510] = 93147, -- Pandaren Spirit Pet Supplies
+    [143511] = 93149, -- Pandaren Spirit Pet Supplies
+    [143512] = 93148, -- Pandaren Spirit Pet Supplies
+    [146885] = 103535, -- Bulging Bag of Charms
+    [147598] = 104014, -- Pouch of Timeless Coins
+    [149222] = 105911, -- Pouch of Enduring Wisdom
+    [149223] = 105912, -- Oversized Pouch of Enduring Wisdom
+    --[168178] = 114116, -- Bag of Salvaged Goods
+    --[168179] = 114119, -- Crate of Salvage
+    --[168180] = 114120, -- Big Crate of Salvage
+    [171513] = 116414, -- Pet Supplies
+    [175767] = 118697, -- Big Bag of Pet Supplies
+    [178508] = 120321, -- Mystery Bag
+}
+
 private.FACTION_DATA = {
     -- Used only for private.REP_BUFFS
     ARGENT_CRUSADE = { 1106, _G.GetFactionInfoByID(1106) },
@@ -228,28 +261,6 @@ private.REP_BUFFS = {
         faction = private.FACTION_DATA.HONOR_HOLD[2],
         modifier = 0.1,
     },
-}
-
-private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
-    [142397] = 98134, -- Heroic Cache of Treasures
-    [142901] = 98546, -- Bulging Heroic Cache of Treasures
-    [143506] = 98095, -- Brawler's Pet Supplies
-    [143507] = 94207, -- Fabled Pandaren Pet Supplies
-    [143508] = 89125, -- Sack of Pet Supplies
-    [143509] = 93146, -- Pandaren Spirit Pet Supplies
-    [143510] = 93147, -- Pandaren Spirit Pet Supplies
-    [143511] = 93149, -- Pandaren Spirit Pet Supplies
-    [143512] = 93148, -- Pandaren Spirit Pet Supplies
-    [146885] = 103535, -- Bulging Bag of Charms
-    [147598] = 104014, -- Pouch of Timeless Coins
-    [149222] = 105911, -- Pouch of Enduring Wisdom
-    [149223] = 105912, -- Oversized Pouch of Enduring Wisdom
-    [168178] = 114116, -- Bag of Salvaged Goods
-    [168179] = 114119, -- Crate of Salvage
-    [168180] = 114120, -- Big Crate of Salvage
-    [171513] = 116414, -- Pet Supplies
-    [175767] = 118697, -- Big Bag of Pet Supplies
-    [178508] = 120321, -- Mystery Bag
 }
 
 private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {

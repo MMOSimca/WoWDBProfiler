@@ -158,6 +158,7 @@ local name_to_id_map = {}
 local killed_boss_id_timer_handle
 local killed_npc_id
 local target_location_timer_handle
+local last_timber_spell_id
 local current_target_id
 local current_area_id
 local current_loot
@@ -1357,9 +1358,28 @@ end
 do
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.NPC] = function(item_id, quantity)
-            Debug("CHAT_MSG_LOOT: %d (%d)", item_id, quantity)
+            Debug("CHAT_MSG_LOOT: AF.NPC %d (%d)", item_id, quantity)
+        end,
+        [AF.OBJECT] = function(item_id, quantity)
+            Debug("CHAT_MSG_LOOT: AF.OBJECT %d (%d)", item_id, quantity)
+            for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id] do
+                -- Check for top level object data
+                local object_entry = DBEntry("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id][timber_variant]))
+                local difficulty_token = InstanceDifficultyToken()
+                if object_entry[difficulty_token] then
+                    -- Increment loot count
+                    object_entry[difficulty_token]["opening_count"] = object_entry[difficulty_token]["opening_count"] or 0 + 1
+                    
+                    -- Add drop data
+                    local loot_table = LootTable(object_entry, "opening", difficulty_token)
+                    table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                else
+                    Debug("CHAT_MSG_LOOT: When handling timber, the top level loot data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id][timber_variant])
+                end
+            end
         end,
         [AF.ZONE] = function(item_id, quantity)
+            Debug("CHAT_MSG_LOOT: AF.ZONE %d (%d)", item_id, quantity)
             InitializeCurrentLoot()
             current_loot.list[1] = ("%d:%d"):format(item_id, quantity)
             GenericLootUpdate("zones")
@@ -1371,15 +1391,7 @@ do
     function WDP:CHAT_MSG_LOOT(event_name, message)
         local category
 
-        if current_action.spell_label ~= "EXTRACT_GAS" then
-            category = AF.ZONE
-        elseif private.raid_boss_id then
-            category = AF.NPC
-        end
-        local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
-
         local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
-
         if not item_link then
             quantity, item_link = 1, deformat(message, _G.LOOT_ITEM_PUSHED_SELF)
         end
@@ -1388,7 +1400,19 @@ do
         if not item_id then
             return
         end
-        
+
+        -- Set update category
+        if last_timber_spell_id and item_id == TIMBER_ITEM_ID then
+            category = AF.OBJECT
+        -- Recently changed from ~= "EXTRACT_GAS" because of some occassional bad data, and, as far as I know, no benefit.
+        elseif current_action.spell_label == "FISHING" then
+            category = AF.ZONE
+        elseif private.raid_boss_id then
+            category = AF.NPC
+        end
+
+        -- Take action based on update category
+        local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
         if not category or not update_func then
             -- We still want to record the item's data, even if it doesn't need its drop location recorded
             RecordItemData(item_id, item_link, true)
@@ -2572,6 +2596,16 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     private.tracked_line = nil
     private.previous_spell_id = spell_id
 
+    -- Handle Logging spell casts
+    if private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] then
+        last_timber_spell_id = spell_id
+        for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] do
+            UpdateDBEntryLocation("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id][timber_variant]))
+        end
+        return
+    end
+
+    -- Handle Loot Toast spell casts
     if private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
@@ -2579,6 +2613,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
 
         private.loot_toast_container_id = private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later
+        return
     end
 
     if anvil_spell_ids[spell_id] then
