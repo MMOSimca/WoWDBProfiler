@@ -1810,6 +1810,13 @@ do
         local extrapolated_guid_registry = {}
         local num_guids = 0
 
+        -- Loot extrapolation cannot handle objects that need special spell labels (like HERBALISM or MINING) (MIND_CONTROL is okay)
+        if SPELL_FLAGS_BY_LABEL[current_action.spell_label] and not NON_LOOT_SPELL_LABELS[current_action.spell_label] then
+            Debug("%s: Problematic spell label %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
+            table.wipe(current_action)
+            return false
+        end
+
         table.wipe(current_action)
 
         for loot_slot = 1, _G.GetNumLootItems() do
@@ -1838,10 +1845,6 @@ do
 
         if num_guids == 0 then
             Debug("%s: No GUIDs found in loot. Blank loot window?", log_source)
-            return false
-        end
-        if private.previous_spell_id and private.EXTRAPOLATION_BANNED_SPELL_IDS[private.previous_spell_id] then
-            Debug("%s: Problematic spell id %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
             return false
         end
 
@@ -2374,14 +2377,14 @@ function WDP:TRAINER_SHOW(event_name)
     private.trainer_shown = true
 
     -- Get the initial trainer filters
-    local available = _G.GetTrainerServiceTypeFilter("available")
-    local unavailable = _G.GetTrainerServiceTypeFilter("unavailable")
-    local used = _G.GetTrainerServiceTypeFilter("used")
+    local available = _G.GetTrainerServiceTypeFilter("available") and 1 or 0
+    local unavailable = _G.GetTrainerServiceTypeFilter("unavailable") and 1 or 0
+    local used = _G.GetTrainerServiceTypeFilter("used") and 1 or 0
 
     -- Clear the trainer filters
-    _G.SetTrainerServiceTypeFilter("available", true)
-    _G.SetTrainerServiceTypeFilter("unavailable", true)
-    _G.SetTrainerServiceTypeFilter("used", true)
+    _G.SetTrainerServiceTypeFilter("available", 1)
+    _G.SetTrainerServiceTypeFilter("unavailable", 1)
+    _G.SetTrainerServiceTypeFilter("used", 1)
 
     for index = 1, _G.GetNumTrainerServices(), 1 do
         local spell_name, rank_name, _, _, required_level = _G.GetTrainerServiceInfo(index)
@@ -2413,9 +2416,9 @@ function WDP:TRAINER_SHOW(event_name)
         end
     end
     -- Reset the filters to what they were before
-    _G.SetTrainerServiceTypeFilter("available", available or false)
-    _G.SetTrainerServiceTypeFilter("unavailable", unavailable or false)
-    _G.SetTrainerServiceTypeFilter("used", used or false)
+    _G.SetTrainerServiceTypeFilter("available", available or 0)
+    _G.SetTrainerServiceTypeFilter("unavailable", unavailable or 0)
+    _G.SetTrainerServiceTypeFilter("used", used or 0)
 end
 
 
