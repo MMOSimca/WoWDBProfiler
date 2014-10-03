@@ -26,6 +26,13 @@ private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167961] = private.LOGGING_SPELL_ID_TO_
 private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168043] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167969]
 private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168200] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168201]
 
+-- Map of Salvage spells to item IDs of the Salvage containers (no longer loot toasts)
+private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP = {
+    [168178] = 114116, -- Bag of Salvaged Goods
+    [168179] = 114119, -- Crate of Salvage
+    [168180] = 114120, -- Big Crate of Salvage
+}
+
 private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
     [142901] = 98546, -- Bulging Heroic Cache of Treasures

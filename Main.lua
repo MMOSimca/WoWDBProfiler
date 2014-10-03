@@ -52,6 +52,10 @@ local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 local CHI_WAVE_SPELL_ID = 132464
 local DISGUISE_SPELL_ID = 121308
 
+-- For timer-based loot gathering of abnormal containers (that don't use SHOW_LOOT_TOAST, sadly)
+local CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168179]
+local BIG_CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168180]
+
 -- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
 local DUPLICATE_WORLD_BOSS_IDS = {
     [71952] = { 71953, 71954, 71955, },
@@ -159,6 +163,7 @@ local killed_boss_id_timer_handle
 local killed_npc_id
 local target_location_timer_handle
 local last_timber_spell_id
+local chat_loot_timer_handle
 local current_target_id
 local current_area_id
 local current_loot
@@ -300,47 +305,6 @@ do
         return math.floor(copper_cost / modifier)
     end
 end -- do-block
-
-
--- Called on a timer
-local function ClearKilledNPC()
-    killed_npc_id = nil
-end
-
-
-local function ClearKilledBossID()
-    if killed_boss_id_timer_handle then
-        WDP:CancelTimer(killed_boss_id_timer_handle)
-        killed_boss_id_timer_handle = nil
-    end
-
-    table.wipe(boss_loot_toasting)
-    private.raid_boss_id = nil
-end
-
-
-local function ClearLootToastContainerID()
-    if loot_toast_container_timer_handle then
-        WDP:CancelTimer(loot_toast_container_timer_handle)
-        loot_toast_container_timer_handle = nil
-    end
-
-    private.container_loot_toasting = false
-    private.loot_toast_container_id = nil
-end
-
-
-local function ClearLootToastData()
-    -- cancel existing timer if found
-    if loot_toast_data_timer_handle then
-        WDP:CancelTimer(loot_toast_data_timer_handle)
-        loot_toast_data_timer_handle = nil
-    end
-
-    if loot_toast_data then
-        table.wipe(loot_toast_data)
-    end
-end
 
 
 local function InstanceDifficultyToken()
@@ -857,6 +821,62 @@ local function InitializeCurrentLoot()
     table.wipe(current_action)
 end
 
+
+-- TIMERS -------------------------------------------------------------
+
+local function ClearKilledNPC()
+    killed_npc_id = nil
+end
+
+
+local function ClearKilledBossID()
+    if killed_boss_id_timer_handle then
+        WDP:CancelTimer(killed_boss_id_timer_handle)
+        killed_boss_id_timer_handle = nil
+    end
+
+    table.wipe(boss_loot_toasting)
+    private.raid_boss_id = nil
+end
+
+
+local function ClearLootToastContainerID()
+    if loot_toast_container_timer_handle then
+        WDP:CancelTimer(loot_toast_container_timer_handle)
+        loot_toast_container_timer_handle = nil
+    end
+
+    private.container_loot_toasting = false
+    private.loot_toast_container_id = nil
+end
+
+
+local function ClearLootToastData()
+    -- cancel existing timer if found
+    if loot_toast_data_timer_handle then
+        WDP:CancelTimer(loot_toast_data_timer_handle)
+        loot_toast_data_timer_handle = nil
+    end
+
+    if loot_toast_data then
+        table.wipe(loot_toast_data)
+    end
+end
+
+
+local function ClearTimeBasedLootData()
+    if chat_loot_timer_handle then
+        WDP:CancelTimer(chat_loot_timer_handle)
+        chat_loot_timer_handle = nil
+    end
+
+    if current_loot and current_loot.identifier and (current_loot.identifier == CRATE_OF_SALVAGE_ITEM_ID or current_loot.identifier == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
+        GenericLootUpdate("items")
+    end
+    current_loot = nil
+end
+
+
 -- METHODS ------------------------------------------------------------
 
 function WDP:OnInitialize()
@@ -1357,6 +1377,22 @@ end
 
 do
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
+        [AF.ITEM] = function(item_id, quantity)
+            local container_id = current_action.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
+            -- Verify that we're still assigning data to the right items
+            if container_id and container_id == CRATE_OF_SALVAGE_ITEM_ID or container_id == BIG_CRATE_OF_SALVAGE_ITEM_ID then
+                Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
+                InitializeCurrentLoot()
+                current_loot.sources[container_id] = current_loot.sources[container_id] or {}
+                current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
+            else -- If not, cancel the timer and wipe the loot table early
+                Debug("CHAT_MSG_LOOT: We would have assigned the wrong loot to salvage crates!")
+                WDP:CancelTimer(chat_loot_timer_handle)
+                chat_loot_timer_handle = nil
+                table.wipe(current_action)
+                current_loot = nil
+            end
+        end,
         [AF.NPC] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.NPC %d (%d)", item_id, quantity)
         end,
@@ -1409,6 +1445,8 @@ do
             category = AF.ZONE
         elseif private.raid_boss_id then
             category = AF.NPC
+        elseif chat_loot_timer_handle then
+            category = AF.ITEM
         end
 
         -- Take action based on update category
@@ -2613,6 +2651,20 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
 
         private.loot_toast_container_id = private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later
+        return
+    end
+
+    -- For Crates of Salvage (and potentially other items based on spell casts in the future which need manual handling)
+    if private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
+        -- Set up timer
+        chat_loot_timer_handle = WDP:ScheduleTimer(ClearTimeBasedLootData, 0.5)
+
+        -- Standard item handling setup
+        table.wipe(current_action)
+        current_loot = nil
+        current_action.target_type = AF.ITEM
+        current_action.identifier = item_id
+        current_action.loot_label = "contains"
         return
     end
 
