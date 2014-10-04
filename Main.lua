@@ -53,6 +53,7 @@ local CHI_WAVE_SPELL_ID = 132464
 local DISGUISE_SPELL_ID = 121308
 
 -- For timer-based loot gathering of abnormal containers (that don't use SHOW_LOOT_TOAST, sadly)
+local BAG_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168178]
 local CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168179]
 local BIG_CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168180]
 
@@ -865,12 +866,13 @@ end
 
 
 local function ClearTimeBasedLootData()
+    Debug("ClearTimeBasedLootData: Ending salvage loot timer.")
     if chat_loot_timer_handle then
         WDP:CancelTimer(chat_loot_timer_handle)
         chat_loot_timer_handle = nil
     end
 
-    if current_loot and current_loot.identifier and (current_loot.identifier == CRATE_OF_SALVAGE_ITEM_ID or current_loot.identifier == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
+    if current_loot and current_loot.identifier and (current_loot.identifier == BAG_OF_SALVAGE_ITEM_ID or current_loot.identifier == CRATE_OF_SALVAGE_ITEM_ID or current_loot.identifier == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
         GenericLootUpdate("items")
     end
     current_loot = nil
@@ -1378,19 +1380,15 @@ end
 do
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function(item_id, quantity)
-            local container_id = current_action.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
+            local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
-            if container_id and container_id == CRATE_OF_SALVAGE_ITEM_ID or container_id == BIG_CRATE_OF_SALVAGE_ITEM_ID then
+            if container_id and (container_id == BAG_OF_SALVAGE_ITEM_ID or container_id == CRATE_OF_SALVAGE_ITEM_ID or container_id == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
                 Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
-                InitializeCurrentLoot()
                 current_loot.sources[container_id] = current_loot.sources[container_id] or {}
                 current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
             else -- If not, cancel the timer and wipe the loot table early
                 Debug("CHAT_MSG_LOOT: We would have assigned the wrong loot to salvage crates!")
-                WDP:CancelTimer(chat_loot_timer_handle)
-                chat_loot_timer_handle = nil
-                table.wipe(current_action)
-                current_loot = nil
+                ClearTimeBasedLootData()
             end
         end,
         [AF.NPC] = function(item_id, quantity)
@@ -2657,14 +2655,16 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     -- For Crates of Salvage (and potentially other items based on spell casts in the future which need manual handling)
     if private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         -- Set up timer
-        chat_loot_timer_handle = WDP:ScheduleTimer(ClearTimeBasedLootData, 0.5)
+        Debug("%s: Beginning Salvage loot timer for spellID %d", event_name, spell_id)
+        chat_loot_timer_handle = WDP:ScheduleTimer(ClearTimeBasedLootData, 1)
 
         -- Standard item handling setup
         table.wipe(current_action)
         current_loot = nil
         current_action.target_type = AF.ITEM
-        current_action.identifier = item_id
+        current_action.identifier = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         current_action.loot_label = "contains"
+        InitializeCurrentLoot()
         return
     end
 
