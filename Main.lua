@@ -188,17 +188,22 @@ local current_action = {
 -- HELPERS ------------------------------------------------------------
 
 local function Debug(message, ...)
-    if not DEBUGGING or not message or not ... then
+    if not DEBUGGING or not message then
         return
     end
-    local args = { ... }
+    
+    if ... then
+        local args = { ... }
 
-    for index = 1, #args do
-        if args[index] == nil then
-            args[index] = "nil"
+        for index = 1, #args do
+            if args[index] == nil then
+                args[index] = "nil"
+            end
         end
+        _G.print(message:format(unpack(args)))
+    else
+        _G.print(message)
     end
-    _G.print(message:format(unpack(args)))
 end
 
 
