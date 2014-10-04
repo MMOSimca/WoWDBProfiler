@@ -1405,10 +1405,10 @@ do
                 if object_entry[difficulty_token] then
                     -- Increment loot count
                     object_entry[difficulty_token]["opening_count"] = object_entry[difficulty_token]["opening_count"] or 0 + 1
-                    
+
                     -- Add drop data
-                    local loot_table = LootTable(object_entry, "opening", difficulty_token)
-                    table.insert(loot_table, ("%d:%d"):format(item_id, quantity))
+                    object_entry[difficulty_token]["opening"] = entry[difficulty_token]["opening"] or {}
+                    table.insert(object_entry[difficulty_token]["opening"], ("%d:%d"):format(item_id, quantity))
                 else
                     Debug("CHAT_MSG_LOOT: When handling timber, the top level loot data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id][timber_variant])
                 end
@@ -1873,7 +1873,7 @@ do
         local num_guids = 0
 
         -- Loot extrapolation cannot handle objects that need special spell labels (like HERBALISM or MINING) (MIND_CONTROL is okay)
-        if SPELL_FLAGS_BY_LABEL[current_action.spell_label] and not NON_LOOT_SPELL_LABELS[current_action.spell_label] then
+        if private.SPELL_FLAGS_BY_LABEL[current_action.spell_label] and not private.NON_LOOT_SPELL_LABELS[current_action.spell_label] then
             Debug("%s: Problematic spell label %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
             table.wipe(current_action)
             return false
