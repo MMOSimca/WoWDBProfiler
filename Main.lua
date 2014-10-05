@@ -48,6 +48,8 @@ local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
+local TIMBER_ITEM_ID = 114781
+
 -- Ignoring NPC casts of the following spells
 local CHI_WAVE_SPELL_ID = 132464
 local DISGUISE_SPELL_ID = 121308
@@ -1401,21 +1403,21 @@ do
         end,
         [AF.OBJECT] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.OBJECT %d (%d)", item_id, quantity)
-            for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id] do
+            --for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id] do
                 -- Check for top level object data
-                local object_entry = DBEntry("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id][timber_variant]))
+                local object_entry = DBEntry("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id]))
                 local difficulty_token = InstanceDifficultyToken()
                 if object_entry[difficulty_token] then
                     -- Increment loot count
                     object_entry[difficulty_token]["opening_count"] = object_entry[difficulty_token]["opening_count"] or 0 + 1
 
                     -- Add drop data
-                    object_entry[difficulty_token]["opening"] = entry[difficulty_token]["opening"] or {}
+                    object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
                     table.insert(object_entry[difficulty_token]["opening"], ("%d:%d"):format(item_id, quantity))
                 else
-                    Debug("CHAT_MSG_LOOT: When handling timber, the top level loot data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id][timber_variant])
+                    Debug("CHAT_MSG_LOOT: When handling timber, the top level loot data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id])
                 end
-            end
+            --end
         end,
         [AF.ZONE] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.ZONE %d (%d)", item_id, quantity)
@@ -2313,7 +2315,7 @@ do
             return
         end
         local unit_type, unit_id = ParseGUID(_G.UnitGUID("questnpc"))
-
+        Debug("UpdateQuestJuncture: Updating quest juncture for %s.", ("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type], unit_id))
         if unit_type == private.UNIT_TYPES.OBJECT then
             UpdateDBEntryLocation("objects", unit_id)
         end
@@ -2640,9 +2642,9 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     -- Handle Logging spell casts
     if private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] then
         last_timber_spell_id = spell_id
-        for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] do
-            UpdateDBEntryLocation("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id][timber_variant]))
-        end
+        --for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] do
+        UpdateDBEntryLocation("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id]))
+        --end
         return
     end
 
