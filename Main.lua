@@ -2061,7 +2061,7 @@ do
                         end
                     else
                         -- If this is nil, then the item's quantity could be wrong if loot_quantity is wrong, so we won't process this slot's loot.
-                        Debug("%s: Slot quantity is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
+                        Debug("%s: Slot quantity is nil for loot slot %d.", event_name, loot_slot)
                     end
                 end
             end
@@ -2402,13 +2402,16 @@ do
 
 
     local function RegisterTools(tradeskill_name, tradeskill_index)
-        local spell_id = tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
-        local required_tool = _G.GetTradeSkillTools(tradeskill_index)
+        local link = _G.GetTradeSkillRecipeLink(tradeskill_index)
+        if link then
+            local spell_id = tonumber(link:match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
+            local required_tool = _G.GetTradeSkillTools(tradeskill_index)
 
-        if required_tool then
-            for tool_name, registry in pairs(TRADESKILL_TOOLS) do
-                if required_tool:find(tool_name) then
-                    registry[spell_id] = true
+            if required_tool then
+                for tool_name, registry in pairs(TRADESKILL_TOOLS) do
+                    if required_tool:find(tool_name) then
+                        registry[spell_id] = true
+                    end
                 end
             end
         end
