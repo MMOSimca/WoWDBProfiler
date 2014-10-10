@@ -1392,7 +1392,7 @@ do
             if container_id and (container_id == BAG_OF_SALVAGE_ITEM_ID or container_id == CRATE_OF_SALVAGE_ITEM_ID or container_id == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
                 Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
                 current_loot.sources[container_id] = current_loot.sources[container_id] or {}
-                current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
+                current_loot.sources[container_id][item_id] = (current_loot.sources[container_id][item_id] or 0) + quantity
             else -- If not, cancel the timer and wipe the loot table early
                 Debug("CHAT_MSG_LOOT: We would have assigned the wrong loot to salvage crates!")
                 ClearTimeBasedLootData()
@@ -1409,7 +1409,7 @@ do
                 local difficulty_token = InstanceDifficultyToken()
                 if object_entry[difficulty_token] then
                     -- Increment loot count
-                    object_entry[difficulty_token]["opening_count"] = object_entry[difficulty_token]["opening_count"] or 0 + 1
+                    object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
 
                     -- Add drop data
                     object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
