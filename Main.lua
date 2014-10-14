@@ -898,6 +898,12 @@ function WDP:OnInitialize()
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
 
+    -- Disable if using a MoP build
+    if build_num < 19000 then
+        WDP:Disable()
+        return
+    end
+
     if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
         for entry in pairs(DATABASE_DEFAULTS.global) do
             global_db[entry] = {}
