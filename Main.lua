@@ -10,6 +10,7 @@ local bit = _G.bit
 local math = _G.math
 local table = _G.table
 
+local next = _G.next
 local select = _G.select
 local unpack = _G.unpack
 
@@ -47,12 +48,27 @@ local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
-local SPELL_ID_CHI_WAVE = 132464
-local SPELL_ID_DISGUISE = 121308
+local TIMBER_ITEM_ID = 114781
+
+-- Ignoring NPC casts of the following spells
+local CHI_WAVE_SPELL_ID = 132464
+local DISGUISE_SPELL_ID = 121308
+
+-- For timer-based loot gathering of abnormal containers (that don't use SHOW_LOOT_TOAST, sadly)
+local BAG_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168178]
+local CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168179]
+local BIG_CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168180]
+
+-- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
+local DUPLICATE_WORLD_BOSS_IDS = {
+    [71952] = { 71953, 71954, 71955, },
+}
 
 local ALLOWED_LOCALES = {
     enUS = true,
     enGB = true,
+    enTW = true,
+    enCN = true,
 }
 
 local DATABASE_DEFAULTS = {
@@ -149,6 +165,9 @@ local name_to_id_map = {}
 local killed_boss_id_timer_handle
 local killed_npc_id
 local target_location_timer_handle
+local last_timber_spell_id
+local last_garrison_cache_object_id
+local chat_loot_timer_handle
 local current_target_id
 local current_area_id
 local current_loot
@@ -172,17 +191,22 @@ local current_action = {
 -- HELPERS ------------------------------------------------------------
 
 local function Debug(message, ...)
-    if not DEBUGGING or not message or not ... then
+    if not DEBUGGING or not message then
         return
     end
-    local args = { ... }
+    
+    if ... then
+        local args = { ... }
 
-    for index = 1, #args do
-        if args[index] == nil then
-            args[index] = "nil"
+        for index = 1, #args do
+            if args[index] == nil then
+                args[index] = "nil"
+            end
         end
+        _G.print(message:format(unpack(args)))
+    else
+        _G.print(message)
     end
-    _G.print(message:format(unpack(args)))
 end
 
 
@@ -217,7 +241,7 @@ do
             _G.TradeSkillFrame.filterTbl.hasSkillUp = false
             _G.TradeSkillOnlyShowSkillUps(false)
         end
-        _G.SetTradeSkillInvSlotFilter(0, 1, 1)
+        _G.SetTradeSkillInvSlotFilter(0, true, true)
         _G.TradeSkillUpdateFilterBar()
         _G.TradeSkillFrame_Update()
 
@@ -292,54 +316,6 @@ do
 end -- do-block
 
 
--- constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
-local DUPLICATE_WORLD_BOSS_IDS = {
-    [71952] = { 71953, 71954, 71955, },
-}
-
-
--- Called on a timer
-local function ClearKilledNPC()
-    killed_npc_id = nil
-end
-
-
-local function ClearKilledBossID()
-    if killed_boss_id_timer_handle then
-        WDP:CancelTimer(killed_boss_id_timer_handle)
-        killed_boss_id_timer_handle = nil
-    end
-
-    table.wipe(boss_loot_toasting)
-    private.raid_finder_boss_id = nil
-    private.world_boss_id = nil
-end
-
-
-local function ClearLootToastContainerID()
-    if loot_toast_container_timer_handle then
-        WDP:CancelTimer(loot_toast_container_timer_handle)
-        loot_toast_container_timer_handle = nil
-    end
-
-    private.container_loot_toasting = false
-    private.loot_toast_container_id = nil
-end
-
-
-local function ClearLootToastData()
-    -- cancel existing timer if found
-    if loot_toast_data_timer_handle then
-        WDP:CancelTimer(loot_toast_data_timer_handle)
-        loot_toast_data_timer_handle = nil
-    end
-
-    if loot_toast_data then
-        table.wipe(loot_toast_data)
-    end
-end
-
-
 local function InstanceDifficultyToken()
     local _, instance_type, instance_difficulty, _, _, _, is_dynamic = _G.GetInstanceInfo()
 
@@ -380,11 +356,7 @@ do
 
     function NPCEntry(identifier)
         local npc = DBEntry("npcs", identifier)
-
-        if not npc then
-            return
-        end
-        return _G.setmetatable(npc, npc_meta)
+        return npc and _G.setmetatable(npc, npc_meta) or nil
     end
 
     function npc_prototype:EncounterData(difficulty_token)
@@ -463,26 +435,37 @@ end
 local ParseGUID
 do
     local UNIT_TYPES = private.UNIT_TYPES
-    local UNIT_TYPE_BITMASK = 0x007
 
     local NPC_ID_MAPPING = {
         [62164] = 63191, -- Garalon
     }
 
 
+    local function MatchUnitTypes(unit_type_name)
+        if not unit_type_name then
+            return UNIT_TYPES.UNKNOWN
+        end
+
+        for def, text in next, UNIT_TYPES do
+            if unit_type_name == text then
+                return UNIT_TYPES[def]
+            end
+        end
+        return UNIT_TYPES.UNKNOWN
+    end
+
+
     function ParseGUID(guid)
         if not guid then
             return
         end
-        local bitfield = tonumber(guid:sub(1, 5))
 
-        if not bitfield then
-            return UNIT_TYPES.UNKNOWN
-        end
-        local unit_type = _G.bit.band(bitfield, UNIT_TYPE_BITMASK)
+        -- We might want to use some of this new information later, but leaving the returns alone for now
+        local unit_type_name, unk_id1, server_id, instance_id, unk_id2, unit_idnum, spawn_id = ("-"):split(guid)
 
-        if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET then
-            local unit_idnum = tonumber(guid:sub(6, 10), 16)
+        local unit_type = MatchUnitTypes(unit_type_name)
+        if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET and unit_type ~= UNIT_TYPES.ITEM then
+
             local id_mapping = NPC_ID_MAPPING[unit_idnum]
 
             if id_mapping and UnitTypeIsNPC(unit_type) then
@@ -583,7 +566,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
 
         if not current_line then
-            Debug("HandleItemUse: Item with ID %d and link %s had an invalid tooltip.", item_id, item_link, _G.ITEM_OPENABLE)
+            Debug("HandleItemUse: Item with ID %d and link %s had an invalid tooltip.", item_id, item_link)
             return
         end
 
@@ -597,7 +580,6 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             return
         end
     end
-
     Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)
 end
 
@@ -674,7 +656,7 @@ do
                     -- Items return the player as the source, so we need to use the item's ID (disenchant, milling, etc)
                     source_id = current_loot.identifier
                 else
-                    local unit_ID = select(2, ParseGUID(source_guid))
+                    local _, unit_ID = ParseGUID(source_guid)
                     if unit_ID then
                         if current_loot.target_type == AF.OBJECT then
                             source_id = ("%s:%s"):format(current_loot.spell_label, unit_ID)
@@ -805,7 +787,8 @@ do
             _G.SetCVar("Sound_EnableSFX", 0)
             world_map:Show()
         end
-        local micro_dungeon_id = MICRO_DUNGEON_IDS[select(5, _G.GetMapInfo())]
+        local _, _, _, _, micro_dungeon_map_name = _G.GetMapInfo()
+        local micro_dungeon_id = MICRO_DUNGEON_IDS[micro_dungeon_map_name]
 
         _G.SetMapToCurrentZone()
 
@@ -847,6 +830,63 @@ local function InitializeCurrentLoot()
     table.wipe(current_action)
 end
 
+
+-- TIMERS -------------------------------------------------------------
+
+local function ClearKilledNPC()
+    killed_npc_id = nil
+end
+
+
+local function ClearKilledBossID()
+    if killed_boss_id_timer_handle then
+        WDP:CancelTimer(killed_boss_id_timer_handle)
+        killed_boss_id_timer_handle = nil
+    end
+
+    table.wipe(boss_loot_toasting)
+    private.raid_boss_id = nil
+end
+
+
+local function ClearLootToastContainerID()
+    if loot_toast_container_timer_handle then
+        WDP:CancelTimer(loot_toast_container_timer_handle)
+        loot_toast_container_timer_handle = nil
+    end
+
+    private.container_loot_toasting = false
+    private.loot_toast_container_id = nil
+end
+
+
+local function ClearLootToastData()
+    -- cancel existing timer if found
+    if loot_toast_data_timer_handle then
+        WDP:CancelTimer(loot_toast_data_timer_handle)
+        loot_toast_data_timer_handle = nil
+    end
+
+    if loot_toast_data then
+        table.wipe(loot_toast_data)
+    end
+end
+
+
+local function ClearTimeBasedLootData()
+    Debug("ClearTimeBasedLootData: Ending salvage loot timer.")
+    if chat_loot_timer_handle then
+        WDP:CancelTimer(chat_loot_timer_handle)
+        chat_loot_timer_handle = nil
+    end
+
+    if current_loot and current_loot.identifier and (current_loot.identifier == BAG_OF_SALVAGE_ITEM_ID or current_loot.identifier == CRATE_OF_SALVAGE_ITEM_ID or current_loot.identifier == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
+        GenericLootUpdate("items")
+    end
+    current_loot = nil
+end
+
+
 -- METHODS ------------------------------------------------------------
 
 function WDP:OnInitialize()
@@ -858,12 +898,19 @@ function WDP:OnInitialize()
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
 
+    -- Disable if using a MoP build
+    if build_num < 19000 then
+        WDP:Disable()
+        return
+    end
+
     if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
         for entry in pairs(DATABASE_DEFAULTS.global) do
             global_db[entry] = {}
         end
     end
     raw_db.build_num = build_num
+    raw_db.region = private.region
     raw_db.version = DB_VERSION
 
     private.InitializeCommentSystem()
@@ -949,14 +996,6 @@ do
             local amount, stat = left_text:match("+(.-) (.*)")
 
             if amount and stat then
-                if reforge_id and reforge_id ~= 0 then
-                    local reforge_string = stat:find("Reforged")
-
-                    if reforge_string then
-                        stat = stat:sub(0, reforge_string - 3)
-                        intermediary.reforge_id = reforge_id
-                    end
-                end
                 create_entry = true
                 intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber((amount:gsub(",", "")))
             end
@@ -974,29 +1013,54 @@ do
             item.upgrades[upgrade_id][stat] = amount
         end
     end
-end
-
--- do-block
+end -- do-block
 
 
-local function RecordItemData(item_id, item_link, durability)
-    local item_string = select(3, item_link:find("^|%x+|H(.+)|h%[.+%]"))
+local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
+    local _, _, item_string = item_link:find("^|%x+|H(.+)|h%[.+%]")
     local item
 
     if item_string then
-        local _, _, _, _, _, _, _, suffix_id, unique_id, _, reforge_id, upgrade_id = (":"):split(item_string)
-        suffix_id = tonumber(suffix_id)
-        upgrade_id = tonumber(upgrade_id)
+        local item_results = { (":"):split(item_string) }
 
-        if suffix_id and suffix_id ~= 0 then
+        local suffix_id = tonumber(item_results[8])
+        local unique_id = item_results[9]
+        local upgrade_id = tonumber(item_results[11])
+        local instance_difficulty_id = tonumber(item_results[12])
+        local num_bonus_ids = tonumber(item_results[13])
+
+        if not num_bonus_ids or num_bonus_ids == 0 or not process_bonus_ids then
+            if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
+                item = DBEntry("items", item_id)
+                item.unique_id = bit.band(unique_id, 0xFFFF)
+
+                if suffix_id and suffix_id ~= 0 then
+                    item.suffix_id = suffix_id
+                end
+
+                if instance_difficulty_id and instance_difficulty_id ~= 0 then
+                    item.instance_difficulty_id = instance_difficulty_id
+                end
+            end
+        elseif num_bonus_ids > 0 then
             item = DBEntry("items", item_id)
-            item.suffix_id = suffix_id
-            item.unique_id = bit.band(unique_id, 0xFFFF)
-        end
 
+            item.unique_id = bit.band(unique_id, 0xFFFF)
+            item.instance_difficulty_id = instance_difficulty_id
+
+            if not item.bonus_ids then
+                item.bonus_ids = {}
+            end
+            
+            for bonus_index = 1, num_bonus_ids do
+                item.bonus_ids[tonumber(item_results[13 + bonus_index])] = true
+            end
+        else
+            Debug("RecordItemData: Item_system is supposed to be 0 or positive, instead it was %s.", item_system)
+        end
         if upgrade_id and upgrade_id ~= 0 then
             DatamineTT:SetHyperlink(item_link)
-            ScrapeItemUpgradeStats(item_id, upgrade_id, reforge_id)
+            ScrapeItemUpgradeStats(item_id, upgrade_id)
         end
     end
 
@@ -1013,7 +1077,7 @@ function WDP:ProcessItems()
 
         if item_id and item_id > 0 then
             local _, max_durability = _G.GetInventoryItemDurability(slot_index)
-            RecordItemData(item_id, _G.GetInventoryItemLink("player", slot_index), max_durability)
+            RecordItemData(item_id, _G.GetInventoryItemLink("player", slot_index), false, max_durability)
         end
     end
 
@@ -1023,7 +1087,7 @@ function WDP:ProcessItems()
 
             if item_id and item_id > 0 then
                 local _, max_durability = _G.GetContainerItemDurability(bag_index, slot_index)
-                RecordItemData(item_id, _G.GetContainerItemLink(bag_index, slot_index), max_durability)
+                RecordItemData(item_id, _G.GetContainerItemLink(bag_index, slot_index), false, max_durability)
             end
         end
     end
@@ -1092,7 +1156,7 @@ do
         level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
 
         if not level_data.power then
-            local max_power = _G.UnitManaMax("target")
+            local max_power = _G.UnitPowerMax("target")
 
             if max_power > 0 then
                 local power_type = _G.UnitPowerType("target")
@@ -1209,16 +1273,40 @@ function WDP:UNIT_PET(event_name, unit_id)
 end
 
 
-function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
+function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, specID, sex, isPersonal, lootSource)
     if not loot_type or (loot_type ~= "item" and loot_type ~= "money" and loot_type ~= "currency") then
         Debug("%s: loot_type is %s. Item link is %s, and quantity is %d.", event_name, loot_type, item_link, quantity)
         return
     end
     local container_id = private.loot_toast_container_id
-    local npc_id = private.raid_finder_boss_id or private.world_boss_id
+    local npc_id = private.raid_boss_id
+    
+    -- Handle Garrison cache specially
+    if lootSource and last_garrison_cache_object_id and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) then
+        -- Record location data for cache
+        UpdateDBEntryLocation("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
 
-    if npc_id then
-        -- slightly messy hack to workaround duplicate world bosses
+        -- Add drop data
+        local currency_texture = CurrencyLinkToTexture(item_link)
+        if currency_texture and currency_texture ~= "" then
+            -- Check for top level object data
+            local object_entry = DBEntry("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
+            local difficulty_token = InstanceDifficultyToken()
+            if object_entry[difficulty_token] then
+                -- Increment loot count
+                object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
+
+                Debug("%s: %s X %d", event_name, currency_texture, quantity)
+                object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
+                table.insert(object_entry[difficulty_token]["opening"], ("currency:%d:%s"):format(quantity, currency_texture))
+            else
+                Debug("%s: When handling the Garrison cache, the top level loot data was missing for objectID %d.", event_name, last_garrison_cache_object_id)
+            end
+        else
+            Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+        end
+    elseif npc_id then
+        -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
         if DUPLICATE_WORLD_BOSS_IDS[npc_id] then
             upper_limit = #DUPLICATE_WORLD_BOSS_IDS[npc_id]
@@ -1241,6 +1329,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
                     local item_id = ItemLinkToID(item_link)
                     if item_id then
                         Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                        RecordItemData(item_id, item_link, true)
                         table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
                     else
                         Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
@@ -1253,10 +1342,6 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
                     local currency_texture = CurrencyLinkToTexture(item_link)
                     if currency_texture and currency_texture ~= "" then
                         Debug("%s: %s X %d", event_name, currency_texture, quantity)
-                        -- workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
-                        if quantity > 1000 and currency_texture == "pvecurrency-valor" then
-                            quantity = math.floor(quantity / 100)
-                        end
                         table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
                     else
                         Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
@@ -1284,6 +1369,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
             local item_id = ItemLinkToID(item_link)
             if item_id then
                 Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                RecordItemData(item_id, item_link, true)
                 current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
             else
                 Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
@@ -1315,6 +1401,11 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
         loot_toast_data = loot_toast_data or {}
         loot_toast_data[#loot_toast_data + 1] = { loot_type, item_link, quantity }
 
+        local item_id = ItemLinkToID(item_link)
+        if item_id then
+            RecordItemData(item_id, item_link, true)
+        end
+
         loot_toast_data_timer_handle = WDP:ScheduleTimer(ClearLootToastData, 5)
     end
 end
@@ -1322,10 +1413,41 @@ end
 
 do
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
+        [AF.ITEM] = function(item_id, quantity)
+            local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
+            -- Verify that we're still assigning data to the right items
+            if container_id and (container_id == BAG_OF_SALVAGE_ITEM_ID or container_id == CRATE_OF_SALVAGE_ITEM_ID or container_id == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
+                Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
+                current_loot.sources[container_id] = current_loot.sources[container_id] or {}
+                current_loot.sources[container_id][item_id] = (current_loot.sources[container_id][item_id] or 0) + quantity
+            else -- If not, cancel the timer and wipe the loot table early
+                Debug("CHAT_MSG_LOOT: We would have assigned the wrong loot to salvage crates!")
+                ClearTimeBasedLootData()
+            end
+        end,
         [AF.NPC] = function(item_id, quantity)
-            Debug("CHAT_MSG_LOOT: %d (%d)", item_id, quantity)
+            Debug("CHAT_MSG_LOOT: AF.NPC %d (%d)", item_id, quantity)
+        end,
+        [AF.OBJECT] = function(item_id, quantity)
+            Debug("CHAT_MSG_LOOT: AF.OBJECT %d (%d)", item_id, quantity)
+            --for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id] do
+                -- Check for top level object data
+                local object_entry = DBEntry("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id]))
+                local difficulty_token = InstanceDifficultyToken()
+                if object_entry[difficulty_token] then
+                    -- Increment loot count
+                    object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
+
+                    -- Add drop data
+                    object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
+                    table.insert(object_entry[difficulty_token]["opening"], ("%d:%d"):format(item_id, quantity))
+                else
+                    Debug("CHAT_MSG_LOOT: When handling timber, the top level loot data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id])
+                end
+            --end
         end,
         [AF.ZONE] = function(item_id, quantity)
+            Debug("CHAT_MSG_LOOT: AF.ZONE %d (%d)", item_id, quantity)
             InitializeCurrentLoot()
             current_loot.list[1] = ("%d:%d"):format(item_id, quantity)
             GenericLootUpdate("zones")
@@ -1337,24 +1459,33 @@ do
     function WDP:CHAT_MSG_LOOT(event_name, message)
         local category
 
-        if current_action.spell_label ~= "EXTRACT_GAS" then
-            category = AF.ZONE
-        elseif private.raid_finder_boss_id then
-            category = AF.NPC
-        end
-        local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
-
-        if not category or not update_func then
-            return
-        end
         local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
-
         if not item_link then
             quantity, item_link = 1, deformat(message, _G.LOOT_ITEM_PUSHED_SELF)
         end
         local item_id = ItemLinkToID(item_link)
 
         if not item_id then
+            return
+        end
+
+        -- Set update category
+        if last_timber_spell_id and item_id == TIMBER_ITEM_ID then
+            category = AF.OBJECT
+        -- Recently changed from ~= "EXTRACT_GAS" because of some occassional bad data, and, as far as I know, no benefit.
+        elseif current_action.spell_label == "FISHING" then
+            category = AF.ZONE
+        elseif private.raid_boss_id then
+            category = AF.NPC
+        elseif chat_loot_timer_handle then
+            category = AF.ITEM
+        end
+
+        -- Take action based on update category
+        local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
+        if not category or not update_func then
+            -- We still want to record the item's data, even if it doesn't need its drop location recorded
+            RecordItemData(item_id, item_link, true)
             return
         end
         update_func(item_id, quantity)
@@ -1443,12 +1574,12 @@ do
 end
 
 
-do -- do-block
+do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
-        if not spell_id or spell_id == SPELL_ID_CHI_WAVE or spell_id == SPELL_ID_DISGUISE then
+        if not spell_id or spell_id == CHI_WAVE_SPELL_ID or spell_id == DISGUISE_SPELL_ID then
             return
         end
         local source_type, source_id = ParseGUID(source_guid)
@@ -1548,70 +1679,12 @@ do -- do-block
         end
     end
 
+    
     local DIPLOMACY_SPELL_ID = 20599
     local MR_POP_RANK1_SPELL_ID = 78634
     local MR_POP_RANK2_SPELL_ID = 78635
-
-    local REP_BUFFS = {
-        [_G.GetSpellInfo(30754)] = "CENARION_FAVOR",
-        [_G.GetSpellInfo(24705)] = "GRIM_VISAGE",
-        [_G.GetSpellInfo(32098)] = "HONOR_HOLD_FAVOR",
-        [_G.GetSpellInfo(39913)] = "NAZGRELS_FERVOR",
-        [_G.GetSpellInfo(39953)] = "SONG_OF_BATTLE",
-        [_G.GetSpellInfo(61849)] = "SPIRIT_OF_SHARING",
-        [_G.GetSpellInfo(32096)] = "THRALLMARS_FAVOR",
-        [_G.GetSpellInfo(39911)] = "TROLLBANES_COMMAND",
-        [_G.GetSpellInfo(95987)] = "UNBURDENED",
-        [_G.GetSpellInfo(100951)] = "WOW_ANNIVERSARY",
-    }
-
-
-    local FACTION_NAMES = {
-        CENARION_CIRCLE = _G.GetFactionInfoByID(609),
-        HONOR_HOLD = _G.GetFactionInfoByID(946),
-        THE_SHATAR = _G.GetFactionInfoByID(935),
-        THRALLMAR = _G.GetFactionInfoByID(947),
-    }
-
-
-    local MODIFIERS = {
-        CENARION_FAVOR = {
-            faction = FACTION_NAMES.CENARION_CIRCLE,
-            modifier = 0.25,
-        },
-        GRIM_VISAGE = {
-            modifier = 0.1,
-        },
-        HONOR_HOLD_FAVOR = {
-            faction = FACTION_NAMES.HONOR_HOLD,
-            modifier = 0.25,
-        },
-        NAZGRELS_FERVOR = {
-            faction = FACTION_NAMES.THRALLMAR,
-            modifier = 0.1,
-        },
-        SONG_OF_BATTLE = {
-            faction = FACTION_NAMES.THE_SHATAR,
-            modifier = 0.1,
-        },
-        SPIRIT_OF_SHARING = {
-            modifier = 0.1,
-        },
-        THRALLMARS_FAVOR = {
-            faction = FACTION_NAMES.THRALLMAR,
-            modifier = 0.25,
-        },
-        TROLLBANES_COMMAND = {
-            faction = FACTION_NAMES.HONOR_HOLD,
-            modifier = 0.1,
-        },
-        UNBURDENED = {
-            modifier = 0.1,
-        },
-        WOW_ANNIVERSARY = {
-            modifier = 0.08,
-        }
-    }
+    local FACTION_DATA = private.FACTION_DATA
+    local REP_BUFFS = private.REP_BUFFS
 
 
     function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
@@ -1635,25 +1708,48 @@ do -- do-block
 
         local modifier = 1
 
+        -- Check for modifiers from known spells
         if _G.IsSpellKnown(DIPLOMACY_SPELL_ID) then
             modifier = modifier + 0.1
         end
-
         if _G.IsSpellKnown(MR_POP_RANK2_SPELL_ID) then
             modifier = modifier + 0.1
         elseif _G.IsSpellKnown(MR_POP_RANK1_SPELL_ID) then
             modifier = modifier + 0.05
         end
 
-        for buff_name, buff_label in pairs(REP_BUFFS) do
+        -- Determine faction ID
+        local faction_ID
+        for pseudo_faction_name, faction_data_table in pairs(FACTION_DATA) do
+            if faction_name == faction_data_table[2] then
+                faction_ID = faction_data_table[1]
+            end
+        end
+        if faction_ID and faction_ID > 0 then
+            -- Check for modifiers from Commendations (applied directly to the faction, account-wide)
+            local _, _, _, _, _, _, _, _, _, _, _, _, _, _, has_bonus_rep_gain = GetFactionInfoByID(faction_ID)
+            if has_bonus_rep_gain then
+                modifier = modifier + 1
+            end
+        end
+
+        -- Check for modifiers from buffs
+        for buff_name, buff_data_table in pairs(REP_BUFFS) do
             if _G.UnitBuff("player", buff_name) then
-                local modded_faction = MODIFIERS[buff_label].faction
+                local modded_faction = buff_data_table.faction
 
                 if not modded_faction or faction_name == modded_faction then
-                    modifier = modifier + MODIFIERS[buff_label].modifier
+                    if buff_data_table.ignore then
+                        -- Some buffs from tabards convert all rep of other factions into rep for a specific faction.
+                        -- We can't know what faction the rep was orginally from, so we must ignore the data entirely in these cases.
+                        return
+                    else
+                        modifier = modifier + buff_data_table.modifier
+                    end
                 end
             end
         end
+        
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
@@ -1661,17 +1757,23 @@ end -- do-block
 
 
 function WDP:CURSOR_UPDATE(event_name)
-    if current_action.fishing_target or _G.Minimap:IsMouseOver() or current_action.spell_label ~= "FISHING" then
+    if current_action.fishing_target or _G.Minimap:IsMouseOver() then
         return
     end
     local text = _G["GameTooltipTextLeft1"]:GetText()
 
-    if not text or text == "Fishing Bobber" then
-        text = "NONE"
-    else
-        current_action.fishing_target = true
+    -- Handle Fishing
+    if (current_action.spell_label == "FISHING") then
+        if not text or text == "Fishing Bobber" then
+            text = "NONE"
+        else
+            current_action.fishing_target = true
+        end
+        current_action.identifier = ("%s:%s"):format(current_action.spell_label, text)
+     -- Handle Garrison Cache
+    elseif private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP[text] then
+        last_garrison_cache_object_id = private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP[text]
     end
-    current_action.identifier = ("%s:%s"):format(current_action.spell_label, text)
 end
 
 
@@ -1731,7 +1833,7 @@ do
             local source_list = {}
 
             for source_guid, loot_data in pairs(current_loot.sources) do
-                local source_id = select(2, ParseGUID(source_guid))
+                local _, source_id = ParseGUID(source_guid)
                 local npc = NPCEntry(source_id)
 
                 if npc then
@@ -1808,6 +1910,13 @@ do
         local extrapolated_guid_registry = {}
         local num_guids = 0
 
+        -- Loot extrapolation cannot handle objects that need special spell labels (like HERBALISM or MINING) (MIND_CONTROL is okay)
+        if private.SPELL_FLAGS_BY_LABEL[current_action.spell_label] and not private.NON_LOOT_SPELL_LABELS[current_action.spell_label] then
+            Debug("%s: Problematic spell label %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
+            table.wipe(current_action)
+            return false
+        end
+
         table.wipe(current_action)
 
         for loot_slot = 1, _G.GetNumLootItems() do
@@ -1839,11 +1948,6 @@ do
             return false
         end
 
-        if private.previous_spell_id and private.EXTRAPOLATION_BANNED_SPELL_IDS[private.previous_spell_id] then
-            Debug("%s: Problematic spell id %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
-            return false
-        end
-
         local num_npcs = 0
         local num_objects = 0
         local num_itemcontainers = 0
@@ -1868,8 +1972,8 @@ do
                     current_action.target_type = AF.NPC
                     current_action.identifier = unit_idnum
                     num_npcs = num_npcs + 1
-                -- Item container GUIDs are currently of the 'PLAYER' type; this may be unintended and could change in the future.
                 elseif unit_type == private.UNIT_TYPES.PLAYER then
+                    -- Item container GUIDs are currently of the 'PLAYER' type; this may be unintended and could change in the future.
                     current_action.loot_label = loot_label
                     current_action.target_type = AF.ITEM
                     -- current_action.identifier assigned during loot verification.
@@ -1947,16 +2051,14 @@ do
 
                 if not loot_guid_registry[current_loot.label][source_guid] then
                     local loot_quantity = loot_info[loot_index + 1]
-
                     -- There is a new bug in 5.4.0 that causes GetLootSlotInfo() to (rarely) return nil values for slot_quantity.
                     if slot_quantity then
                         -- We need slot_quantity to account for an old bug where loot_quantity is sometimes '1' for stacks of items, such as cloth.
                         if slot_quantity > loot_quantity then
                             loot_quantity = slot_quantity
                         end
-
                         local source_type, source_id = ParseGUID(source_guid)
-                        local source_key = ("%s:%d"):format(private.UNIT_TYPE_NAMES[source_type + 1], source_id)
+                        local source_key = ("%s:%d"):format(source_type, source_id)
 
                         if slot_type == _G.LOOT_SLOT_ITEM then
                             local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
@@ -1992,7 +2094,7 @@ do
                         end
                     else
                         -- If this is nil, then the item's quantity could be wrong if loot_quantity is wrong, so we won't process this slot's loot.
-                        Debug("%s: Slot quantity is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
+                        Debug("%s: Slot quantity is nil for loot slot %d.", event_name, loot_slot)
                     end
                 end
             end
@@ -2045,7 +2147,8 @@ do
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
                 return
             end
-            merchant_standing = select(2, UnitFactionStanding("npc"))
+            local _, faction_standing = UnitFactionStanding("npc")
+            merchant_standing = faction_standing
             current_merchant = NPCEntry(unit_idnum)
             current_merchant.sells = current_merchant.sells or {}
         end
@@ -2065,11 +2168,7 @@ do
             if not item_id then
                 local item_name, item_link = DatamineTT:GetItem()
                 item_id = ItemLinkToID(item_link)
-                if item_id then
-                    Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - %s", event_name, item_id)
-                else
-                    Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - nil", event_name)
-                end
+                -- GetMerchantItemLink() still ocassionally fails as of Patch 6.0.2. It fails so badly that debug functions cause considerable slowdown.
             end
 
             if item_id and item_id > 0 then
@@ -2168,7 +2267,7 @@ end -- do-block
 
 
 function WDP:PET_BAR_UPDATE(event_name)
-    if current_action.spell_label ~= "MIND_CONTROL" then
+    if not private.NON_LOOT_SPELL_LABELS[current_action.spell_label] then
         return
     end
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("pet"))
@@ -2245,13 +2344,13 @@ do
             return
         end
         local unit_type, unit_id = ParseGUID(_G.UnitGUID("questnpc"))
-
+        Debug("UpdateQuestJuncture: Updating quest juncture for %s.", ("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type], unit_id))
         if unit_type == private.UNIT_TYPES.OBJECT then
             UpdateDBEntryLocation("objects", unit_id)
         end
         local quest = DBEntry("quests", _G.GetQuestID())
         quest[point] = quest[point] or {}
-        quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type + 1], unit_id)] = true
+        quest[point][("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type], unit_id)] = true
 
         return quest
     end
@@ -2289,7 +2388,7 @@ function WDP:QUEST_LOG_UPDATE(event_name)
     local _, num_quests = _G.GetNumQuestLogEntries()
 
     while processed_quests <= num_quests do
-        local _, _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
+        local _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
 
         if quest_id == 0 then
             processed_quests = processed_quests + 1
@@ -2332,13 +2431,16 @@ do
 
 
     local function RegisterTools(tradeskill_name, tradeskill_index)
-        local spell_id = tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
-        local required_tool = _G.GetTradeSkillTools(tradeskill_index)
+        local link = _G.GetTradeSkillRecipeLink(tradeskill_index)
+        if link then
+            local spell_id = tonumber(link:match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
+            local required_tool = _G.GetTradeSkillTools(tradeskill_index)
 
-        if required_tool then
-            for tool_name, registry in pairs(TRADESKILL_TOOLS) do
-                if required_tool:find(tool_name) then
-                    registry[spell_id] = true
+            if required_tool then
+                for tool_name, registry in pairs(TRADESKILL_TOOLS) do
+                    if required_tool:find(tool_name) then
+                        registry[spell_id] = true
+                    end
                 end
             end
         end
@@ -2368,15 +2470,15 @@ function WDP:TRAINER_SHOW(event_name)
     if not trainer then
         return
     end
-    local trainer_standing = select(2, UnitFactionStanding("npc"))
+    local _, trainer_standing = UnitFactionStanding("npc")
     trainer.teaches = trainer.teaches or {}
 
     private.trainer_shown = true
 
     -- Get the initial trainer filters
-    local available = _G.GetTrainerServiceTypeFilter("available")
-    local unavailable = _G.GetTrainerServiceTypeFilter("unavailable")
-    local used = _G.GetTrainerServiceTypeFilter("used")
+    local available = _G.GetTrainerServiceTypeFilter("available") and 1 or 0
+    local unavailable = _G.GetTrainerServiceTypeFilter("unavailable") and 1 or 0
+    local used = _G.GetTrainerServiceTypeFilter("used") and 1 or 0
 
     -- Clear the trainer filters
     _G.SetTrainerServiceTypeFilter("available", 1)
@@ -2429,6 +2531,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         return
     end
 
+    Debug("UNIT_SPELLCAST_SENT: %s was cast.", spell_name)
     local item_name, item_link = _G.GameTooltip:GetItem()
     local unit_name, unit_id = _G.GameTooltip:GetUnit()
 
@@ -2468,7 +2571,8 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
         if item_name and item_name == target_name then
             current_action.identifier = ItemLinkToID(item_link)
         elseif target_name and target_name ~= "" then
-            current_action.identifier = ItemLinkToID(select(2, _G.GetItemInfo(target_name)))
+            local _, item_link = _G.GetItemInfo(target_name)
+            current_action.identifier = ItemLinkToID(item_link)
         end
     elseif not item_name and not unit_name then
         if bit.band(spell_flags, AF.OBJECT) == AF.OBJECT then
@@ -2489,19 +2593,15 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
     if private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
-        private.raid_finder_boss_id = private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
-    elseif private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
-        ClearKilledBossID()
-        ClearLootToastContainerID()
-        private.world_boss_id = private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
+        private.raid_boss_id = private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id]
     else
-        Debug("%s: Spell ID %d is not a known raid or world boss 'Bonus' spell.", event_name, spell_id)
+        Debug("%s: Spell ID %d is not a known raid boss 'Bonus' spell.", event_name, spell_id)
         return
     end
 
     -- Assign existing loot data to boss if it exists
     if loot_toast_data then
-        local npc_id = private.raid_finder_boss_id or private.world_boss_id
+        local npc_id = private.raid_boss_id
 
         -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
@@ -2571,6 +2671,16 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     private.tracked_line = nil
     private.previous_spell_id = spell_id
 
+    -- Handle Logging spell casts
+    if private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] then
+        last_timber_spell_id = spell_id
+        --for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] do
+        UpdateDBEntryLocation("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id]))
+        --end
+        return
+    end
+
+    -- Handle Loot Toast spell casts
     if private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
@@ -2578,6 +2688,23 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
 
         private.loot_toast_container_id = private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later
+        return
+    end
+
+    -- For Crates of Salvage (and potentially other items based on spell casts in the future which need manual handling)
+    if private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
+        -- Set up timer
+        Debug("%s: Beginning Salvage loot timer for spellID %d", event_name, spell_id)
+        chat_loot_timer_handle = WDP:ScheduleTimer(ClearTimeBasedLootData, 1)
+
+        -- Standard item handling setup
+        table.wipe(current_action)
+        current_loot = nil
+        current_action.target_type = AF.ITEM
+        current_action.identifier = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
+        current_action.loot_label = "contains"
+        InitializeCurrentLoot()
+        return
     end
 
     if anvil_spell_ids[spell_id] then
@@ -2586,7 +2713,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         UpdateDBEntryLocation("objects", OBJECT_ID_FORGE)
     elseif spell_name:match("^Harvest.+") then
         killed_npc_id = current_target_id
-        private.harvesting = true
+        private.harvesting = true -- Used to track which NPCs can be harvested (can we get this from CreatureCache instead?)
     end
 end
 

@@ -115,7 +115,7 @@ local function CreateUnitComment(unit_id, is_command)
         WDP:Printf("Unable to determine unit from '%s'", unit_id)
         return
     end
-    local type_name = private.UNIT_TYPE_NAMES[unit_type + 1]
+    local type_name = private.UNIT_TYPE_NAMES[unit_type]
     local unit_name = is_command and _G.UnitName(unit_id) or comment_units[unit_id].name
 
     table.wipe(comment_units)
@@ -198,21 +198,21 @@ end -- do-block
 local function CreateQuestComment()
     local index = _G.GetQuestLogSelection()
 
-    if not index or not _G.QuestLogFrame:IsShown() then
-        WDP:Print("You must select a quest from the Quest frame.")
+    if not index or not _G.QuestMapFrame:IsVisible() then
+        WDP:Print("You must select a quest from the World Map's Quest frame.")
         return
     end
     local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
 
     if is_header then
-        WDP:Print("You must select a quest from the Quest frame.")
+        WDP:Print("You must select a quest from the World Map's Quest frame.")
         return
     end
     NewComment("QUEST", title, idnum)
 end
 
 local function CreateAchievementComment()
-    if not _G.AchievementFrame or not _G.AchievementFrame:IsShown() or not _G.AchievementFrameAchievements.selection then
+    if not _G.AchievementFrame or not _G.AchievementFrame:IsVisible() or not _G.AchievementFrameAchievements.selection then
         WDP:Print("You must select an achievement from the Achievement frame.")
         return
     end
@@ -319,7 +319,7 @@ do
             end
         end
 
-        if _G.AchievementFrame and _G.AchievementFrame:IsShown() and _G.AchievementFrameAchievements.selection then
+        if _G.AchievementFrame and _G.AchievementFrame:IsVisible() and _G.AchievementFrameAchievements.selection then
             for _, button in next, _G.AchievementFrameAchievementsContainer.buttons do
                 if button.selected then
                     line = display:AddLine(("Achievement: %s"):format(button.label:GetText()))
@@ -362,7 +362,7 @@ do
 
         local quest_index = _G.GetQuestLogSelection()
 
-        if quest_index and _G.QuestLogFrame:IsShown() then
+        if quest_index and _G.QuestMapFrame:IsVisible() and not _G.QuestScrollFrame:IsVisible() then
             local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(quest_index)
 
             if not is_header then

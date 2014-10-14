@@ -13,104 +13,37 @@ local ADDON_NAME, private = ...
 
 
 -----------------------------------------------------------------------
--- Constants.
+-- Game Data Constants.
 -----------------------------------------------------------------------
-private.wow_version, private.build_num = _G.GetBuildInfo()
+-- Map of Alliance Logging NPC Summon spells to all possible Timber objectIDs of the proper tree size
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP = {
+    [167902] = 234021, --{ 233604, 233922, , 234080, 234097, 234109, 234110, 234122, 234126, 234193, 234197, 237727, },
+    [167969] = 234022, --{ 233634, 234000, , 234098, 234111, 234119, 234123, 234127, 234194, 234196, 234198, },
+    [168201] = 234023, --{ 233625, 234007, , 234099, 234120, 234124, 234128, 234195, 234199, },
+}
+-- Account for Horde spell IDs
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167961] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167902]
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168043] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[167969]
+private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168200] = private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[168201]
 
-private.UNIT_TYPES = {
-    PLAYER = 0,
-    OBJECT = 1,
-    UNKNOWN = 2,
-    NPC = 3,
-    PET = 4,
-    VEHICLE = 5,
+-- Map of Salvage spells to item IDs of the Salvage containers (no longer loot toasts)
+private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP = {
+    [168178] = 114116, -- Bag of Salvaged Goods
+    [168179] = 114119, -- Crate of Salvage
+    [168180] = 114120, -- Big Crate of Salvage
 }
 
-
-private.UNIT_TYPE_NAMES = {
-    "PLAYER",
-    "OBJECT",
-    "UNKNOWN",
-    "NPC",
-    "PET",
-    "VEHICLE",
+-- Map of Garrison Cache object names to Garrison Cache object IDs
+private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP = {
+    ["Garrison Cache"] = 236916,
+    ["Full Garrison Cache"] = 237722,
+    ["Hefty Garrison Cache"] = 237723,
 }
-
-
-private.ACTION_TYPE_FLAGS = {
-    ITEM = 0x00000001,
-    NPC = 0x00000002,
-    OBJECT = 0x00000004,
-    ZONE = 0x00000008,
-}
-
-
-private.ACTION_TYPE_NAMES = {}
-
-for name, bit in _G.pairs(private.ACTION_TYPE_FLAGS) do
-    private.ACTION_TYPE_NAMES[bit] = name
-end
-
-
-private.EXTRAPOLATION_BANNED_SPELL_IDS = {
-    [13262] = "DISENCHANT",
-    [4036] = "ENGINEERING",
-    [30427] = "EXTRACT_GAS",
-    [131476] = "FISHING",
-    [2366] = "HERB_GATHERING",
-    [51005] = "MILLING",
-    [605] = "MIND_CONTROL",
-    [2575] = "MINING",
-    [921] = "PICK_POCKET",
-    [31252] = "PROSPECTING",
-    [73979] = "SEARCHING_FOR_ARTIFACTS",
-    [8613] = "SKINNING",
-}
-
-
-private.SPELL_LABELS_BY_NAME = {
-    [_G.GetSpellInfo(13262)] = "DISENCHANT",
-    [_G.GetSpellInfo(4036)] = "ENGINEERING",
-    [_G.GetSpellInfo(30427)] = "EXTRACT_GAS",
-    [_G.GetSpellInfo(131476)] = "FISHING",
-    [_G.GetSpellInfo(2366)] = "HERB_GATHERING",
-    [_G.GetSpellInfo(51005)] = "MILLING",
-    [_G.GetSpellInfo(605)] = "MIND_CONTROL",
-    [_G.GetSpellInfo(2575)] = "MINING",
-    [_G.GetSpellInfo(3365)] = "OPENING",
-    [_G.GetSpellInfo(921)] = "PICK_POCKET",
-    [_G.GetSpellInfo(31252)] = "PROSPECTING",
-    [_G.GetSpellInfo(73979)] = "SEARCHING_FOR_ARTIFACTS",
-    [_G.GetSpellInfo(8613)] = "SKINNING",
-}
-
-
-private.NON_LOOT_SPELL_LABELS = {
-    MIND_CONTROL = true,
-}
-
-
-local AF = private.ACTION_TYPE_FLAGS
-
-private.SPELL_FLAGS_BY_LABEL = {
-    DISENCHANT = AF.ITEM,
-    ENGINEERING = AF.NPC,
-    EXTRACT_GAS = AF.ZONE,
-    FISHING = AF.ZONE,
-    HERB_GATHERING = bit.bor(AF.NPC, AF.OBJECT),
-    MILLING = AF.ITEM,
-    MIND_CONTROL = AF.NPC,
-    MINING = bit.bor(AF.NPC, AF.OBJECT),
-    OPENING = AF.OBJECT,
-    PICK_POCKET = AF.NPC,
-    PROSPECTING = AF.ITEM,
-    SEARCHING_FOR_ARTIFACTS = AF.OBJECT,
-    SKINNING = AF.NPC,
-}
-
+private.GARRISON_CACHE_LOOT_SOURCE_ID = 10
 
 private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
+    [142901] = 98546, -- Bulging Heroic Cache of Treasures
     [143506] = 98095, -- Brawler's Pet Supplies
     [143507] = 94207, -- Fabled Pandaren Pet Supplies
     [143508] = 89125, -- Sack of Pet Supplies
@@ -122,115 +55,243 @@ private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [147598] = 104014, -- Pouch of Timeless Coins
     [149222] = 105911, -- Pouch of Enduring Wisdom
     [149223] = 105912, -- Oversized Pouch of Enduring Wisdom
+    --[168178] = 114116, -- Bag of Salvaged Goods
+    --[168179] = 114119, -- Crate of Salvage
+    --[168180] = 114120, -- Big Crate of Salvage
+    [171513] = 116414, -- Pet Supplies
+    [175767] = 118697, -- Big Bag of Pet Supplies
+    [178508] = 120321, -- Mystery Bag
 }
 
-
-private.RAID_FINDER_BOSS_IDS = {
-    -----------------------------------------------------------------------
-    -- Mogu'shan Vaults
-    -----------------------------------------------------------------------
-    [59915] = true, -- Jasper Guardian
-    [60009] = true, -- Feng the Accursed
-    [60043] = true, -- Jade Guardian
-    [60047] = true, -- Amethyst Guardian
-    [60051] = true, -- Cobalt Guardian
-    [60143] = true, -- Gara'jal the Spiritbinder
-    [60399] = true, -- Qin-xi
-    [60400] = true, -- Jan-xi
-    [60410] = true, -- Elegon
-    [60701] = true, -- Zian of the Endless Shadow
-    [60708] = true, -- Meng the Demented
-    [60709] = true, -- Qiang the Merciless
-    [60710] = true, -- Subetai the Swift
-
-    -----------------------------------------------------------------------
-    -- Terrace of Endless Spring
-    -----------------------------------------------------------------------
-    [60583] = true, -- Protector Kaolan
-    [60585] = true, -- Elder Regail
-    [60586] = true, -- Elder Asani
-    [60999] = true, -- Sha of Fear
-    [62442] = true, -- Tsulong
-    [62983] = true, -- Lei Shi
-
-    -----------------------------------------------------------------------
-    -- Heart of Fear
-    -----------------------------------------------------------------------
-    [62164] = true, -- Garalon
-    [62397] = true, -- Wind Lord Mel'jarak
-    [62511] = true, -- Amber-Shaper Un'sok
-    [62543] = true, -- Blade Lord Ta'yak
-    [62837] = true, -- Grand Empress Shek'zeer
-    [62980] = true, -- Imperial Vizier Zor'lok
-
-    -----------------------------------------------------------------------
-    -- Throne of Thunder
-    -----------------------------------------------------------------------
-    [69465] = true, -- Jin'rokh the Breaker
-    [68476] = true, -- Horridon
-    [69078] = true, -- Sul the Sandcrawler
-    [69131] = true, -- Frost King Malakk
-    [69132] = true, -- High Priestess Mar'li
-    [69134] = true, -- Kazra'jin
-    [67977] = true, -- Tortos
-    [70212] = true, -- Flaming Head (of Megaera)
-    [70235] = true, -- Frozen Head (of Megaera)
-    [70247] = true, -- Venomous Head (of Megaera)
-    [69712] = true, -- Ji-kun
-    [68036] = true, -- Durumu
-    [69017] = true, -- Primordius
-    [69427] = true, -- Dark Animus
-    [68078] = true, -- Iron Qon
-    [68904] = true, -- Suen
-    [68905] = true, -- Lu'lin
-    [68397] = true, -- Lei Shen
-
-    -----------------------------------------------------------------------
-    -- Siege of Orgrimmar
-    -----------------------------------------------------------------------
-    [71543] = true, -- Immerseus
-    [71475] = true, -- Rook Stonetoe (Fallen Protectors encounter)
-    [71479] = true, -- He Softfoot (Fallen Protectors encounter)
-    [71480] = true, -- Sun Tenderheart (Fallen Protectors encounter)
-    [71967] = true, -- Norushen (Norushen encounter)
-    [72276] = true, -- Amalgam of Corruption (Norushen encounter)
-    [71734] = true, -- Sha of Pride
-    [72249] = true, -- Galakras
-    [71466] = true, -- Iron Juggernaut
-    [71858] = true, -- Wavebinder Kardris (Kor'kron Dark Shaman encounter)
-    [71859] = true, -- Earthbreaker Haromm (Kor'kron Dark Shaman encounter)
-    [71515] = true, -- General Nazgrim
-    [71454] = true, -- Malkorok
-    [71889] = true, -- Secured Stockpile of Pandaren Spoils (Spoils of Pandaria encounter)
-    [71529] = true, -- Thok the Bloodthirsty
-    [71504] = true, -- Siegecrafter Blackfuse
-    [71152] = true, -- Skeer the Bloodseeker (Paragons of the Klaxxi encounter)
-    [71153] = true, -- Hisek the Swarmkeeper (Paragons of the Klaxxi encounter)
-    [71154] = true, -- Ka'roz the Locust (Paragons of the Klaxxi encounter)
-    [71155] = true, -- Korven the Prime (Paragons of the Klaxxi encounter)
-    [71156] = true, -- Kaz'tik the Manipulator (Paragons of the Klaxxi encounter)
-    [71157] = true, -- Xaril the Poisoned Mind (Paragons of the Klaxxi encounter)
-    [71158] = true, -- Rik'kal the Dissector (Paragons of the Klaxxi encounter)
-    [71160] = true, -- Iyyokuk the Lucid (Paragons of the Klaxxi encounter)
-    [71161] = true, -- Kil'ruk the Wind-Reaver (Paragons of the Klaxxi encounter)
-    [71865] = true, -- Garrosh Hellscream
+private.FACTION_DATA = {
+    -- Used only for private.REP_BUFFS
+    ARGENT_CRUSADE = { 1106, _G.GetFactionInfoByID(1106) },
+    BILGEWATER_CARTEL = { 1133, _G.GetFactionInfoByID(1133) },
+    CENARION_CIRCLE = { 609, _G.GetFactionInfoByID(609) },
+    DARKSPEAR = { 530, _G.GetFactionInfoByID(530) },
+    DARNASSUS = { 69, _G.GetFactionInfoByID(69) },
+    DRAGONMAW_CLAN = { 1172, _G.GetFactionInfoByID(1172) },
+    EARTHEN_RING = { 1135, _G.GetFactionInfoByID(1135) },
+    EBON_BLADE = { 1098, _G.GetFactionInfoByID(1098) },
+    EXODAR = { 930, _G.GetFactionInfoByID(930) },
+    GILNEAS = { 1134, _G.GetFactionInfoByID(1134) },
+    GNOMEREGAN = { 54, _G.GetFactionInfoByID(54) },
+    GUARDIANS_OF_HYJAL = { 1158, _G.GetFactionInfoByID(1158) },
+    GUILD = { 1168, _G.GetFactionInfoByID(1168) },
+    HONOR_HOLD = { 946, _G.GetFactionInfoByID(946) },
+    HUOJIN = { 1352, _G.GetFactionInfoByID(1352) },
+    IRONFORGE = { 47, _G.GetFactionInfoByID(47) },
+    KIRIN_TOR = { 1090, _G.GetFactionInfoByID(1090) },
+    ORGRIMMAR = { 76, _G.GetFactionInfoByID(76) },
+    RAMKAHEN = { 1173, _G.GetFactionInfoByID(1173) },
+    SHATAR = { 935, _G.GetFactionInfoByID(935) },
+    SILVERMOON = { 911, _G.GetFactionInfoByID(911) },
+    STORMWIND = { 72, _G.GetFactionInfoByID(72) },
+    THERAZANE = { 1171, _G.GetFactionInfoByID(1171) },
+    THRALLMAR = { 947, _G.GetFactionInfoByID(947) },
+    THUNDER_BLUFF = { 81, _G.GetFactionInfoByID(81) },
+    TUSHUI = { 1353, _G.GetFactionInfoByID(1353) },
+    UNDERCITY = { 68, _G.GetFactionInfoByID(68) },
+    WILDHAMMER_CLAN = { 1174, _G.GetFactionInfoByID(1174) },
+    WYRMREST_ACCORD = { 1091, _G.GetFactionInfoByID(1091) },
+    -- Commendation Factions
+    ANGLERS = { 1302, _G.GetFactionInfoByID(1302) },
+    AUGUST_CELESTIALS = { 1341, _G.GetFactionInfoByID(1341) },
+    DOMINANCE_OFFENSIVE = { 1375, _G.GetFactionInfoByID(1375) },
+    GOLDEN_LOTUS = { 1269, _G.GetFactionInfoByID(1269) },
+    KIRIN_TOR_OFFENSIVE = { 1387, _G.GetFactionInfoByID(1387) },
+    KLAXXI = { 1337, _G.GetFactionInfoByID(1337) },
+    LOREWALKERS = { 1345, _G.GetFactionInfoByID(1345) },
+    OPERATION_SHIELDWALL = { 1376, _G.GetFactionInfoByID(1376) },
+    ORDER_OF_THE_CLOUD_SERPENTS = { 1271, _G.GetFactionInfoByID(1271) },
+    SHADO_PAN = { 1270, _G.GetFactionInfoByID(1270) },
+    SHADO_PAN_ASSAULT = { 1435, _G.GetFactionInfoByID(1435) },
+    SUNREAVER_ONSLAUGHT = { 1388, _G.GetFactionInfoByID(1388) },
+    TILLERS = { 1272, _G.GetFactionInfoByID(1272) },
 }
 
+private.REP_BUFFS = {
+    -- Tabard Buffs
+    [_G.GetSpellInfo(93830)] = { -- BILGEWATER CARTEL TABARD
+        faction = private.FACTION_DATA.BILGEWATER_CARTEL[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93827)] = { -- DARKSPEAR TABARD
+        faction = private.FACTION_DATA.DARKSPEAR[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93806)] = { -- DARNASSUS TABARD
+        faction = private.FACTION_DATA.DARNASSUS[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93811)] = { -- EXODAR TABARD
+        faction = private.FACTION_DATA.EXODAR[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93816)] = { -- GILNEAS TABARD
+        faction = private.FACTION_DATA.GILNEAS[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93821)] = { -- GNOMEREGAN TABARD
+        faction = private.FACTION_DATA.GNOMEREGAN[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(126436)] = { -- HUOJIN TABARD
+        faction = private.FACTION_DATA.HUOJIN[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(97340)] = { -- ILLUSTRIOUS GUILD TABARD
+        faction = private.FACTION_DATA.GUILD[2],
+        modifier = 1,
+    },
+    [_G.GetSpellInfo(93805)] = { -- IRONFORGE TABARD
+        faction = private.FACTION_DATA.IRONFORGE[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93825)] = { -- ORGRIMMAR TABARD
+        faction = private.FACTION_DATA.ORGRIMMAR[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(97341)] = { -- RENOWNED GUILD TABARD
+        faction = private.FACTION_DATA.GUILD[2],
+        modifier = 0.5,
+    },
+    [_G.GetSpellInfo(93828)] = { -- SILVERMOON CITY TABARD
+        faction = private.FACTION_DATA.SILVERMOON[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93795)] = { -- STORMWIND TABARD
+        faction = private.FACTION_DATA.STORMWIND[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93337)] = { -- TABARD OF RAMKAHEN
+        faction = private.FACTION_DATA.RAMKAHEN[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(57819)] = { -- TABARD OF THE ARGENT CRUSADE
+        faction = private.FACTION_DATA.ARGENT_CRUSADE[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(94158)] = { -- TABARD OF THE DRAGONMAW CLAN
+        faction = private.FACTION_DATA.DRAGONMAW_CLAN[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93339)] = { -- TABARD OF THE EARTHEN RING
+        faction = private.FACTION_DATA.EARTHEN_RING[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(57820)] = { -- TABARD OF THE EBON BLADE
+        faction = private.FACTION_DATA.EBON_BLADE[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93341)] = { -- TABARD OF THE GUARDIANS OF HYJAL
+        faction = private.FACTION_DATA.GUARDIANS_OF_HYJAL[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(57821)] = { -- TABARD OF THE KIRIN TOR
+        faction = private.FACTION_DATA.KIRIN_TOR[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93368)] = { -- TABARD OF THE WILDHAMMER CLAN
+        faction = private.FACTION_DATA.WILDHAMMER_CLAN[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(57822)] = { -- TABARD OF THE WYRMREST ACCORD
+        faction = private.FACTION_DATA.WYRMREST_ACCORD[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(93347)] = { -- TABARD OF THERAZANE
+        faction = private.FACTION_DATA.THERAZANE[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(94463)] = { -- THUNDERBLUFF TABARD
+        faction = private.FACTION_DATA.THUNDER_BLUFF[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(126434)] = { -- TUSHUI TABARD
+        faction = private.FACTION_DATA.TUSHUI[2],
+        ignore = true,
+    },
+    [_G.GetSpellInfo(94462)] = { -- UNDERCITY TABARD
+        faction = private.FACTION_DATA.UNDERCITY[2],
+        ignore = true,
+    },
 
-private.WORLD_BOSS_IDS = {
-    [60491] = true, -- Sha of Anger
-    [62346] = true, -- Galleon
-    [69099] = true, -- Nalak
-    [69161] = true, -- Oondasta
-    [71952] = true, -- Chi-Ji
-    [71953] = true, -- Xuen
-    [71954] = true, -- Niuzao
-    [71955] = true, -- Yu'lon
-    [72057] = true, -- Ordos
+    -- Banner Buffs
+    [_G.GetSpellInfo(90216)] = { -- ALLIANCE GUILD STANDARD
+        ignore = true,
+    },
+    [_G.GetSpellInfo(90708)] = { -- HORDE GUILD STANDARD
+        ignore = true,
+    },
+
+    -- Holiday Buffs
+    [_G.GetSpellInfo(136583)] = { -- DARKMOON TOP HAT
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(24705)] = { -- GRIM VISAGE
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(61849)] = { -- SPIRIT OF SHARING
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(95987)] = { -- UNBURDENED
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(46668)] = { -- WHEE!
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(100951)] = { -- WOW 8TH ANNIVERSARY
+        modifier = 0.08,
+    },
+    [_G.GetSpellInfo(132700)] = { -- WOW 9TH ANNIVERSARY
+        modifier = 0.09,
+    },
+    [_G.GetSpellInfo(150986)] = { -- WOW 10TH ANNIVERSARY
+        modifier = 0.1,
+    },
+
+    -- Situational Buffs
+    [_G.GetSpellInfo(39953)] = { -- ADALS SONG OF BATTLE
+        faction = private.FACTION_DATA.SHATAR[2],
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(30754)] = { -- CENARION FAVOR
+        faction = private.FACTION_DATA.CENARION_CIRCLE[2],
+        modifier = 0.25,
+    },
+    [_G.GetSpellInfo(32098)] = { -- HONOR HOLD FAVOR
+        faction = private.FACTION_DATA.HONOR_HOLD[2],
+        modifier = 0.25,
+    },
+    [_G.GetSpellInfo(39913)] = { -- NAZGRELS FERVOR
+        faction = private.FACTION_DATA.THRALLMAR[2],
+        modifier = 0.1,
+    },
+    [_G.GetSpellInfo(32096)] = { -- THRALLMARS FAVOR
+        faction = private.FACTION_DATA.THRALLMAR[2],
+        modifier = 0.25,
+    },
+    [_G.GetSpellInfo(39911)] = { -- TROLLBANES COMMAND
+        faction = private.FACTION_DATA.HONOR_HOLD[2],
+        modifier = 0.1,
+    },
 }
-
 
 private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
+    -----------------------------------------------------------------------
+    -- World Bosses
+    -----------------------------------------------------------------------
+    [132205] = 60491, -- Sha of Anger Bonus (Sha of Anger)
+    [132206] = 62346, -- Galleon Bonus (Galleon)
+    [136381] = 69099, -- Nalak Bonus (Nalak)
+    [137554] = 69161, -- Oondasta Bonus (Oondasta)
+    [148317] = 71952, -- Celestials Bonus (Chi-Ji)
+    [148316] = 72057, -- Ordos Bonus (Ordos)
+    --[????] = 81535, -- Tarlna the Ageless Bonus Loot (Tarlna the Ageless)
+    --[????] = 87437, -- Drov the Ruiner Bonus Loot (Drov the Ruiner)
+    --[????] = 87493, -- Rukhmar Bonus Loot (Rukhmar)
+
     -----------------------------------------------------------------------
     -- Mogu'shan Vaults
     -----------------------------------------------------------------------
@@ -294,13 +355,109 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [145918] = 71504, -- Siegecrafter Blackfuse Bonus (Siegecrafter Blackfuse)
     [145921] = 71161, -- Klaxxi Paragons Bonus (Kil'ruk the Wind-Reaver)
     [145922] = 71865, -- Garrosh Hellscream Bonus (Garrosh Hellscream)
+
+    -----------------------------------------------------------------------
+    -- Blackrock Foundry
+    -----------------------------------------------------------------------
+    [177510] = 76877, -- Gruul Bonus Loot (Gruul)
+    [177511] = 77182, -- Oregorger Bonus Loot (Oregorger)
+    [177512] = 76809, -- Blast Furnace Loot (Foreman Feldspar)
+    [177513] = 76973, -- Hans'gar & Franzok Bonus Loot (Hans'gar)
+    [177515] = 76814, -- Flamebender Ka'graz Bonus Loot (Flamebender Ka'graz)
+    [177516] = 77692, -- Kromog Bonus Loot (Kromog)
+    [177517] = 76865, -- Beastlord Darmac Bonus Loot (Beastlord Darmac)
+    [177518] = 76906, -- Operator Thogar Bonus Loot (Operator Thogar)
+    [177519] = 77557, -- The Iron Maidens Bonus Loot (Admiral Gar'an)
+    [177520] = 87420, -- Blackhand Bonus Loot (Blackhand)
+
+    -----------------------------------------------------------------------
+    -- Highmaul
+    -----------------------------------------------------------------------
+    [177503] = 87444, -- Kargath Bladefist Bonus Loot (Kargath Bladefist)
+    [177504] = 87447, -- Butcher Bonus Loot (The Butcher)
+    [177505] = 87446, -- Tectus Bonus Loot (Tectus)
+    [177506] = 87441, -- Brackenspore Bonus Loot (Brackenspore)
+    [177507] = 87449, -- Twin Ogron Bonus Loot (Twin Ogron)
+    [177508] = 87445, -- Ko'ragh Bonus Loot (Ko'ragh)
+    [177509] = 87818, -- Imperator Mar'gok Bonus Loot (Imperator Mar'gok)
 }
 
-private.WORLD_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
-    [132205] = 60491, -- Sha of Anger Bonus (Sha of Anger)
-    [132206] = 62346, -- Galleon Bonus (Galleon)
-    [136381] = 69099, -- Nalak Bonus (Nalak)
-    [137554] = 69161, -- Oondasta Bonus (Oondasta)
-    [148317] = 71952, -- Celestials Bonus (Chi-Ji)
-    [148316] = 72057, -- Ordos Bonus (Ordos)
+
+-----------------------------------------------------------------------
+-- Fundamental Constants.
+-----------------------------------------------------------------------
+private.wow_version, private.build_num = _G.GetBuildInfo()
+private.region = GetCVar("portal"):sub(0,2):upper()
+-- PTR/Beta return "public-test", but they are properly called "XX"
+if private.region == "PU" then private.region = "XX" end
+
+private.UNIT_TYPES = {
+    PLAYER = "Player",
+    OBJECT = "GameObject",
+    UNKNOWN = "Unknown",
+    NPC = "Creature",
+    PET = "Pet",
+    VEHICLE = "Vehicle",
+    ITEM = "Item",
+}
+
+private.UNIT_TYPE_NAMES = {
+    ["Player"] = "PLAYER",
+    ["GameObject"] = "OBJECT",
+    ["Unknown"] = "UNKNOWN",
+    ["Creature"] = "NPC",
+    ["Pet"] = "PET",
+    ["Vehicle"] = "VEHICLE",
+    ["Item"] = "ITEM",
+}
+
+private.ACTION_TYPE_FLAGS = {
+    ITEM = 0x00000001,
+    NPC = 0x00000002,
+    OBJECT = 0x00000004,
+    ZONE = 0x00000008,
+}
+
+private.ACTION_TYPE_NAMES = {}
+
+for name, bit in _G.pairs(private.ACTION_TYPE_FLAGS) do
+    private.ACTION_TYPE_NAMES[bit] = name
+end
+
+private.SPELL_LABELS_BY_NAME = {
+    [_G.GetSpellInfo(13262)] = "DISENCHANT",
+    [_G.GetSpellInfo(4036)] = "ENGINEERING",
+    [_G.GetSpellInfo(30427)] = "EXTRACT_GAS",
+    [_G.GetSpellInfo(131476)] = "FISHING",
+    [_G.GetSpellInfo(2366)] = "HERB_GATHERING",
+    [_G.GetSpellInfo(51005)] = "MILLING",
+    [_G.GetSpellInfo(605)] = "MIND_CONTROL",
+    [_G.GetSpellInfo(2575)] = "MINING",
+    [_G.GetSpellInfo(3365)] = "OPENING",
+    [_G.GetSpellInfo(921)] = "PICK_POCKET",
+    [_G.GetSpellInfo(31252)] = "PROSPECTING",
+    [_G.GetSpellInfo(73979)] = "SEARCHING_FOR_ARTIFACTS",
+    [_G.GetSpellInfo(8613)] = "SKINNING",
+}
+
+private.NON_LOOT_SPELL_LABELS = {
+    MIND_CONTROL = true,
+}
+
+local AF = private.ACTION_TYPE_FLAGS
+
+private.SPELL_FLAGS_BY_LABEL = {
+    DISENCHANT = AF.ITEM,
+    ENGINEERING = AF.NPC,
+    EXTRACT_GAS = AF.ZONE,
+    FISHING = AF.ZONE,
+    HERB_GATHERING = bit.bor(AF.NPC, AF.OBJECT),
+    MILLING = AF.ITEM,
+    MIND_CONTROL = AF.NPC,
+    MINING = bit.bor(AF.NPC, AF.OBJECT),
+    OPENING = AF.OBJECT,
+    PICK_POCKET = AF.NPC,
+    PROSPECTING = AF.ITEM,
+    SEARCHING_FOR_ARTIFACTS = AF.OBJECT,
+    SKINNING = AF.NPC,
 }
