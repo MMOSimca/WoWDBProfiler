@@ -1336,10 +1336,6 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, specID,
                     local currency_texture = CurrencyLinkToTexture(item_link)
                     if currency_texture and currency_texture ~= "" then
                         Debug("%s: %s X %d", event_name, currency_texture, quantity)
-                        -- Workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
-                        if quantity > 1000 and currency_texture == "pvecurrency-valor" then
-                            quantity = math.floor(quantity / 100)
-                        end
                         table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
                     else
                         Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
