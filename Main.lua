@@ -2135,11 +2135,7 @@ do
             if not item_id then
                 local item_name, item_link = DatamineTT:GetItem()
                 item_id = ItemLinkToID(item_link)
-                if item_id then
-                    Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - %s", event_name, item_id)
-                else
-                    Debug("%s: GetMerchantItemLink() still ocassionally fails, apparently. Failed item's ID - nil", event_name)
-                end
+                -- GetMerchantItemLink() still ocassionally fails as of Patch 6.0.2. It fails so badly that debug functions cause considerable slowdown.
             end
 
             if item_id and item_id > 0 then
