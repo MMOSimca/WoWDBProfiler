@@ -33,6 +33,14 @@ private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP = {
     [168180] = 114120, -- Big Crate of Salvage
 }
 
+-- Map of Garrison Cache object names to Garrison Cache object IDs
+private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP = {
+    ["Garrison Cache"] = 236916,
+    ["Full Garrison Cache"] = 237722,
+    ["Hefty Garrison Cache"] = 237723,
+}
+private.GARRISON_CACHE_LOOT_SOURCE_ID = 10
+
 private.LOOT_SPELL_ID_TO_ITEM_ID_MAP = {
     [142397] = 98134, -- Heroic Cache of Treasures
     [142901] = 98546, -- Bulging Heroic Cache of Treasures

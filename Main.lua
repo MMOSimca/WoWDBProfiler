@@ -166,6 +166,7 @@ local killed_boss_id_timer_handle
 local killed_npc_id
 local target_location_timer_handle
 local last_timber_spell_id
+local last_garrison_cache_object_id
 local chat_loot_timer_handle
 local current_target_id
 local current_area_id
@@ -1266,15 +1267,39 @@ function WDP:UNIT_PET(event_name, unit_id)
 end
 
 
-function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity)
+function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, specID, sex, isPersonal, lootSource)
     if not loot_type or (loot_type ~= "item" and loot_type ~= "money" and loot_type ~= "currency") then
         Debug("%s: loot_type is %s. Item link is %s, and quantity is %d.", event_name, loot_type, item_link, quantity)
         return
     end
     local container_id = private.loot_toast_container_id
     local npc_id = private.raid_boss_id
+    
+    -- Handle Garrison cache specially
+    if lootSource and last_garrison_cache_object_id and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) then
+        -- Record location data for cache
+        UpdateDBEntryLocation("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
 
-    if npc_id then
+        -- Add drop data
+        local currency_texture = CurrencyLinkToTexture(item_link)
+        if currency_texture and currency_texture ~= "" then
+            -- Check for top level object data
+            local object_entry = DBEntry("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
+            local difficulty_token = InstanceDifficultyToken()
+            if object_entry[difficulty_token] then
+                -- Increment loot count
+                object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
+
+                Debug("%s: %s X %d", event_name, currency_texture, quantity)
+                object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
+                table.insert(object_entry[difficulty_token]["opening"], ("currency:%d:%s"):format(quantity, currency_texture))
+            else
+                Debug("%s: When handling the Garrison cache, the top level loot data was missing for objectID %d.", event_name, last_garrison_cache_object_id)
+            end
+        else
+            Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+        end
+    elseif npc_id then
         -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
         if DUPLICATE_WORLD_BOSS_IDS[npc_id] then
@@ -1730,17 +1755,23 @@ end -- do-block
 
 
 function WDP:CURSOR_UPDATE(event_name)
-    if current_action.fishing_target or _G.Minimap:IsMouseOver() or current_action.spell_label ~= "FISHING" then
+    if current_action.fishing_target or _G.Minimap:IsMouseOver() then
         return
     end
     local text = _G["GameTooltipTextLeft1"]:GetText()
 
-    if not text or text == "Fishing Bobber" then
-        text = "NONE"
-    else
-        current_action.fishing_target = true
+    -- Handle Fishing
+    if (current_action.spell_label == "FISHING") then
+        if not text or text == "Fishing Bobber" then
+            text = "NONE"
+        else
+            current_action.fishing_target = true
+        end
+        current_action.identifier = ("%s:%s"):format(current_action.spell_label, text)
+     -- Handle Garrison Cache
+    elseif private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP[text] then
+        last_garrison_cache_object_id = private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP[text]
     end
-    current_action.identifier = ("%s:%s"):format(current_action.spell_label, text)
 end
 
 
