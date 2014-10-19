@@ -116,7 +116,7 @@ local EVENT_MAPPING = {
     MERCHANT_SHOW = "UpdateMerchantItems",
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
-    PET_JOURNAL_LIST_UPDATE = true,
+    --PET_JOURNAL_LIST_UPDATE = true,
     PLAYER_REGEN_DISABLED = true,
     PLAYER_REGEN_ENABLED = true,
     PLAYER_TARGET_CHANGED = true,
@@ -561,7 +561,14 @@ local function HandleItemUse(item_link, bag_index, slot_index)
     if not is_lootable then
         return
     end
-    DatamineTT:ClearLines()
+
+    table.wipe(current_action)
+    current_loot = nil
+    current_action.target_type = AF.ITEM
+    current_action.identifier = item_id
+    current_action.loot_label = "contains"
+
+    --[[DatamineTT:ClearLines()
     DatamineTT:SetBagItem(bag_index, slot_index)
 
     for line_index = 1, DatamineTT:NumLines() do
@@ -582,7 +589,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             return
         end
     end
-    Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)
+    Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)]]--
 end
 
 
@@ -2276,8 +2283,8 @@ function WDP:PET_BAR_UPDATE(event_name)
 end
 
 
-function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
-    -- This function produces data currently unused by wowdb.com and it makes debugging errors in the .lua output nearly impossible due to the massive bloat.
+-- This function produces data currently unused by wowdb.com, and it causes unneeded bloat in the raw lua DB.
+--[[function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
     if DEBUGGING then
         return
     end
@@ -2305,7 +2312,7 @@ function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
             end
         end
     end
-end
+end]]--
 
 
 function WDP:PLAYER_REGEN_DISABLED(event_name)
