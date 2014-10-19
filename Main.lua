@@ -1366,7 +1366,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, specID,
             if item_id then
                 Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
                 RecordItemData(item_id, item_link, true)
-                current_loot.sources[container_id][item_id] = current_loot.sources[container_id][item_id] or 0 + quantity
+                current_loot.sources[container_id][item_id] = (current_loot.sources[container_id][item_id] or 0) + quantity
             else
                 Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
                 current_loot = nil
@@ -1374,13 +1374,13 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, specID,
             end
         elseif loot_type == "money" then
             Debug("%s: money X %d", event_name, quantity)
-            current_loot.sources[container_id]["money"] = current_loot.sources[container_id]["money"] or 0 + quantity
+            current_loot.sources[container_id]["money"] = (current_loot.sources[container_id]["money"] or 0) + quantity
         elseif loot_type == "currency" then
             local currency_texture = CurrencyLinkToTexture(item_link)
             if currency_texture and currency_texture ~= "" then
                 Debug("%s: %s X %d", event_name, currency_texture, quantity)
                 local currency_token = ("currency:%s"):format(currency_texture)
-                current_loot.sources[container_id][currency_token] = current_loot.sources[container_id][currency_token] or 0 + quantity
+                current_loot.sources[container_id][currency_token] = (current_loot.sources[container_id][currency_token] or 0) + quantity
             else
                 Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
                 current_loot = nil
@@ -1804,7 +1804,7 @@ do
                 end
             end
 
-            if not locked_item_id or (current_action.identifier and current_action.identifier ~= locked_item_id) then
+            if (not current_action.spell_label == "DISENCHANT") and (not locked_item_id or (current_action.identifier and current_action.identifier ~= locked_item_id)) then
                 return false
             end
             current_action.identifier = locked_item_id
@@ -2060,7 +2060,7 @@ do
                             local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                             Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
                             current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                            current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
+                            current_loot.sources[source_guid][item_id] = (current_loot.sources[source_guid][item_id] or 0) + loot_quantity
                             guids_used[source_guid] = true
                         elseif slot_type == LOOT_SLOT_MONEY then
                             Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
@@ -2068,7 +2068,7 @@ do
                                 table.insert(current_loot.list, ("money:%d"):format(loot_quantity))
                             else
                                 current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                                current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + loot_quantity
+                                current_loot.sources[source_guid]["money"] = (current_loot.sources[source_guid]["money"] or 0) + loot_quantity
                                 guids_used[source_guid] = true
                             end
                         elseif slot_type == LOOT_SLOT_CURRENCY then
@@ -2081,7 +2081,7 @@ do
                                     local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
 
                                     current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                                    current_loot.sources[source_guid][currency_token] = current_loot.sources[source_guid][currency_token] or 0 + loot_quantity
+                                    current_loot.sources[source_guid][currency_token] = (current_loot.sources[source_guid][currency_token] or 0) + loot_quantity
                                     guids_used[source_guid] = true
                                 end
                             else
