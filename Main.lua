@@ -14,6 +14,8 @@ local next = _G.next
 local select = _G.select
 local unpack = _G.unpack
 
+local LOOT_SLOT_CURRENCY, LOOT_SLOT_ITEM, LOOT_SLOT_MONEY = _G.LOOT_SLOT_CURRENCY, _G.LOOT_SLOT_ITEM, _G.LOOT_SLOT_MONEY
+
 
 -- ADDON NAMESPACE ----------------------------------------------------
 
@@ -897,12 +899,6 @@ function WDP:OnInitialize()
 
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
-
-    -- Disable if using a MoP build
-    if build_num < 19000 then
-        WDP:Disable()
-        return
-    end
 
     if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
         for entry in pairs(DATABASE_DEFAULTS.global) do
@@ -2060,13 +2056,13 @@ do
                         local source_type, source_id = ParseGUID(source_guid)
                         local source_key = ("%s:%d"):format(source_type, source_id)
 
-                        if slot_type == _G.LOOT_SLOT_ITEM then
+                        if slot_type == LOOT_SLOT_ITEM then
                             local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
                             Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
                             current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
                             current_loot.sources[source_guid][item_id] = current_loot.sources[source_guid][item_id] or 0 + loot_quantity
                             guids_used[source_guid] = true
-                        elseif slot_type == _G.LOOT_SLOT_MONEY then
+                        elseif slot_type == LOOT_SLOT_MONEY then
                             Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
                             if current_loot.target_type == AF.ZONE then
                                 table.insert(current_loot.list, ("money:%d"):format(loot_quantity))
@@ -2075,7 +2071,7 @@ do
                                 current_loot.sources[source_guid]["money"] = current_loot.sources[source_guid]["money"] or 0 + loot_quantity
                                 guids_used[source_guid] = true
                             end
-                        elseif slot_type == _G.LOOT_SLOT_CURRENCY then
+                        elseif slot_type == LOOT_SLOT_CURRENCY then
                             -- Same bug with GetLootSlotInfo() will screw up currency when it happens, so we won't process this slot's loot.
                             if icon_texture then
                                 Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
