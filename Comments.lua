@@ -202,7 +202,7 @@ local function CreateQuestComment()
         WDP:Print("You must select a quest from the World Map's Quest frame.")
         return
     end
-    local title, _, tag, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
+    local title, _, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
 
     if is_header then
         WDP:Print("You must select a quest from the World Map's Quest frame.")
@@ -363,7 +363,7 @@ do
         local quest_index = _G.GetQuestLogSelection()
 
         if quest_index and _G.QuestMapFrame:IsVisible() and not _G.QuestScrollFrame:IsVisible() then
-            local title, _, suggested_group, is_header, _, _, _, idnum = _G.GetQuestLogTitle(quest_index)
+            local title, _, _, is_header = _G.GetQuestLogTitle(quest_index)
 
             if not is_header then
                 line = display:AddLine(("Quest: %s"):format(title))

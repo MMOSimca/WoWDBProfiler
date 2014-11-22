@@ -1288,7 +1288,7 @@ function WDP:UNIT_PET(event_name, unit_id)
 end
 
 
-function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID, is_personal, loot_source)
+function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID, sex_ID, is_personal, loot_source)
     if not loot_type or (loot_type ~= "item" and loot_type ~= "money" and loot_type ~= "currency") then
         Debug("%s: loot_type is %s. Item link is %s, and quantity is %d.", event_name, loot_type, item_link, quantity)
         return
@@ -1297,7 +1297,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     local npc_id = private.raid_boss_id
 
     -- Need information on the most recent args, so using this complete debug statement for now
-    Debug("%s: loot_type: %s, item_link: %s, quantity: %s, spec_ID: %s, is_personal: %s, loot_source: %s", event_name, loot_type, item_link, quantity, spec_ID, is_personal, loot_source)
+    Debug("%s: loot_type: %s, item_link: %s, quantity: %s, spec_ID: %s, sex_ID: %s, is_personal: %s, loot_source: %s", event_name, loot_type, item_link, quantity, spec_ID, sex_ID, is_personal, loot_source)
 
     -- Handle Garrison cache specially
     if lootSource and last_garrison_cache_object_id and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) then
