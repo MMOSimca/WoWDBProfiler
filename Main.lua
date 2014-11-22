@@ -1493,6 +1493,22 @@ do
         end
         update_func(item_id, quantity)
     end
+
+
+    function WDP:CHAT_MSG_SYSTEM(event_name, message)
+        local item_link, quantity = deformat(message, _G.ERR_QUEST_REWARD_ITEM_MULT_IS)
+        if not item_link then
+            quantity, item_link = 1, deformat(message, _G.ERR_QUEST_REWARD_ITEM_S)
+        end
+        local item_id = ItemLinkToID(item_link)
+
+        if not item_id then
+            return
+        end
+
+        -- We only want to record the item's incoming data; no other need for system messages atm.
+        RecordItemData(item_id, item_link, true)
+    end
 end
 
 
