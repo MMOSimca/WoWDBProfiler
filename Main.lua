@@ -203,6 +203,10 @@ local function Debug(message, ...)
         for index = 1, #args do
             if args[index] == nil then
                 args[index] = "nil"
+            elseif args[index] == true then
+                args[index] = "true"
+            elseif args[index] == false then
+                args[index] = "false"
             end
         end
         _G.print(message:format(unpack(args)))
@@ -1293,7 +1297,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     local npc_id = private.raid_boss_id
 
     -- Need information on the most recent args, so using this complete debug statement for now
-    Debug("%s: loot_type: %s, item_link: %s, quantity: %s, spec_ID: %s, is_personal: %s, loot_source: %s", event_name, loot_type, item_link, quantity, spec_ID, (is_personal and "true") or "false", loot_source)
+    Debug("%s: loot_type: %s, item_link: %s, quantity: %s, spec_ID: %s, is_personal: %s, loot_source: %s", event_name, loot_type, item_link, quantity, spec_ID, is_personal, loot_source)
 
     -- Handle Garrison cache specially
     if lootSource and last_garrison_cache_object_id and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) then
