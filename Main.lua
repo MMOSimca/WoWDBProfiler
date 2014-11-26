@@ -14,8 +14,6 @@ local next = _G.next
 local select = _G.select
 local unpack = _G.unpack
 
-local LOOT_SLOT_CURRENCY, LOOT_SLOT_ITEM, LOOT_SLOT_MONEY = _G.LOOT_SLOT_CURRENCY, _G.LOOT_SLOT_ITEM, _G.LOOT_SLOT_MONEY
-
 
 -- ADDON NAMESPACE ----------------------------------------------------
 
@@ -49,6 +47,10 @@ local PLAYER_FACTION = _G.UnitFactionGroup("player")
 local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
+
+local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
+local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
+local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
 
 local TIMBER_ITEM_ID = 114781
 
@@ -201,13 +203,7 @@ local function Debug(message, ...)
         local args = { ... }
 
         for index = 1, #args do
-            if args[index] == nil then
-                args[index] = "nil"
-            elseif args[index] == true then
-                args[index] = "true"
-            elseif args[index] == false then
-                args[index] = "false"
-            end
+            args[index] = tostring(args[index])
         end
         _G.print(message:format(unpack(args)))
     else
