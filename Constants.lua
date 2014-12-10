@@ -288,9 +288,9 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [137554] = 69161, -- Oondasta Bonus (Oondasta)
     [148317] = 71952, -- Celestials Bonus (Chi-Ji)
     [148316] = 72057, -- Ordos Bonus (Ordos)
-    --[????] = 81535, -- Tarlna the Ageless Bonus Loot (Tarlna the Ageless)
-    --[????] = 87437, -- Drov the Ruiner Bonus Loot (Drov the Ruiner)
-    --[????] = 87493, -- Rukhmar Bonus Loot (Rukhmar)
+    [178848] = 81252, -- Drov the Ruiner Bonus Loot (Drov the Ruiner)
+    [178850] = 81535, -- Tarlna the Ageless Bonus Loot (Tarlna the Ageless)
+    [178852] = 83746, -- Rukhmar Bonus Loot (Rukhmar)
 
     -----------------------------------------------------------------------
     -- Mogu'shan Vaults
@@ -368,18 +368,18 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [177517] = 76865, -- Beastlord Darmac Bonus Loot (Beastlord Darmac)
     [177518] = 76906, -- Operator Thogar Bonus Loot (Operator Thogar)
     [177519] = 77557, -- The Iron Maidens Bonus Loot (Admiral Gar'an)
-    [177520] = 87420, -- Blackhand Bonus Loot (Blackhand)
+    [177520] = 77325, -- Blackhand Bonus Loot (Blackhand)
 
     -----------------------------------------------------------------------
     -- Highmaul
     -----------------------------------------------------------------------
-    [177503] = 87444, -- Kargath Bladefist Bonus Loot (Kargath Bladefist)
-    [177504] = 87447, -- Butcher Bonus Loot (The Butcher)
-    [177505] = 87446, -- Tectus Bonus Loot (Tectus)
-    [177506] = 87441, -- Brackenspore Bonus Loot (Brackenspore)
-    [177507] = 87449, -- Twin Ogron Bonus Loot (Twin Ogron)
-    [177508] = 87445, -- Ko'ragh Bonus Loot (Ko'ragh)
-    [177509] = 87818, -- Imperator Mar'gok Bonus Loot (Imperator Mar'gok)
+    [177503] = 78714, -- Kargath Bladefist Bonus Loot (Kargath Bladefist)
+    [177504] = 77404, -- Butcher Bonus Loot (The Butcher)
+    [177505] = 78948, -- Tectus Bonus Loot (Tectus)
+    [177506] = 78491, -- Brackenspore Bonus Loot (Brackenspore)
+    [177507] = 78237, -- Twin Ogron Bonus Loot (Phemos)
+    [177508] = 79015, -- Ko'ragh Bonus Loot (Ko'ragh)
+    [177509] = 77428, -- Imperator Mar'gok Bonus Loot (Imperator Mar'gok)
 }
 
 
