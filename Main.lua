@@ -59,9 +59,9 @@ local CHI_WAVE_SPELL_ID = 132464
 local DISGUISE_SPELL_ID = 121308
 
 -- For timer-based loot gathering of abnormal containers (that don't use SHOW_LOOT_TOAST, sadly)
-local BAG_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168178]
-local CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168179]
-local BIG_CRATE_OF_SALVAGE_ITEM_ID = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[168180]
+local BAG_OF_SALVAGE_ITEM_ID = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[168178]
+local CRATE_OF_SALVAGE_ITEM_ID = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[168179]
+local BIG_CRATE_OF_SALVAGE_ITEM_ID = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[168180]
 
 -- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
 local DUPLICATE_WORLD_BOSS_IDS = {
@@ -1448,21 +1448,19 @@ do
         end,
         [AF.OBJECT] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.OBJECT %d (%d)", item_id, quantity)
-            --for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id] do
-                -- Check for top level object data
-                local object_entry = DBEntry("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id]))
-                local difficulty_token = InstanceDifficultyToken()
-                if object_entry[difficulty_token] then
-                    -- Increment loot count
-                    object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
+            -- Check for top level object data
+            local object_entry = DBEntry("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id]))
+            local difficulty_token = InstanceDifficultyToken()
+            if object_entry[difficulty_token] then
+                -- Increment loot count
+                object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
 
-                    -- Add drop data
-                    object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
-                    table.insert(object_entry[difficulty_token]["opening"], ("%d:%d"):format(item_id, quantity))
-                else
-                    Debug("CHAT_MSG_LOOT: When handling timber, the top level loot data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id])
-                end
-            --end
+                -- Add drop data
+                object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
+                table.insert(object_entry[difficulty_token]["opening"], ("%d:%d"):format(item_id, quantity))
+            else
+                Debug("CHAT_MSG_LOOT: When handling timber, the top level data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id])
+            end
         end,
         [AF.ZONE] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.ZONE %d (%d)", item_id, quantity)
@@ -2674,10 +2672,6 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
                     elseif loot_type == "currency" then
                         local currency_texture = CurrencyLinkToTexture(hyperlink)
                         Debug("%s: Assigned stored currency loot data - %s - currency:%d:%s", event_name, hyperlink, currency_texture, quantity)
-                        -- Workaround for Patch 5.4.0 bug with Flexible raid Siege of Orgrimmar bosses and Valor Points
-                        if quantity > 1000 and currency_texture == "pvecurrency-valor" then
-                            quantity = math.floor(quantity / 100)
-                        end
                         table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
                     end
                 end
@@ -2708,25 +2702,23 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     -- Handle Logging spell casts
     if private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] then
         last_timber_spell_id = spell_id
-        --for timber_variant = 1, #private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] do
         UpdateDBEntryLocation("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id]))
-        --end
         return
     end
 
     -- Handle Loot Toast spell casts
-    if private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
+    if private.LOOT_TOAST_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
         ClearLootToastData()
 
-        private.loot_toast_container_id = private.LOOT_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
+        private.loot_toast_container_id = private.LOOT_TOAST_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later
         return
     end
 
     -- For Crates of Salvage (and potentially other items based on spell casts in the future which need manual handling)
-    if private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
+    if private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         -- Set up timer
         Debug("%s: Beginning Salvage loot timer for spellID %d", event_name, spell_id)
         chat_loot_timer_handle = WDP:ScheduleTimer(ClearTimeBasedLootData, 1)
@@ -2735,7 +2727,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         table.wipe(current_action)
         current_loot = nil
         current_action.target_type = AF.ITEM
-        current_action.identifier = private.SALVAGE_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
+        current_action.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         current_action.loot_label = "contains"
         InitializeCurrentLoot()
         return
