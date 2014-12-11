@@ -14,13 +14,15 @@ local next = _G.next
 local select = _G.select
 local unpack = _G.unpack
 
+local C_Timer = _G.C_Timer
+
 
 -- ADDON NAMESPACE ----------------------------------------------------
 
 local ADDON_NAME, private = ...
 
 local LibStub = _G.LibStub
-local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0")
+local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
 local LPJ = LibStub("LibPetJournal-2.0")
@@ -849,7 +851,7 @@ end
 
 local function ClearKilledBossID()
     if killed_boss_id_timer_handle then
-        WDP:CancelTimer(killed_boss_id_timer_handle)
+        killed_boss_id_timer_handle:Cancel()
         killed_boss_id_timer_handle = nil
     end
 
@@ -860,7 +862,7 @@ end
 
 local function ClearLootToastContainerID()
     if loot_toast_container_timer_handle then
-        WDP:CancelTimer(loot_toast_container_timer_handle)
+        loot_toast_container_timer_handle:Cancel()
         loot_toast_container_timer_handle = nil
     end
 
@@ -870,9 +872,8 @@ end
 
 
 local function ClearLootToastData()
-    -- cancel existing timer if found
     if loot_toast_data_timer_handle then
-        WDP:CancelTimer(loot_toast_data_timer_handle)
+        loot_toast_data_timer_handle:Cancel()
         loot_toast_data_timer_handle = nil
     end
 
@@ -885,7 +886,7 @@ end
 local function ClearTimeBasedLootData()
     Debug("ClearTimeBasedLootData: Ending salvage loot timer.")
     if chat_loot_timer_handle then
-        WDP:CancelTimer(chat_loot_timer_handle)
+        chat_loot_timer_handle:Cancel()
         chat_loot_timer_handle = nil
     end
 
@@ -955,8 +956,16 @@ function WDP:OnEnable()
     for index = 1, _G.GetNumLanguages() do
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
-    item_process_timer_handle = self:ScheduleRepeatingTimer("ProcessItems", 30)
-    target_location_timer_handle = self:ScheduleRepeatingTimer("UpdateTargetLocation", 0.5)
+
+    -- These two timers loop indefinitely by constantly resetting their remaining iterations to 100k.
+    item_process_timer_handle = C_Timer.NewTicker(30, function()
+        item_process_timer_handle._remainingIterations = 100000
+        WDP:ProcessItems()
+    end, 100000)
+    target_location_timer_handle = C_Timer.NewTicker(0.5, function()
+        target_location_timer_handle._remainingIterations = 100000
+        WDP:UpdateTargetLocation()
+    end, 100000)
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
@@ -1420,7 +1429,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
             RecordItemData(item_id, item_link, true)
         end
 
-        loot_toast_data_timer_handle = WDP:ScheduleTimer(ClearLootToastData, 5)
+        loot_toast_data_timer_handle = C_Timer.NewTimer(5, ClearLootToastData)
     end
 end
 
@@ -1581,7 +1590,7 @@ do
                 private.discovered_recipe_name = recipe_name
                 private.profession_level = prof_level
 
-                self:ScheduleTimer(IterativeRecordDiscovery, 0.2)
+                C_Timer.After(0.2, IterativeRecordDiscovery)
             end
         end
 
@@ -1664,7 +1673,7 @@ do
                 --Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN) -- broken in Patch 5.4
             end
             killed_npc_id = unit_idnum
-            WDP:ScheduleTimer(ClearKilledNPC, 0.1)
+            C_Timer.After(0.1, ClearKilledNPC)
         end,
     }
 
@@ -2684,7 +2693,7 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
 
     ClearLootToastData()
 
-    killed_boss_id_timer_handle = WDP:ScheduleTimer(ClearKilledBossID, 5) -- we need to assign a handle here to cancel it later
+    killed_boss_id_timer_handle = C_Timer.NewTimer(5, ClearKilledBossID) -- we need to assign a handle here to cancel it later
 end
 
 
@@ -2709,7 +2718,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         ClearLootToastData()
 
         private.loot_toast_container_id = private.LOOT_TOAST_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
-        loot_toast_container_timer_handle = WDP:ScheduleTimer(ClearLootToastContainerID, 1) -- we need to assign a handle here to cancel it later
+        loot_toast_container_timer_handle = C_Timer.NewTimer(1, ClearLootToastContainerID) -- we need to assign a handle here to cancel it later
         return
     end
 
@@ -2717,7 +2726,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     if private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         -- Set up timer
         Debug("%s: Beginning Salvage loot timer for spellID %d", event_name, spell_id)
-        chat_loot_timer_handle = WDP:ScheduleTimer(ClearTimeBasedLootData, 1)
+        chat_loot_timer_handle = C_Timer.NewTimer(1, ClearTimeBasedLootData)
 
         -- Standard item handling setup
         table.wipe(current_action)
