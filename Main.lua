@@ -1288,10 +1288,6 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     if not loot_type or (loot_type ~= "item" and loot_type ~= "money" and loot_type ~= "currency") then
         Debug("%s: loot_type is %s. Item link is %s, and quantity is %d.", event_name, loot_type, item_link, quantity)
         return
-    -- loot_source of 3 seems to occur only when it is being 'faked' and the item was actually in the loot window, whereas loot_source of 1 or 10 is real
-    -- Ignoring this event when the loot_source is 'faked' should drastically reduce the chances of loot data being misrecorded
-    elseif not loot_source or loot_source == 3 then
-        Debug("%s: Aborting attempts to handle loot toast because it has a loot_source of 3 or nil.", event_name)
     end
     local container_id = private.loot_toast_container_id
     local npc_id = private.raid_boss_id
