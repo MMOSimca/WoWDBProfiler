@@ -1057,7 +1057,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
                 if not item.seen_bonuses then
                     item.seen_bonuses = {}
                 end
-                item.seen_bonuses[0] = true
+                item.seen_bonuses["0"] = true
             end
         elseif num_bonus_ids > 0 then
             item = DBEntry("items", item_id)
