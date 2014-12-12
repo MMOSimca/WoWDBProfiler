@@ -1054,11 +1054,10 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
                     item.instance_difficulty_id = instance_difficulty_id
                 end
 
-                -- Future code: waiting for dev time to implement server-side parsing
-                --[[if not item.bonus_ids then
-                    item.bonus_ids = {}
+                if not item.seen_bonuses then
+                    item.seen_bonuses = {}
                 end
-                item.bonus_ids[0] = true]]--
+                item.seen_bonuses[0] = true
             end
         elseif num_bonus_ids > 0 then
             item = DBEntry("items", item_id)
@@ -1066,15 +1065,36 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
             item.unique_id = bit.band(unique_id, 0xFFFF)
             item.instance_difficulty_id = instance_difficulty_id
 
-            if not item.bonus_ids then
-                item.bonus_ids = {}
+            if not item.seen_bonuses then
+                item.seen_bonuses = {}
             end
-            
-            for bonus_index = 1, num_bonus_ids do
-                item.bonus_ids[tonumber(item_results[13 + bonus_index])] = true
+
+            -- We want the bonus ID combo output to be in the form ["bonusID1:bonusID2:bonusID3"] = true
+            -- And sorted numerically with the smallest bonusID first
+            local sorted_bonus_string = ""
+            local min_bonus_id_array = {}
+            for iterations = 1, num_bonus_ids do
+                -- Find minimum of this iteration
+                local min_bonus_id = 100000
+                for bonus_index = 1, num_bonus_ids do
+                    local temp_bonus_id = tonumber(item_results[13 + bonus_index])
+                    if (not min_bonus_id_array[temp_bonus_id]) and (min_bonus_id < temp_bonus_id) then
+                        min_bonus_id = temp_bonus_id
+                    end
+                end
+
+                -- Keep track of already processed IDs
+                min_bonus_id_array[min_bonus_id] = true
+
+                -- Build string
+                if iterations == 1 then
+                    sorted_bonus_string = sorted_bonus_string .. tostring(min_bonus_id)
+                else
+                    sorted_bonus_string = sorted_bonus_string .. ":" .. tostring(min_bonus_id)
+                end
             end
-            
-            Debug("RecordItemData: Recorded bonusIDs for %d.", item_id)
+
+            Debug("RecordItemData: Recorded bonus IDs %s for item %d.", sorted_bonus_string, item_id)
         else
             Debug("RecordItemData: num_bonus_ids is supposed to be 0 or positive, instead it was %d.", num_bonus_ids)
         end
