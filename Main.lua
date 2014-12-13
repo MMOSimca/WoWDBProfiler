@@ -1078,7 +1078,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
                 local min_bonus_id = 100000
                 for bonus_index = 1, num_bonus_ids do
                     local temp_bonus_id = tonumber(item_results[13 + bonus_index])
-                    if (not min_bonus_id_array[temp_bonus_id]) and (min_bonus_id < temp_bonus_id) then
+                    if (not min_bonus_id_array[temp_bonus_id]) and (temp_bonus_id < min_bonus_id) then
                         min_bonus_id = temp_bonus_id
                     end
                 end
