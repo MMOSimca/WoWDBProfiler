@@ -65,6 +65,19 @@ private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP = {
     [168180] = 114120, -- Big Crate of Salvage
 }
 
+-- List of items that, when right-clicked, reward loot (includes items from DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP).
+-- This means they -must- be tracked via CHAT_MSG_LOOT.
+-- It also means there is a high margin for bad data since multiple bags can be clicked within a small time frame.
+-- True = instant cast; false = cast time
+private.CONTAINER_ITEM_ID_LIST = {
+    [114116] = false, -- Bag of Salvaged Goods
+    [114119] = false, -- Crate of Salvage
+    [114120] = false, -- Big Crate of Salvage
+    [116980] = true, -- Invader's Forgotten Treasure
+    [120319] = true, -- Invader's Damaged Cache
+    [120320] = true, -- Invader's Abandoned Sack
+}
+
 private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     -----------------------------------------------------------------------
     -- World Bosses
