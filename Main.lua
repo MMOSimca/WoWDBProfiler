@@ -890,7 +890,7 @@ local function ClearChatLootData()
         chat_loot_timer_handle = nil
     end
 
-    if current_loot and current_loot.identifier and (CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
+    if current_loot and current_loot.identifier and (private.CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
         GenericLootUpdate("items")
     end
     current_loot = nil
@@ -1458,7 +1458,7 @@ do
             local currency_token = ("currency:%s"):format(currency_texture)
             local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
-            if container_id and (CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
+            if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
                 Debug("CHAT_MSG_CURRENCY: AF.ITEM %s (%d)", currency_token, quantity)
                 current_loot.sources[container_id] = current_loot.sources[container_id] or {}
                 current_loot.sources[container_id][currency_token] = (current_loot.sources[container_id][currency_token] or 0) + quantity
@@ -1516,7 +1516,7 @@ do
         [AF.ITEM] = function(item_id, quantity)
             local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
-            if container_id and (CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
+            if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
                 Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
                 current_loot.sources[container_id] = current_loot.sources[container_id] or {}
                 current_loot.sources[container_id][item_id] = (current_loot.sources[container_id][item_id] or 0) + quantity
