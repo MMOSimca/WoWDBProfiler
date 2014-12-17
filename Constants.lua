@@ -88,34 +88,34 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [137554] = 69161, -- Oondasta Bonus (Oondasta)
     [148317] = 71952, -- Celestials Bonus (Chi-Ji)
     [148316] = 72057, -- Ordos Bonus (Ordos)
-    [178848] = 81252, -- Drov the Ruiner Bonus Loot (Drov the Ruiner)
-    [178850] = 81535, -- Tarlna the Ageless Bonus Loot (Tarlna the Ageless)
-    [178852] = 83746, -- Rukhmar Bonus Loot (Rukhmar)
+    [178847] = 81252, -- Drov Bonus (Drov the Ruiner)
+    [178849] = 81535, -- Tarlna Bonus (Tarlna the Ageless)
+    [178851] = 83746, -- Rukhmar Bonus (Rukhmar)
 
     -----------------------------------------------------------------------
     -- Blackrock Foundry
     -----------------------------------------------------------------------
-    [177510] = 76877, -- Gruul Bonus Loot (Gruul)
-    [177511] = 77182, -- Oregorger Bonus Loot (Oregorger)
-    [177512] = 76809, -- Blast Furnace Loot (Foreman Feldspar)
-    [177513] = 76973, -- Hans'gar & Franzok Bonus Loot (Hans'gar)
-    [177515] = 76814, -- Flamebender Ka'graz Bonus Loot (Flamebender Ka'graz)
-    [177516] = 77692, -- Kromog Bonus Loot (Kromog)
-    [177517] = 76865, -- Beastlord Darmac Bonus Loot (Beastlord Darmac)
-    [177518] = 76906, -- Operator Thogar Bonus Loot (Operator Thogar)
-    [177519] = 77557, -- The Iron Maidens Bonus Loot (Admiral Gar'an)
-    [177520] = 77325, -- Blackhand Bonus Loot (Blackhand)
+    [177529] = 76877, -- Gruul Bonus (Gruul)
+    [177530] = 77182, -- Oregorger Bonus (Oregorger)
+    [177531] = 76809, -- Blast Furnace (Foreman Feldspar)
+    [177533] = 76973, -- Hans'gar & Franzok Bonus (Hans'gar)
+    [177534] = 76814, -- Flamebender Ka'graz Bonus (Flamebender Ka'graz)
+    [177535] = 77692, -- Kromog Bonus (Kromog)
+    [177536] = 76865, -- Beastlord Darmac Bonus (Beastlord Darmac)
+    [177537] = 76906, -- Operator Thogar Bonus (Operator Thogar)
+    [177538] = 77557, -- The Iron Maidens Bonus (Admiral Gar'an)
+    [177539] = 77325, -- Blackhand Bonus (Blackhand)
 
     -----------------------------------------------------------------------
     -- Highmaul
     -----------------------------------------------------------------------
-    [177503] = 78714, -- Kargath Bladefist Bonus Loot (Kargath Bladefist)
-    [177504] = 77404, -- Butcher Bonus Loot (The Butcher)
-    [177505] = 78948, -- Tectus Bonus Loot (Tectus)
-    [177506] = 78491, -- Brackenspore Bonus Loot (Brackenspore)
-    [177507] = 78237, -- Twin Ogron Bonus Loot (Phemos)
-    [177508] = 79015, -- Ko'ragh Bonus Loot (Ko'ragh)
-    [177509] = 77428, -- Imperator Mar'gok Bonus Loot (Imperator Mar'gok)
+    [177521] = 78714, -- Kargath Bladefist Bonus (Kargath Bladefist)
+    [177522] = 77404, -- Butcher Bonus (The Butcher)
+    [177523] = 78948, -- Tectus Bonus (Tectus)
+    [177524] = 78491, -- Brackenspore Bonus (Brackenspore)
+    [177525] = 78237, -- Twin Ogron Bonus (Phemos)
+    [177526] = 79015, -- Ko'ragh Bonus (Ko'ragh)
+    [177528] = 77428, -- Imperator Mar'gok Bonus (Imperator Mar'gok)
 
     -----------------------------------------------------------------------
     -- Mists of Pandaria
