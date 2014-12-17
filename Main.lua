@@ -60,11 +60,6 @@ local TIMBER_ITEM_ID = 114781
 local CHI_WAVE_SPELL_ID = 132464
 local DISGUISE_SPELL_ID = 121308
 
--- For timer-based loot gathering of abnormal containers (that don't use SHOW_LOOT_TOAST, sadly)
-local BAG_OF_SALVAGE_ITEM_ID = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[168178]
-local CRATE_OF_SALVAGE_ITEM_ID = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[168179]
-local BIG_CRATE_OF_SALVAGE_ITEM_ID = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[168180]
-
 -- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
 local DUPLICATE_WORLD_BOSS_IDS = {
     [71952] = { 71953, 71954, 71955, },
@@ -99,6 +94,7 @@ local EVENT_MAPPING = {
     BANKFRAME_OPENED = true,
     BATTLEFIELDS_SHOW = true,
     BLACK_MARKET_ITEM_UPDATE = true,
+    CHAT_MSG_CURRENCY = true,
     CHAT_MSG_LOOT = true,
     CHAT_MSG_MONSTER_SAY = "RecordQuote",
     CHAT_MSG_MONSTER_WHISPER = "RecordQuote",
@@ -722,6 +718,7 @@ do
         local entry
 
         -- At this point we only have a name if it's an object.
+        -- (As of 5.x, the above statement is almost never true, but there are a few cases, like gas extractions.)
         if current_loot.target_type == AF.OBJECT then
             entry = DBEntry(data_type, ("%s:%s"):format(current_loot.spell_label, current_loot.object_name))
         else
@@ -893,7 +890,7 @@ local function ClearChatLootData()
         chat_loot_timer_handle = nil
     end
 
-    if current_loot and current_loot.identifier and (current_loot.identifier == BAG_OF_SALVAGE_ITEM_ID or current_loot.identifier == CRATE_OF_SALVAGE_ITEM_ID or current_loot.identifier == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
+    if current_loot and current_loot.identifier and (CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
         GenericLootUpdate("items")
     end
     current_loot = nil
@@ -1456,11 +1453,70 @@ end
 
 
 do
+    local CHAT_MSG_CURRENCY_UPDATE_FUNCS = {
+        [AF.ITEM] = function(currency_texture, quantity)
+            local currency_token = ("currency:%s"):format(currency_texture)
+            local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
+            -- Verify that we're still assigning data to the right items
+            if container_id and (CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
+                Debug("CHAT_MSG_CURRENCY: AF.ITEM %s (%d)", currency_token, quantity)
+                current_loot.sources[container_id] = current_loot.sources[container_id] or {}
+                current_loot.sources[container_id][currency_token] = (current_loot.sources[container_id][currency_token] or 0) + quantity
+            else -- If not, cancel the timer and wipe the loot table early
+                Debug("CHAT_MSG_CURRENCY: We would have assigned the wrong loot!")
+                ClearChatLootData()
+            end
+        end,
+        [AF.NPC] = function(currency_texture, quantity)
+            Debug("CHAT_MSG_CURRENCY: AF.NPC currency:%s (%d)", currency_texture, quantity)
+        end,
+        [AF.ZONE] = function(currency_texture, quantity)
+            local currency_token = ("currency:%s"):format(currency_texture)
+            Debug("CHAT_MSG_CURRENCY: AF.ZONE %s (%d)", currency_token, quantity)
+            InitializeCurrentLoot()
+            current_loot.list[1] = ("%s:%d"):format(currency_token, quantity)
+            GenericLootUpdate("zones")
+            current_loot = nil
+        end,
+    }
+
+
+    function WDP:CHAT_MSG_CURRENCY(event_name, message)
+        local category
+
+        local currency_link, quantity = deformat(message, _G.CURRENCY_GAINED_MULTIPLE)
+        if not currency_link then
+            quantity, currency_link = 1, deformat(message, _G.CURRENCY_GAINED)
+        end
+        local currency_texture = CurrencyLinkToTexture(currency_link)
+
+        if not currency_texture or currency_texture == "" then
+            return
+        end
+
+        -- Set update category
+        if current_action.spell_label == "FISHING" then
+            category = AF.ZONE
+        elseif raid_boss_id then
+            category = AF.NPC
+        elseif chat_loot_timer_handle then
+            category = AF.ITEM
+        end
+
+        -- Take action based on update category
+        local update_func = CHAT_MSG_CURRENCY_UPDATE_FUNCS[category]
+        if not category or not update_func then
+            return
+        end
+        update_func(currency_texture, quantity)
+    end
+
+
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function(item_id, quantity)
             local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
-            if container_id and (container_id == BAG_OF_SALVAGE_ITEM_ID or container_id == CRATE_OF_SALVAGE_ITEM_ID or container_id == BIG_CRATE_OF_SALVAGE_ITEM_ID) then
+            if container_id and (CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
                 Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
                 current_loot.sources[container_id] = current_loot.sources[container_id] or {}
                 current_loot.sources[container_id][item_id] = (current_loot.sources[container_id][item_id] or 0) + quantity
@@ -1498,7 +1554,7 @@ do
     }
 
 
-    function WDP:CHAT_MSG_CURRENCY(event_name, message)
+    function WDP:CHAT_MSG_LOOT(event_name, message)
         local category
 
         local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
@@ -1517,7 +1573,7 @@ do
         -- Recently changed from ~= "EXTRACT_GAS" because of some occassional bad data, and, as far as I know, no benefit.
         elseif current_action.spell_label == "FISHING" then
             category = AF.ZONE
-        elseif private.raid_boss_id then
+        elseif raid_boss_id then
             category = AF.NPC
         elseif chat_loot_timer_handle then
             category = AF.ITEM
@@ -1532,22 +1588,22 @@ do
         end
         update_func(item_id, quantity)
     end
+end
 
 
-    function WDP:CHAT_MSG_SYSTEM(event_name, message)
-        local item_link, quantity = deformat(message, _G.ERR_QUEST_REWARD_ITEM_MULT_IS)
-        if not item_link then
-            quantity, item_link = 1, deformat(message, _G.ERR_QUEST_REWARD_ITEM_S)
-        end
-        local item_id = ItemLinkToID(item_link)
-
-        if not item_id then
-            return
-        end
-
-        -- We only want to record the item's incoming data; no other need for system messages atm.
-        RecordItemData(item_id, item_link, true)
+function WDP:CHAT_MSG_SYSTEM(event_name, message)
+    local item_link, quantity = deformat(message, _G.ERR_QUEST_REWARD_ITEM_MULT_IS)
+    if not item_link then
+        quantity, item_link = 1, deformat(message, _G.ERR_QUEST_REWARD_ITEM_S)
     end
+    local item_id = ItemLinkToID(item_link)
+
+    if not item_id then
+        return
+    end
+
+    -- We only want to record the item's incoming data; no other need for system messages atm.
+    RecordItemData(item_id, item_link, true)
 end
 
 
