@@ -593,7 +593,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
     current_action.loot_label = "contains"
 
     -- For items that open instantly with no spell cast
-    if private.CONTAINER_ITEM_ID_LIST[item_id] == true then
+    if (not _G.GetNumLootItems()) and (private.CONTAINER_ITEM_ID_LIST[item_id] == true) then
         ClearChatLootData()
         Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
         chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
@@ -1107,6 +1107,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
                 end
             end
 
+            item.seen_bonuses[sorted_bonus_string] = true
             Debug("RecordItemData: Recorded bonus IDs %s for item %d.", sorted_bonus_string, item_id)
         else
             Debug("RecordItemData: num_bonus_ids is supposed to be 0 or positive, instead it was %d.", num_bonus_ids)
@@ -1592,11 +1593,12 @@ do
             category = AF.ITEM
         end
 
+        -- We still want to record the item's data, even if it doesn't need its drop location recorded
+        RecordItemData(item_id, item_link, true)
+
         -- Take action based on update category
         local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
         if not category or not update_func then
-            -- We still want to record the item's data, even if it doesn't need its drop location recorded
-            RecordItemData(item_id, item_link, true)
             return
         end
         update_func(item_id, quantity)
@@ -2028,6 +2030,9 @@ do
 
 
     function WDP:LOOT_CLOSED(event_name)
+        if chat_loot_timer_handle then
+            ClearChatLootData()
+        end
         current_loot = nil
         table.wipe(current_action)
     end
