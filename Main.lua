@@ -193,6 +193,10 @@ local current_action = {
 }
 
 
+-- Timer prototypes
+local ClearKilledNPC, ClearKilledBossID, ClearLootToastContainerID, ClearLootToastData, ClearChatLootData
+
+
 -- HELPERS ------------------------------------------------------------
 
 local function Debug(message, ...)
@@ -210,6 +214,25 @@ local function Debug(message, ...)
     else
         _G.print(message)
     end
+end
+
+
+local function InitializeCurrentLoot()
+    current_loot = {
+        list = {},
+        sources = {},
+        identifier = current_action.identifier,
+        label = current_action.loot_label or "drops",
+        map_level = current_action.map_level,
+        object_name = current_action.object_name,
+        spell_label = current_action.spell_label,
+        target_type = current_action.target_type,
+        x = current_action.x,
+        y = current_action.y,
+        zone_data = current_action.zone_data,
+    }
+
+    table.wipe(current_action)
 end
 
 
@@ -569,6 +592,14 @@ local function HandleItemUse(item_link, bag_index, slot_index)
     current_action.identifier = item_id
     current_action.loot_label = "contains"
 
+    -- For items that open instantly with no spell cast
+    if private.CONTAINER_ITEM_ID_LIST[item_id] == true then
+        ClearChatLootData()
+        Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
+        chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
+        InitializeCurrentLoot()
+    end
+
     --[[DatamineTT:ClearLines()
     DatamineTT:SetBagItem(bag_index, slot_index)
 
@@ -823,33 +854,15 @@ do
     end
 end
 
-local function InitializeCurrentLoot()
-    current_loot = {
-        list = {},
-        sources = {},
-        identifier = current_action.identifier,
-        label = current_action.loot_label or "drops",
-        map_level = current_action.map_level,
-        object_name = current_action.object_name,
-        spell_label = current_action.spell_label,
-        target_type = current_action.target_type,
-        x = current_action.x,
-        y = current_action.y,
-        zone_data = current_action.zone_data,
-    }
-
-    table.wipe(current_action)
-end
-
 
 -- TIMERS -------------------------------------------------------------
 
-local function ClearKilledNPC()
+function ClearKilledNPC()
     killed_npc_id = nil
 end
 
 
-local function ClearKilledBossID()
+function ClearKilledBossID()
     if killed_boss_id_timer_handle then
         killed_boss_id_timer_handle:Cancel()
         killed_boss_id_timer_handle = nil
@@ -860,7 +873,7 @@ local function ClearKilledBossID()
 end
 
 
-local function ClearLootToastContainerID()
+function ClearLootToastContainerID()
     if loot_toast_container_timer_handle then
         loot_toast_container_timer_handle:Cancel()
         loot_toast_container_timer_handle = nil
@@ -871,7 +884,7 @@ local function ClearLootToastContainerID()
 end
 
 
-local function ClearLootToastData()
+function ClearLootToastData()
     if loot_toast_data_timer_handle then
         loot_toast_data_timer_handle:Cancel()
         loot_toast_data_timer_handle = nil
@@ -883,15 +896,15 @@ local function ClearLootToastData()
 end
 
 
-local function ClearChatLootData()
-    Debug("ClearChatLootData: Ending chat-based loot timer.")
+function ClearChatLootData()
     if chat_loot_timer_handle then
+        Debug("ClearChatLootData: Ending chat-based loot timer.")
         chat_loot_timer_handle:Cancel()
         chat_loot_timer_handle = nil
-    end
 
-    if current_loot and current_loot.identifier and (private.CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
-        GenericLootUpdate("items")
+        if current_loot and current_loot.identifier and (private.CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
+            GenericLootUpdate("items")
+        end
     end
     current_loot = nil
 end
@@ -2707,6 +2720,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
 end
 
 
+-- Triggered by bonus roll prompts, disenchant prompts, and in a few other rare circumstances
 function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text, duration, currency_id_cost)
     if private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP[spell_id] then
         ClearKilledBossID()
@@ -2785,14 +2799,14 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     private.tracked_line = nil
     private.previous_spell_id = spell_id
 
-    -- Handle Logging spell casts
+    -- For spells cast when Logging
     if private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id] then
         last_timber_spell_id = spell_id
         UpdateDBEntryLocation("objects", ("OPENING:%s"):format(private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[spell_id]))
         return
     end
 
-    -- Handle Loot Toast spell casts
+    -- For spells cast by items that always trigger loot toasts
     if private.LOOT_TOAST_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         ClearKilledBossID()
         ClearLootToastContainerID()
@@ -2803,10 +2817,11 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         return
     end
 
-    -- For Crates of Salvage (and potentially other items based on spell casts in the future which need manual handling)
+    -- For spells cast by items that don't usually trigger loot toasts
     if private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
         -- Set up timer
-        Debug("%s: Beginning Salvage loot timer for spellID %d", event_name, spell_id)
+        ClearChatLootData()
+        Debug("%s: Beginning chat-based loot timer for spellID %d", event_name, spell_id)
         chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
 
         -- Standard item handling setup

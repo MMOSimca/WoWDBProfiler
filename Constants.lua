@@ -279,6 +279,11 @@ private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP = {
 -- True = instant cast; false = cast time
 private.CONTAINER_ITEM_ID_LIST = {
     [116980] = true, -- Invader's Forgotten Treasure
+    [118529] = true, -- Cache of Highmaul Treasures (Normal)
+    [118530] = true, -- Cache of Highmaul Treasures (Heroic)
+    [118531] = true, -- Cache of Highmaul Treasures (Mythic)
+    [119036] = true, -- Box of Storied Treasures
+    [119037] = true, -- Supply of Storied Rarities
     [120319] = true, -- Invader's Damaged Cache
     [120320] = true, -- Invader's Abandoned Sack
 }
