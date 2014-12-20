@@ -111,6 +111,7 @@ local EVENT_MAPPING = {
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
+    LOOT_SLOT_CLEARED = "ClearChatLootData",
     MAIL_SHOW = true,
     MERCHANT_CLOSED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
