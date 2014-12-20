@@ -111,7 +111,7 @@ local EVENT_MAPPING = {
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
-    LOOT_SLOT_CLEARED = "ClearChatLootData",
+    LOOT_SLOT_CLEARED = true,
     MAIL_SHOW = true,
     MERCHANT_CLOSED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
@@ -898,14 +898,15 @@ end
 
 
 function ClearChatLootData()
-    if chat_loot_timer_handle then
-        Debug("ClearChatLootData: Ending chat-based loot timer.")
-        chat_loot_timer_handle:Cancel()
-        chat_loot_timer_handle = nil
+    if not chat_loot_timer_handle then
+        return
+    end
+    Debug("ClearChatLootData: Ending chat-based loot timer.")
+    chat_loot_timer_handle:Cancel()
+    chat_loot_timer_handle = nil
 
-        if current_loot and current_loot.identifier and (private.CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
-            GenericLootUpdate("items")
-        end
+    if current_loot and current_loot.identifier and (private.CONTAINER_ITEM_ID_LIST[current_loot.identifier] ~= nil) then
+        GenericLootUpdate("items")
     end
     current_loot = nil
 end
@@ -1272,6 +1273,11 @@ end -- do-block
 
 
 -- EVENT HANDLERS -----------------------------------------------------
+
+function WDP:LOOT_SLOT_CLEARED(...)
+    ClearChatLootData()
+end
+
 
 function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] then
@@ -2031,9 +2037,7 @@ do
 
 
     function WDP:LOOT_CLOSED(event_name)
-        if chat_loot_timer_handle then
-            ClearChatLootData()
-        end
+        ClearChatLootData()
         current_loot = nil
         table.wipe(current_action)
     end
@@ -2136,9 +2140,7 @@ do
 
 
     function WDP:LOOT_OPENED(event_name)
-        if chat_loot_timer_handle then
-            ClearChatLootData()
-        end
+        ClearChatLootData()
 
         if current_loot then
             current_loot = nil
