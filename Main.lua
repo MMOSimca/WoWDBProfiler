@@ -1947,8 +1947,12 @@ do
             current_action.identifier = locked_item_id
             return true
         end,
-        [AF.NPC] = true,
-        [AF.OBJECT] = true,
+        [AF.NPC] = function()
+            return not _G.IsFishingLoot()
+        end,
+        [AF.OBJECT] = function()
+            return not _G.IsFishingLoot()
+        end,
         [AF.ZONE] = function()
             current_action.zone_data = UpdateDBEntryLocation("zones", current_action.identifier)
             return _G.IsFishingLoot()
@@ -2131,7 +2135,6 @@ do
             return false
         end
 
-        Debug("%s: Successfully extrapolated information for current_action.", log_source)
         return true
     end
 
@@ -2150,8 +2153,6 @@ do
         end
 
         if not current_action.target_type then
-            Debug("%s: No target type found. Attempting to extrapolate current_action from loot data.", event_name)
-
             if not ExtrapolatedCurrentActionFromLootData(event_name) then
                 Debug("%s: Unable to extrapolate current_action. Aborting attempts to handle loot for now.", event_name)
                 return
