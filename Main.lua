@@ -40,6 +40,8 @@ local DB_VERSION = 18
 local DEBUGGING = false
 local EVENT_DEBUG = false
 
+local ITEM_ID_TIMBER = 114781
+
 local OBJECT_ID_ANVIL = 192628
 local OBJECT_ID_FISHING_BOBBER = 35591
 local OBJECT_ID_FORGE = 1685
@@ -53,12 +55,6 @@ local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
 local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
 local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
-
-local TIMBER_ITEM_ID = 114781
-
--- Ignoring NPC casts of the following spells
-local CHI_WAVE_SPELL_ID = 132464
-local DISGUISE_SPELL_ID = 121308
 
 -- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
 local DUPLICATE_WORLD_BOSS_IDS = {
@@ -1589,7 +1585,7 @@ do
         end
 
         -- Set update category
-        if last_timber_spell_id and item_id == TIMBER_ITEM_ID then
+        if last_timber_spell_id and item_id == ITEM_ID_TIMBER then
             category = AF.OBJECT
         -- Recently changed from ~= "EXTRACT_GAS" because of some occassional bad data, and, as far as I know, no benefit.
         elseif current_action.spell_label == "FISHING" then
@@ -1711,8 +1707,15 @@ do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
+    -- Spells that are cast by players that are mistakely assigned as being cast by the target; must be blacklisted
+    local BLACKLISTED_SPELLS = {
+        [117526] = true, -- Binding Shot
+        [132464] = true, -- Chi Wave
+        [121308] = true, -- Disguise
+    }
+
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
-        if not spell_id or spell_id == CHI_WAVE_SPELL_ID or spell_id == DISGUISE_SPELL_ID then
+        if not spell_id or BLACKLISTED_SPELLS[spell_id] then
             return
         end
         local source_type, source_id = ParseGUID(source_guid)
