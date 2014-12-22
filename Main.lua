@@ -449,7 +449,7 @@ local function ItemLinkToID(item_link)
     if not item_link then
         return
     end
-    return tonumber(item_link:match("item:(%d+)"))
+    return tonumber(tostring(item_link):match("item:(%d+)"))
 end
 
 private.ItemLinkToID = ItemLinkToID
