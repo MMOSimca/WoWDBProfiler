@@ -583,7 +583,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
     end
     local _, _, _, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
 
-    if not is_lootable then
+    if not is_lootable and not private.CONTAINER_ITEM_ID_LIST[item_id] then
         return
     end
 
@@ -1613,22 +1613,6 @@ do
 end
 
 
-function WDP:CHAT_MSG_SYSTEM(event_name, message)
-    local item_link, quantity = deformat(message, _G.ERR_QUEST_REWARD_ITEM_MULT_IS)
-    if not item_link then
-        quantity, item_link = 1, deformat(message, _G.ERR_QUEST_REWARD_ITEM_S)
-    end
-    local item_id = ItemLinkToID(item_link)
-
-    if not item_id then
-        return
-    end
-
-    -- We only want to record the item's incoming data; no other need for system messages atm.
-    RecordItemData(item_id, item_link, true)
-end
-
-
 function WDP:RecordQuote(event_name, message, source_name, language_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] or not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
         return
@@ -1677,35 +1661,48 @@ do
 
 
     function WDP:CHAT_MSG_SYSTEM(event_name, message)
-        if not private.trainer_shown then
-            local recipe_name = message:match(RECIPE_MATCH)
-
-            if recipe_name and private.previous_spell_id then
-                local profession_name, prof_level = _G.GetTradeSkillLine()
-
-                if profession_name == _G.UNKNOWN then
-                    return
-                end
-                private.discovered_recipe_name = recipe_name
-                private.profession_level = prof_level
-
-                C_Timer.After(0.2, IterativeRecordDiscovery)
-            end
+        local item_link, quantity = deformat(message, _G.ERR_QUEST_REWARD_ITEM_MULT_IS)
+        if not item_link then
+            quantity, item_link = 1, deformat(message, _G.ERR_QUEST_REWARD_ITEM_S)
         end
+        local item_id = ItemLinkToID(item_link)
 
-        if currently_drunk then
-            if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
-                currently_drunk = nil
+        -- If it isn't a quest message, check the other uses of system messages
+        if not item_id then
+            if not private.trainer_shown then
+                local recipe_name = message:match(RECIPE_MATCH)
+
+                if recipe_name and private.previous_spell_id then
+                    local profession_name, prof_level = _G.GetTradeSkillLine()
+
+                    if profession_name == _G.UNKNOWN then
+                        return
+                    end
+                    private.discovered_recipe_name = recipe_name
+                    private.profession_level = prof_level
+
+                    C_Timer.After(0.2, IterativeRecordDiscovery)
+                end
+            end
+
+            if currently_drunk then
+                if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
+                    currently_drunk = nil
+                end
+                return
+            end
+
+            for index = 1, #DRUNK_MATCHES do
+                if message == DRUNK_COMPARES[index] or message:match(DRUNK_MATCHES[index]) then
+                    currently_drunk = true
+                    break
+                end
             end
             return
         end
 
-        for index = 1, #DRUNK_MATCHES do
-            if message == DRUNK_COMPARES[index] or message:match(DRUNK_MATCHES[index]) then
-                currently_drunk = true
-                break
-            end
-        end
+        -- We only want to record the item's incoming data; no other need for system messages atm.
+        RecordItemData(item_id, item_link, true)
     end
 end
 
