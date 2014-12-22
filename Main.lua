@@ -2045,17 +2045,38 @@ do
 
 
     local function ExtrapolatedCurrentActionFromLootData(event_name)
+        local log_source = event_name .. "- ExtrapolatedCurrentActionFromLootData"
+        local previous_spell_label = current_action.spell_label
         local extrapolated_guid_registry = {}
         local num_guids = 0
+        table.wipe(current_action)
 
-        -- Loot extrapolation cannot handle objects that need special spell labels (like HERBALISM or MINING) (MIND_CONTROL is okay)
-        if private.SPELL_FLAGS_BY_LABEL[current_action.spell_label] and not private.NON_LOOT_SPELL_LABELS[current_action.spell_label] then
-            Debug("%s: Problematic spell label %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
-            table.wipe(current_action)
-            return false
+        if _G.IsFishingLoot() then
+            -- Set up a proper 'fishing' current_action table
+            local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
+            if not (zone_name and area_id and x and y and map_level) then
+                Debug("%s: Missing current location data - %s, %d, %d, %d, %d.", log_source, zone_name, area_id, x, y, map_level)
+                return
+            end
+            current_action.instance_token = instance_token
+            current_action.map_level = map_level
+            current_action.x = x
+            current_action.y = y
+            current_action.zone_data = ("%s:%d"):format(zone_name, area_id)
+            current_action.spell_label = "FISHING"
+            current_action.loot_label = "fishing"
+            current_action.identifier = "FISHING:NONE"
+            current_action.target_type = AF.ZONE
+
+            Debug("%s: Fishing loot detected.", log_source)
+            return true
         end
 
-        table.wipe(current_action)
+        -- Loot extrapolation cannot handle objects that need special spell labels (like HERBALISM or MINING) (MIND_CONTROL is okay)
+        if previous_spell_label and private.SPELL_FLAGS_BY_LABEL[previous_spell_label] and not private.NON_LOOT_SPELL_LABELS[previous_spell_label] then
+            Debug("%s: Problematic spell label %s found. Loot extrapolation for this set of loot would have run an increased risk of introducing bad data into the system.", log_source, private.previous_spell_id)
+            return false
+        end
 
         for loot_slot = 1, _G.GetNumLootItems() do
             local loot_info = {
@@ -2079,7 +2100,6 @@ do
                 end
             end
         end
-        local log_source = event_name .. "- ExtrapolatedCurrentActionFromLootData"
 
         if num_guids == 0 then
             Debug("%s: No GUIDs found in loot. Blank loot window?", log_source)
