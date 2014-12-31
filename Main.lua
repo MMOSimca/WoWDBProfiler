@@ -590,7 +590,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
     current_action.loot_label = "contains"
 
     -- For items that open instantly with no spell cast
-    if (not _G.GetNumLootItems()) and (private.CONTAINER_ITEM_ID_LIST[item_id] == true) then
+    if _G.GetNumLootItems() == 0 and private.CONTAINER_ITEM_ID_LIST[item_id] == true then
         ClearChatLootData()
         Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
         chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
