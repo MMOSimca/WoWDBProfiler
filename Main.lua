@@ -90,6 +90,7 @@ local EVENT_MAPPING = {
     BANKFRAME_OPENED = true,
     BATTLEFIELDS_SHOW = true,
     BLACK_MARKET_ITEM_UPDATE = true,
+    BONUS_ROLL_RESULT = true,
     CHAT_MSG_CURRENCY = true,
     CHAT_MSG_LOOT = true,
     CHAT_MSG_MONSTER_SAY = "RecordQuote",
@@ -1272,6 +1273,14 @@ end -- do-block
 
 function WDP:LOOT_SLOT_CLEARED(...)
     ClearChatLootData()
+end
+
+
+-- For now, bonus roll data only pollutes the true drop percentages. We still want to capture the data from SPELL_CONFIRMATION_PROMPT because of legendary quest items though.
+function WDP:BONUS_ROLL_RESULT(event_name)
+    Debug("%s: Bonus roll detected; stopping loot recording for this boss to avoid recording bonus loot.", event_name)
+    ClearKilledBossID()
+    ClearLootToastContainerID()
 end
 
 
