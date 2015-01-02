@@ -70,8 +70,6 @@ private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP = {
     [73500] = 52340,
     [80615] = 58856,
     [84193] = 60838,
-    [85325] = 54218,
-    [85435] = 50301,
     [99438] = 69956,
     [99500] = 69990,
     [109946] = 78890,
@@ -296,15 +294,20 @@ private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP = {
 -- It also means there is a high margin for bad data since multiple bags can be clicked within a small time frame.
 -- True = instant cast; false = cast time
 private.CONTAINER_ITEM_ID_LIST = {
-    [105751] = true, -- Kor'kron Shaman's Treasure
-    [116980] = true, -- Invader's Forgotten Treasure
-    [118529] = true, -- Cache of Highmaul Treasures (Normal)
-    [118530] = true, -- Cache of Highmaul Treasures (Heroic)
-    [118531] = true, -- Cache of Highmaul Treasures (Mythic)
-    [119036] = true, -- Box of Storied Treasures
-    [119037] = true, -- Supply of Storied Rarities
-    [120319] = true, -- Invader's Damaged Cache
-    [120320] = true, -- Invader's Abandoned Sack
+    [50301] = true,
+    [54218] = true,
+    [97565] = true,
+    [102137] = true,
+    [105751] = true,
+    [110592] = true,
+    [116980] = true,
+    [118529] = true,
+    [118530] = true,
+    [118531] = true,
+    [119036] = true,
+    [119037] = true,
+    [120319] = true,
+    [120320] = true,
 }
 for key, value in next, private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP do
     private.CONTAINER_ITEM_ID_LIST[value] = false

@@ -575,27 +575,35 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         end
     end
 
-    if not bag_index or not slot_index then
-        return
+    local any_loot = false
+
+    -- Check if Blizzard has marked this item has officially having a chance of containing loot
+    if bag_index and slot_index then
+        local _, _, _, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
+        if is_lootable then
+            any_loot = true
+        end
     end
-    local _, _, _, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
-
-    if not is_lootable and not private.CONTAINER_ITEM_ID_LIST[item_id] then
-        return
+    
+    -- Check if we've marked this item as one Blizzard provides bad is_lootable data for
+    if private.CONTAINER_ITEM_ID_LIST[item_id] ~= nil then
+        any_loot = true
     end
 
-    table.wipe(current_action)
-    current_loot = nil
-    current_action.target_type = AF.ITEM
-    current_action.identifier = item_id
-    current_action.loot_label = "contains"
+    if any_loot then
+        table.wipe(current_action)
+        current_loot = nil
+        current_action.target_type = AF.ITEM
+        current_action.identifier = item_id
+        current_action.loot_label = "contains"
 
-    -- For items that open instantly with no spell cast
-    if _G.GetNumLootItems() == 0 and private.CONTAINER_ITEM_ID_LIST[item_id] == true then
-        ClearChatLootData()
-        Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
-        chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
-        InitializeCurrentLoot()
+        -- For items that open instantly with no spell cast
+        if (private.CONTAINER_ITEM_ID_LIST[item_id] == true) and ((not _G.GetNumLootItems()) or (_G.GetNumLootItems() == 0)) then
+            ClearChatLootData()
+            Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
+            chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
+            InitializeCurrentLoot()
+        end
     end
 
     --[[DatamineTT:ClearLines()
