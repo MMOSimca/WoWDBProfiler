@@ -577,7 +577,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 
     local any_loot = false
 
-    -- Check if Blizzard has marked this item has officially having a chance of containing loot
+    -- Check if Blizzard has marked this item as officially having a chance of containing loot
     if bag_index and slot_index then
         local _, _, _, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
         if is_lootable then
@@ -605,29 +605,6 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             InitializeCurrentLoot()
         end
     end
-
-    --[[DatamineTT:ClearLines()
-    DatamineTT:SetBagItem(bag_index, slot_index)
-
-    for line_index = 1, DatamineTT:NumLines() do
-        local current_line = _G["WDPDatamineTTTextLeft" .. line_index]
-
-        if not current_line then
-            Debug("HandleItemUse: Item with ID %d and link %s had an invalid tooltip.", item_id, item_link)
-            return
-        end
-
-        if current_line:GetText() == _G.ITEM_OPENABLE then
-            table.wipe(current_action)
-            current_loot = nil
-
-            current_action.target_type = AF.ITEM
-            current_action.identifier = item_id
-            current_action.loot_label = "contains"
-            return
-        end
-    end
-    Debug("HandleItemUse: Item with ID %d and link %s did not have a tooltip that contained the string %s.", item_id, item_link, _G.ITEM_OPENABLE)]]--
 end
 
 
@@ -1714,7 +1691,7 @@ do
             return
         end
 
-        -- We only want to record the item's incoming data; no other need for system messages atm.
+        -- If it is an item, parse its link
         RecordItemData(item_id, item_link, true)
     end
 end
@@ -2868,7 +2845,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         -- Set up timer
         ClearChatLootData()
         Debug("%s: Beginning chat-based loot timer for spellID %d", event_name, spell_id)
-        chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
+        chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
 
         -- Standard item handling setup
         table.wipe(current_action)
