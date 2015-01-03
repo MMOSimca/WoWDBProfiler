@@ -101,6 +101,8 @@ local EVENT_MAPPING = {
     COMBAT_TEXT_UPDATE = true,
     CURSOR_UPDATE = true,
     FORGE_MASTER_OPENED = true,
+    GARRISON_MISSION_BONUS_ROLL_COMPLETE = "HandleBadChatLootData",
+    GARRISON_MISSION_COMPLETE_RESPONSE = "HandleBadChatLootData",
     GOSSIP_SHOW = true,
     GROUP_ROSTER_UPDATE = true,
     GUILDBANKFRAME_OPENED = true,
@@ -108,7 +110,7 @@ local EVENT_MAPPING = {
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
-    LOOT_SLOT_CLEARED = true,
+    LOOT_SLOT_CLEARED = "HandleBadChatLootData",
     MAIL_SHOW = true,
     MERCHANT_CLOSED = true,
     MERCHANT_SHOW = "UpdateMerchantItems",
@@ -1256,7 +1258,7 @@ end -- do-block
 
 -- EVENT HANDLERS -----------------------------------------------------
 
-function WDP:LOOT_SLOT_CLEARED(...)
+function WDP:HandleBadChatLootData(...)
     ClearChatLootData()
 end
 
@@ -1334,7 +1336,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     Debug("%s: loot_type: %s, item_link: %s, quantity: %s, spec_ID: %s, sex_ID: %s, is_personal: %s, loot_source: %s", event_name, loot_type, item_link, quantity, spec_ID, sex_ID, is_personal, loot_source)
 
     -- Handle Garrison cache specially
-    if lootSource and last_garrison_cache_object_id and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) then
+    if lootSource and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) and last_garrison_cache_object_id then
         -- Record location data for cache
         UpdateDBEntryLocation("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
 
@@ -1523,6 +1525,16 @@ do
     end
 
 
+    local BLACKLISTED_ITEMS = {
+        [114116] = true,
+        [114119] = true,
+        [114120] = true,
+        [116980] = true,
+        [120319] = true,
+        [120320] = true,
+    }
+
+
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function(item_id, quantity)
             local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
@@ -1595,7 +1607,7 @@ do
 
         -- Take action based on update category
         local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
-        if not category or not update_func then
+        if not category or not update_func or BLACKLISTED_ITEMS[item_id] then
             return
         end
         update_func(item_id, quantity)
