@@ -1561,12 +1561,12 @@ do
 
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function(item_id, quantity)
-            local container_id = current_loot.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
+            local container_id = chat_loot_data.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
             if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
                 Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
-                current_loot.sources[container_id] = current_loot.sources[container_id] or {}
-                current_loot.sources[container_id][item_id] = (current_loot.sources[container_id][item_id] or 0) + quantity
+                chat_loot_data.sources[container_id] = chat_loot_data.sources[container_id] or {}
+                chat_loot_data.sources[container_id][item_id] = (chat_loot_data.sources[container_id][item_id] or 0) + quantity
             else -- If not, cancel the timer and wipe the loot table early
                 Debug("CHAT_MSG_LOOT: We would have assigned the wrong loot!")
                 ClearChatLootData()
