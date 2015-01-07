@@ -313,6 +313,58 @@ for key, value in next, private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP do
     private.CONTAINER_ITEM_ID_LIST[value] = false
 end
 
+-- Mapping of NPC IDs for use with GetLFGDungeonEncounterInfo and GetSavedInstanceEncounterInfo.
+-- Non-english clients can't partcipate due to these poorly-thought-out API functions.
+private.RAID_ENCOUNTER_NAME_TO_NPC_ID_MAP = {
+    -----------------------------------------------------------------------
+    -- Blackrock Foundry
+    -----------------------------------------------------------------------
+    ["Oregorger the Devourer"] = 77182,
+    ["Gruul"] = 76877,
+    ["Hans'gar & Franzok"] = 76973,
+    ["Beastlord Darmac"] = 76865,
+    ["Flamebender Ka'graz"] = 76814,
+    ["Operator Thogar"] = 76906,
+    ["Blast Furnace"] = 76809,
+    ["Kromog, Legend of the Mountain"] = 77692,
+    ["The Iron Maidens"] = 77557,
+    ["Blackhand"] = 77325,
+
+    -----------------------------------------------------------------------
+    -- Highmaul
+    -----------------------------------------------------------------------
+    ["Kargath Bladefist"] = 78714,
+    ["The Butcher"] = 77404,
+    ["Brackenspore"] = 78491,
+    ["Tectus, The Living Mountain"] = 78948,
+    ["Twin Ogron"] = 78237,
+    ["Ko'ragh"] = 79015,
+    ["Imperator Mar'gok"] = 77428,
+
+    -----------------------------------------------------------------------
+    -- Mists of Pandaria
+    -----------------------------------------------------------------------
+    ["Immerseus"] = 71543,
+    ["Fallen Protectors"] = 71475,
+    ["Norushen"] = 72276,
+    ["Sha of Pride"] = 71734,
+    ["Galakras"] = 72249,
+    ["Iron Juggernaut"] = 71466,
+    ["Kor'kron Dark Shaman"] = 71859,
+    ["General Nazgrim"] = 71515,
+    ["Malkorok"] = 71454,
+    ["Spoils of Pandaria"] = 71889,
+    ["Thok the Bloodthirsty"] = 71529,
+    ["Siegecrafter Blackfuse"] = 71504,
+    ["Paragons of the Klaxxi"] = 71161,
+    ["Garrosh Hellscream"] = 71865,
+}
+-- To prevent kill count from being incremented in the old fashion (only when using personal loot for now)
+private.RAID_ENCOUNTER_NPC_ID_LIST = {}
+for key, value in next, private.RAID_ENCOUNTER_NAME_TO_NPC_ID_MAP do
+    private.RAID_ENCOUNTER_NPC_ID_LIST[value] = true
+end
+
 -- Mapping of Spell IDs for bonus roll confirmation prompts to raid bosses
 -- In some cases this records only bonus loot, and in other cases this is needed for all loot.
 private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
@@ -332,14 +384,14 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     -----------------------------------------------------------------------
     -- Blackrock Foundry
     -----------------------------------------------------------------------
-    [177529] = 76877, -- Gruul Bonus (Gruul)
     [177530] = 77182, -- Oregorger Bonus (Oregorger)
-    [177531] = 76809, -- Blast Furnace (Foreman Feldspar)
+    [177529] = 76877, -- Gruul Bonus (Gruul)
     [177533] = 76973, -- Hans'gar & Franzok Bonus (Hans'gar)
-    [177534] = 76814, -- Flamebender Ka'graz Bonus (Flamebender Ka'graz)
-    [177535] = 77692, -- Kromog Bonus (Kromog)
     [177536] = 76865, -- Beastlord Darmac Bonus (Beastlord Darmac)
+    [177534] = 76814, -- Flamebender Ka'graz Bonus (Flamebender Ka'graz)
     [177537] = 76906, -- Operator Thogar Bonus (Operator Thogar)
+    [177531] = 76809, -- Blast Furnace (Foreman Feldspar)
+    [177535] = 77692, -- Kromog Bonus (Kromog)
     [177538] = 77557, -- The Iron Maidens Bonus (Admiral Gar'an)
     [177539] = 77325, -- Blackhand Bonus (Blackhand)
 
@@ -348,8 +400,8 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     -----------------------------------------------------------------------
     [177521] = 78714, -- Kargath Bladefist Bonus (Kargath Bladefist)
     [177522] = 77404, -- Butcher Bonus (The Butcher)
-    [177523] = 78948, -- Tectus Bonus (Tectus)
     [177524] = 78491, -- Brackenspore Bonus (Brackenspore)
+    [177523] = 78948, -- Tectus Bonus (Tectus)
     [177525] = 78237, -- Twin Ogron Bonus (Phemos)
     [177526] = 79015, -- Ko'ragh Bonus (Ko'ragh)
     [177528] = 77428, -- Imperator Mar'gok Bonus (Imperator Mar'gok)
