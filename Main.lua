@@ -1850,8 +1850,7 @@ do
     local DIPLOMACY_SPELL_ID = 20599
     local MR_POP_RANK1_SPELL_ID = 78634
     local MR_POP_RANK2_SPELL_ID = 78635
-    local FACTION_DATA = private.FACTION_DATA
-    local REP_BUFFS = private.REP_BUFFS
+    local TRADING_PACT_SPELL_ID = 170200
 
 
     function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
@@ -1884,12 +1883,20 @@ do
         elseif _G.IsSpellKnown(MR_POP_RANK1_SPELL_ID) then
             modifier = modifier + 0.05
         end
+        if _G.IsSpellKnown(TRADING_PACT_SPELL_ID) then
+            modifier = modifier + 0.2
+        end
 
         -- Determine faction ID
         local faction_ID
-        for pseudo_faction_name, faction_data_table in pairs(FACTION_DATA) do
-            if faction_name == faction_data_table[2] then
+        for pseudo_faction_name, faction_data_table in pairs(private.FACTION_DATA) do
+            if faction_name == faction_data_table[3] then
+                -- Check ignore flag
+                if faction_data_table[2] then
+                    return
+                end
                 faction_ID = faction_data_table[1]
+                break
             end
         end
         if faction_ID and faction_ID > 0 then
@@ -1901,7 +1908,7 @@ do
         end
 
         -- Check for modifiers from buffs
-        for buff_name, buff_data_table in pairs(REP_BUFFS) do
+        for buff_name, buff_data_table in pairs(private.REP_BUFFS) do
             if _G.UnitBuff("player", buff_name) then
                 local modded_faction = buff_data_table.faction
 
