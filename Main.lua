@@ -1349,8 +1349,6 @@ do
 end -- do-block
 
 
--- EVENT HANDLERS -----------------------------------------------------
-
 function WDP:HandleBadChatLootData(...)
     ClearChatLootData()
 end
