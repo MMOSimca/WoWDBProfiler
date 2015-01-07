@@ -32,7 +32,6 @@ private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP = {
     ["Full Garrison Cache"] = 237722,
     ["Hefty Garrison Cache"] = 237723,
 }
-private.GARRISON_CACHE_LOOT_SOURCE_ID = 10
 
 -- Mapping of items that, when right-clicked, fire a spell (which can fail, so we have to check success).
 -- They reward loot via loot toast popups upon completion of that spell.

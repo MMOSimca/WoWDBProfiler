@@ -42,6 +42,9 @@ local EVENT_DEBUG = false
 
 local ITEM_ID_TIMBER = 114781
 
+local LOOT_SOURCE_ID_REDUNDANT = 3
+local LOOT_SOURCE_ID_GARRISON_CACHE = 10
+
 local OBJECT_ID_ANVIL = 192628
 local OBJECT_ID_FISHING_BOBBER = 35591
 local OBJECT_ID_FORGE = 1685
@@ -1449,7 +1452,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     Debug("%s: loot_type: %s, item_link: %s, quantity: %s, spec_ID: %s, sex_ID: %s, is_personal: %s, loot_source: %s", event_name, loot_type, item_link, quantity, spec_ID, sex_ID, is_personal, loot_source)
 
     -- Handle Garrison cache specially
-    if lootSource and (lootSource == private.GARRISON_CACHE_LOOT_SOURCE_ID) and last_garrison_cache_object_id then
+    if loot_source and (loot_source == LOOT_SOURCE_ID_GARRISON_CACHE) and last_garrison_cache_object_id then
         -- Record location data for cache
         UpdateDBEntryLocation("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
 
