@@ -1571,6 +1571,23 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         GenericLootUpdate("items")
         current_loot = nil
         container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
+    elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle then
+        local currency_texture = CurrencyLinkToTexture(item_link)
+        if currency_texture and currency_texture ~= "" then
+            local container_id = chat_loot_data.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
+            -- Verify that we're still assigning data to the right items
+            if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
+                local currency_token = ("currency:%s"):format(currency_texture)
+                Debug("%s: Captured currency for chat-based loot recording. %s X %d", event_name, currency_token, quantity)
+                chat_loot_data.sources[container_id] = chat_loot_data.sources[container_id] or {}
+                chat_loot_data.sources[container_id][currency_token] = (chat_loot_data.sources[container_id][currency_token] or 0) + quantity
+            else -- If not, cancel the timer and wipe the loot table early
+                Debug("%s: Canceled chat-based loot recording because we would have assigned the wrong loot!", event_name)
+                ClearChatLootData()
+            end
+        else
+            Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+        end
     else
         Debug("%s: NPC and Container are nil, storing loot toast data for 5 seconds.", event_name)
 
@@ -1589,19 +1606,6 @@ end
 
 do
     local CHAT_MSG_CURRENCY_UPDATE_FUNCS = {
-        [AF.ITEM] = function(currency_texture, quantity)
-            local container_id = chat_loot_data.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
-            -- Verify that we're still assigning data to the right items
-            if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
-                Debug("CHAT_MSG_CURRENCY: AF.ITEM %s (%d)", currency_token, quantity)
-                local currency_token = ("currency:%s"):format(currency_texture:match("[^\\]+$"):lower())
-                chat_loot_data.sources[container_id] = chat_loot_data.sources[container_id] or {}
-                chat_loot_data.sources[container_id][currency_token] = (chat_loot_data.sources[container_id][currency_token] or 0) + quantity
-            else -- If not, cancel the timer and wipe the loot table early
-                Debug("CHAT_MSG_CURRENCY: We would have assigned the wrong loot!")
-                ClearChatLootData()
-            end
-        end,
         [AF.NPC] = function(currency_texture, quantity)
             Debug("CHAT_MSG_CURRENCY: AF.NPC currency:%s (%d)", currency_texture, quantity)
         end,
@@ -1634,8 +1638,6 @@ do
             category = AF.ZONE
         elseif raid_boss_id then
             category = AF.NPC
-        elseif chat_loot_timer_handle then
-            category = AF.ITEM
         end
 
         -- Take action based on update category
