@@ -606,7 +606,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         if (private.CONTAINER_ITEM_ID_LIST[item_id] == true) and ((not _G.GetNumLootItems()) or (_G.GetNumLootItems() == 0)) then
             ClearChatLootData()
             Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
-            chat_loot_timer_handle = C_Timer.NewTimer(1, ClearChatLootData)
+            chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
             chat_loot_data = chat_loot_data or {}
             chat_loot_data.identifier = item_id
             chat_loot_data.sources = {}
