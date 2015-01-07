@@ -1741,6 +1741,7 @@ do
     local BLACKLISTED_SPELLS = {
         [117526] = true, -- Binding Shot
         [132464] = true, -- Chi Wave
+        [132467] = true, -- Chi Wave
         [121308] = true, -- Disguise
     }
 
