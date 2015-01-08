@@ -1571,7 +1571,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         GenericLootUpdate("items")
         current_loot = nil
         container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
-    elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle then
+    elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle and loot_type == "currency" then
         local currency_texture = CurrencyLinkToTexture(item_link)
         if currency_texture and currency_texture ~= "" then
             local container_id = chat_loot_data.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
