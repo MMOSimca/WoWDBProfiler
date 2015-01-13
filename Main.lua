@@ -59,11 +59,6 @@ local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
 local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
 local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
 
--- Constant for duplicate boss data; a dirty hack to get around world bosses that cannot be identified individually and cannot be linked on wowdb because they are not in a raid
-local DUPLICATE_WORLD_BOSS_IDS = {
-    [71952] = { 71953, 71954, 71955, },
-}
-
 local ALLOWED_LOCALES = {
     enUS = true,
     enGB = true,
@@ -1387,53 +1382,40 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
             Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
         end
     elseif raid_boss_id then
-        -- Slightly messy hack to workaround duplicate world bosses
-        local upper_limit = 0
-        if DUPLICATE_WORLD_BOSS_IDS[raid_boss_id] then
-            upper_limit = #DUPLICATE_WORLD_BOSS_IDS[raid_boss_id]
-        end
-        for i = 0, upper_limit do
-            local temp_npc_id = raid_boss_id
+        local npc = NPCEntry(raid_boss_id)
+        if npc then
+            local loot_label = "drops"
+            local encounter_data = npc:EncounterData(InstanceDifficultyToken())
+            encounter_data[loot_label] = encounter_data[loot_label] or {}
+            encounter_data.loot_counts = encounter_data.loot_counts or {}
 
-            if i > 0 then
-                temp_npc_id = DUPLICATE_WORLD_BOSS_IDS[raid_boss_id][i]
+            if loot_type == "item" then
+                local item_id = ItemLinkToID(item_link)
+                if item_id then
+                    Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
+                    RecordItemData(item_id, item_link, true)
+                    table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
+                else
+                    Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
+                    return
+                end
+            elseif loot_type == "money" then
+                Debug("%s: money X %d", event_name, quantity)
+                table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
+            elseif loot_type == "currency" then
+                local currency_texture = CurrencyLinkToTexture(item_link)
+                if currency_texture and currency_texture ~= "" then
+                    Debug("%s: %s X %d", event_name, currency_texture, quantity)
+                    table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
+                else
+                    Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+                    return
+                end
             end
 
-            local npc = NPCEntry(temp_npc_id)
-            if npc then
-                local loot_label = "drops"
-                local encounter_data = npc:EncounterData(InstanceDifficultyToken())
-                encounter_data[loot_label] = encounter_data[loot_label] or {}
-                encounter_data.loot_counts = encounter_data.loot_counts or {}
-
-                if loot_type == "item" then
-                    local item_id = ItemLinkToID(item_link)
-                    if item_id then
-                        Debug("%s: %s X %d (%d)", event_name, item_link, quantity, item_id)
-                        RecordItemData(item_id, item_link, true)
-                        table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
-                    else
-                        Debug("%s: ItemID is nil, from item link %s", event_name, item_link)
-                        return
-                    end
-                elseif loot_type == "money" then
-                    Debug("%s: money X %d", event_name, quantity)
-                    table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
-                elseif loot_type == "currency" then
-                    local currency_texture = CurrencyLinkToTexture(item_link)
-                    if currency_texture and currency_texture ~= "" then
-                        Debug("%s: %s X %d", event_name, currency_texture, quantity)
-                        table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
-                    else
-                        Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
-                        return
-                    end
-                end
-
-                if not boss_loot_toasting[temp_npc_id] then
-                    encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
-                    boss_loot_toasting[temp_npc_id] = true -- Do not count further loots until timer expires or another boss is killed
-                end
+            if not boss_loot_toasting[raid_boss_id] then
+                encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
+                boss_loot_toasting[raid_boss_id] = true -- Do not count further loots until timer expires or another boss is killed
             end
         end
     elseif loot_toast_container_id then
@@ -2805,62 +2787,45 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
 
     -- Assign existing loot data to boss if it exists
     if loot_toast_data then
-        local npc_id = raid_boss_id
+        local npc = NPCEntry(raid_boss_id)
+        if npc then
+            -- Create needed npc fields if required
+            local loot_label = "drops"
+            local encounter_data = npc:EncounterData(InstanceDifficultyToken())
+            encounter_data[loot_label] = encounter_data[loot_label] or {}
+            encounter_data.loot_counts = encounter_data.loot_counts or {}
 
-        -- Slightly messy hack to workaround duplicate world bosses
-        local upper_limit = 0
-        if DUPLICATE_WORLD_BOSS_IDS[npc_id] then
-            upper_limit = #DUPLICATE_WORLD_BOSS_IDS[npc_id]
-        end
+            for index = 1, #loot_toast_data do
+                local data = loot_toast_data[index]
+                local loot_type = data[1]
+                local hyperlink = data[2]
+                local quantity = data[3]
 
-        for i = 0, upper_limit do
-            local temp_npc_id = npc_id
-
-            if i > 0 then
-                temp_npc_id = DUPLICATE_WORLD_BOSS_IDS[npc_id][i]
+                if loot_type == "item" then
+                    local item_id = ItemLinkToID(hyperlink)
+                    Debug("%s: Assigned stored item loot data - %s - %d:%d", event_name, hyperlink, item_id, quantity)
+                    table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
+                elseif loot_type == "money" then
+                    Debug("%s: Assigned stored money loot data - money:%d", event_name, quantity)
+                    table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
+                elseif loot_type == "currency" then
+                    local currency_texture = CurrencyLinkToTexture(hyperlink)
+                    Debug("%s: Assigned stored currency loot data - %s - currency:%d:%s", event_name, hyperlink, currency_texture, quantity)
+                    table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
+                end
             end
 
-            local npc = NPCEntry(temp_npc_id)
-            if npc then
-                -- Create needed npc fields if required
-                local loot_label = "drops"
-                local encounter_data = npc:EncounterData(InstanceDifficultyToken())
-                encounter_data[loot_label] = encounter_data[loot_label] or {}
-                encounter_data.loot_counts = encounter_data.loot_counts or {}
-
-                for index = 1, #loot_toast_data do
-                    local data = loot_toast_data[index]
-                    local loot_type = data[1]
-                    local hyperlink = data[2]
-                    local quantity = data[3]
-
-                    if loot_type == "item" then
-                        local item_id = ItemLinkToID(hyperlink)
-                        Debug("%s: Assigned stored item loot data - %s - %d:%d", event_name, hyperlink, item_id, quantity)
-                        table.insert(encounter_data[loot_label], ("%d:%d"):format(item_id, quantity))
-                    elseif loot_type == "money" then
-                        Debug("%s: Assigned stored money loot data - money:%d", event_name, quantity)
-                        table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
-                    elseif loot_type == "currency" then
-                        local currency_texture = CurrencyLinkToTexture(hyperlink)
-                        Debug("%s: Assigned stored currency loot data - %s - currency:%d:%s", event_name, hyperlink, currency_texture, quantity)
-                        table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
-                    end
-                end
-
-                if not boss_loot_toasting[temp_npc_id] then
-                    encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
-                    boss_loot_toasting[temp_npc_id] = true -- Do not count further loots until timer expires or another boss is killed
-                end
-            else
-                Debug("%s: NPC is nil, but we have stored loot data...", event_name)
+            if not boss_loot_toasting[raid_boss_id] then
+                encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
+                boss_loot_toasting[raid_boss_id] = true -- Do not count further loots until timer expires or another boss is killed
             end
+        else
+            Debug("%s: NPC is nil, but we have stored loot data...", event_name)
         end
     end
 
     ClearLootToastData()
-
-    killed_boss_id_timer_handle = C_Timer.NewTimer(5, ClearKilledBossID) -- we need to assign a handle here to cancel it later
+    killed_boss_id_timer_handle = C_Timer.NewTimer(5, ClearKilledBossID)
 end
 
 
