@@ -103,7 +103,6 @@ local EVENT_MAPPING = {
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
     CURSOR_UPDATE = true,
-    ENCOUNTER_END = true,
     FORGE_MASTER_OPENED = true,
     GARRISON_MISSION_BONUS_ROLL_COMPLETE = "HandleBadChatLootData",
     GARRISON_MISSION_COMPLETE_RESPONSE = "HandleBadChatLootData",
@@ -121,7 +120,6 @@ local EVENT_MAPPING = {
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
     --PET_JOURNAL_LIST_UPDATE = true,
-    PLAYER_LOGOUT = true,
     PLAYER_REGEN_DISABLED = true,
     PLAYER_REGEN_ENABLED = true,
     PLAYER_TARGET_CHANGED = true,
@@ -182,9 +180,6 @@ local chat_loot_timer_handle
 local current_target_id
 local current_area_id
 local current_loot
-local saved_raid_encounter_data
-local update_raid_encounter_timer_handle
-local saved_difficulty_token
 
 
 -- Data for our current action. Including possible values as a reference.
@@ -928,66 +923,6 @@ function ClearChatLootData()
 end
 
 
--- This wipes a timer as well
-local UpdateRaidEncounterInfo
-do
-    local fresh_raid_encounter_data = {}
-
-    function UpdateRaidEncounterInfo()
-        -- Clear timer info
-        if update_raid_encounter_timer_handle then
-            update_raid_encounter_timer_handle:Cancel()
-            update_raid_encounter_timer_handle = nil
-        end
-        table.wipe(fresh_raid_encounter_data)
-
-        -- Collect encounter data for LFR difficulty via RF functions
-        for i = 1, _G.GetNumRFDungeons() do
-            local dungeon_ID = _G.GetRFDungeonInfo(i)
-            fresh_raid_encounter_data[dungeon_ID] = fresh_raid_encounter_data[dungeon_ID] or {}
-            for j = 1, _G.GetLFGDungeonNumEncounters(dungeon_ID) do
-                local boss_name, _, is_killed = _G.GetLFGDungeonEncounterInfo(dungeon_ID, j)
-                fresh_raid_encounter_data[dungeon_ID][boss_name] = is_killed
-            end
-        end
-
-        -- Collect encounter data for Normal/Heroic/Mythic difficulty via saved instance functions
-        for i = 1, _G.GetNumSavedInstances() do
-            local _, dungeon_ID, _, _, _, _, _, _, _, _, num_encounters = _G.GetSavedInstanceInfo(i)
-            fresh_raid_encounter_data[dungeon_ID] = fresh_raid_encounter_data[dungeon_ID] or {}
-            for j = 1, num_encounters do
-                local boss_name, _, is_killed = _G.GetSavedInstanceEncounterInfo(i, j)
-                fresh_raid_encounter_data[dungeon_ID][boss_name] = is_killed
-            end
-        end
-
-        Debug("UpdateRaidEncounterInfo: Collected fresh raid encounter data.")
-        if saved_raid_encounter_data then
-            -- Compare old data vs new table to find changes
-            for dungeon_ID, sub_table in next, saved_raid_encounter_data do
-                for boss_name, is_killed in next, saved_raid_encounter_data[dungeon_ID] do
-                    if private.RAID_ENCOUNTER_NAME_TO_NPC_ID_MAP[boss_name] and saved_raid_encounter_data[dungeon_ID][boss_name] == false and fresh_raid_encounter_data[dungeon_ID] and fresh_raid_encounter_data[dungeon_ID][boss_name] == true then
-                        Debug("UpdateRaidEncounterInfo: Incrementing kill count for boss %s with ID %d.", boss_name, private.RAID_ENCOUNTER_NAME_TO_NPC_ID_MAP[boss_name])
-                        -- Increment kill count for NPC IDs with detected changes
-                        local npc = NPCEntry(private.RAID_ENCOUNTER_NAME_TO_NPC_ID_MAP[boss_name])
-                        if npc then
-                            local encounter_data = npc:EncounterData(saved_difficulty_token)
-                            encounter_data["drops"] = encounter_data["drops"] or {}
-                            encounter_data.loot_counts = encounter_data.loot_counts or {}
-                            encounter_data.loot_counts["drops"] = (encounter_data.loot_counts["drops"] or 0) + 1
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Assign new table over old one
-        saved_raid_encounter_data = fresh_raid_encounter_data
-        saved_difficulty_token = nil
-    end
-end
-
-
 -- METHODS ------------------------------------------------------------
 
 function WDP:OnInitialize()
@@ -1057,10 +992,6 @@ function WDP:OnEnable()
         target_location_timer_handle._remainingIterations = 100000
         WDP:UpdateTargetLocation()
     end, 100000)
-
-    if ALLOWED_LOCALES[CLIENT_LOCALE] then
-        update_raid_encounter_timer_handle = C_Timer.NewTimer(10, UpdateRaidEncounterInfo)
-    end
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
@@ -1359,26 +1290,6 @@ end
 
 -- EVENT HANDLERS -----------------------------------------------------
 
-function WDP:ENCOUNTER_END(event_name)
-    local loot_method = _G.GetLootMethod()
-    -- This will only work for english clients due to questionable API design choices
-    -- Currently only testing this method of kill count recording for personal loot.
-    -- Master looting has too many edge cases, such as chest objects and multiple NPCs with split loot.
-    if loot_method ~= "personalloot" or not ALLOWED_LOCALES[CLIENT_LOCALE] then
-        return
-    end
-
-    saved_difficulty_token = InstanceDifficultyToken()
-    update_raid_encounter_timer_handle = C_Timer.NewTimer(30, UpdateRaidEncounterInfo)
-end
-
-
-function WDP:PLAYER_LOGOUT(event_name)
-    if update_raid_encounter_timer_handle then
-        UpdateRaidEncounterInfo()
-    end
-end
-
 -- For now, bonus roll data only pollutes the true drop percentages. We still want to capture the data from SPELL_CONFIRMATION_PROMPT because of legendary quest items though.
 function WDP:BONUS_ROLL_RESULT(event_name)
     Debug("%s: Bonus roll detected; stopping loot recording for this boss to avoid recording bonus loot.", event_name)
@@ -1476,7 +1387,6 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
             Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
         end
     elseif raid_boss_id then
-        local loot_method = _G.GetLootMethod()
         -- Slightly messy hack to workaround duplicate world bosses
         local upper_limit = 0
         if DUPLICATE_WORLD_BOSS_IDS[raid_boss_id] then
@@ -1521,12 +1431,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
                 end
 
                 if not boss_loot_toasting[temp_npc_id] then
-                    -- In some situations, we will increment kill count by watching what the player is saved to
-                    if not update_raid_encounter_timer_handle or not private.RAID_ENCOUNTER_NPC_ID_LIST[temp_npc_id] or loot_method ~= "personalloot" then
-                        encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
-                    else
-                        Debug("%s: Skipping incrementing kill count for NPC ID %d.", event_name, temp_npc_id)
-                    end
+                    encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
                     boss_loot_toasting[temp_npc_id] = true -- Do not count further loots until timer expires or another boss is killed
                 end
             end
@@ -2106,7 +2011,6 @@ do
             GenericLootUpdate("items")
         end,
         [AF.NPC] = function()
-            local loot_method = _G.GetLootMethod()
             local difficulty_token = InstanceDifficultyToken()
             local loot_label = current_loot.label
             local source_list = {}
@@ -2121,12 +2025,7 @@ do
 
                     if not source_list[source_guid] then
                         encounter_data.loot_counts = encounter_data.loot_counts or {}
-                        -- In some situations, we will increment kill count by watching what the player is saved to
-                        if not update_raid_encounter_timer_handle or not private.RAID_ENCOUNTER_NPC_ID_LIST[source_id] or loot_method ~= "personalloot" then
-                            encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
-                        else
-                            
-                        end
+                        encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + 1
                         source_list[source_guid] = true
                     end
 
