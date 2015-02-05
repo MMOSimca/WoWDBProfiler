@@ -403,7 +403,7 @@ function private.ProcessCommentCommand(arg)
         CreateQuestComment()
         return
     elseif arg == "spell" then
-        CreateSpellComent(true)
+        CreateSpellComment(true)
         return
     end
     CreateUnitComment(arg, true)

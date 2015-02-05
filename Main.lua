@@ -659,9 +659,9 @@ do
 end -- do-block
 
 
-local GenericLootUpdate
+local GenericLootUpdate, LootTable
 do
-    local function LootTable(entry, loot_type, top_field)
+    function LootTable(entry, loot_type, top_field)
         if top_field then
             entry[top_field] = entry[top_field] or {}
             entry[top_field][loot_type] = entry[top_field][loot_type] or {}
