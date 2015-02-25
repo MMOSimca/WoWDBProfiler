@@ -84,8 +84,10 @@ local DATABASE_DEFAULTS = {
 }
 
 local EVENT_MAPPING = {
-    AUCTION_HOUSE_SHOW = true,
-    BANKFRAME_OPENED = true,
+    AUCTION_HOUSE_CLOSED = "ResumeChatLootRecording",
+    AUCTION_HOUSE_SHOW = true, -- also triggers StopChatLootRecording
+    BANKFRAME_CLOSED = "ResumeChatLootRecording",
+    BANKFRAME_OPENED = true, -- also triggers StopChatLootRecording
     BATTLEFIELDS_SHOW = true,
     BLACK_MARKET_ITEM_UPDATE = true,
     BONUS_ROLL_RESULT = true,
@@ -99,19 +101,22 @@ local EVENT_MAPPING = {
     COMBAT_TEXT_UPDATE = true,
     CURSOR_UPDATE = true,
     FORGE_MASTER_OPENED = true,
-    GARRISON_MISSION_BONUS_ROLL_COMPLETE = "HandleBadChatLootData",
-    GARRISON_MISSION_COMPLETE_RESPONSE = "HandleBadChatLootData",
-    GOSSIP_SHOW = true,
+    GARRISON_MISSION_NPC_CLOSED = "ResumeChatLootRecording",
+    GARRISON_MISSION_NPC_OPENED = "StopChatLootRecording",
+    GOSSIP_CLOSED = "ResumeChatLootRecording",
+    GOSSIP_SHOW = true, -- also triggers StopChatLootRecording
     GROUP_ROSTER_UPDATE = true,
-    GUILDBANKFRAME_OPENED = true,
+    GUILDBANKFRAME_CLOSED = "ResumeChatLootRecording",
+    GUILDBANKFRAME_OPENED = true, -- also triggers StopChatLootRecording
     ITEM_TEXT_BEGIN = true,
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
     LOOT_SLOT_CLEARED = "HandleBadChatLootData",
-    MAIL_SHOW = true,
-    MERCHANT_CLOSED = true,
-    MERCHANT_SHOW = "UpdateMerchantItems",
+    MAIL_CLOSED = "ResumeChatLootRecording",
+    MAIL_SHOW = true, -- also triggers StopChatLootRecording
+    MERCHANT_CLOSED = true, -- also triggers ResumeChatLootRecording
+    MERCHANT_SHOW = "UpdateMerchantItems", -- also triggers StopChatLootRecording
     MERCHANT_UPDATE = "UpdateMerchantItems",
     PET_BAR_UPDATE = true,
     --PET_JOURNAL_LIST_UPDATE = true,
@@ -170,6 +175,7 @@ local killed_npc_id
 local target_location_timer_handle
 local last_timber_spell_id
 local last_garrison_cache_object_id
+local block_chat_loot_data
 local chat_loot_data = {}
 local chat_loot_timer_handle
 local current_target_id
@@ -591,7 +597,8 @@ local function HandleItemUse(item_link, bag_index, slot_index)
         any_loot = true
     end
 
-    if any_loot then
+    -- Going to block 'chat-loot data' at this level for now because I don't think we actually want normal item containers being recorded in these scenarios either.
+    if any_loot and not block_chat_loot_data then
         -- For item containers that open instantly with no spell cast
         if (private.CONTAINER_ITEM_ID_LIST[item_id] == true) and ((not _G.GetNumLootItems()) or (_G.GetNumLootItems() == 0)) then
             ClearChatLootData()
@@ -1281,6 +1288,24 @@ end
 
 
 -- EVENT HANDLERS -----------------------------------------------------
+
+-- This function (and the following function) are to stop 'HandleItemUse' from triggering when you put an item that would normally be opened into the bank, guild bank, etc.
+function WDP:StopChatLootRecording(event_name)
+    if not block_chat_loot_data then
+        Debug("%s: Detected event that will taint chat-based loot recording. Pausing data collection.", event_name)
+        ClearChatLootData()
+        block_chat_loot_data = true
+    end
+end
+
+
+function WDP:ResumeChatLootRecording(event_name)
+    if block_chat_loot_data then
+        Debug("%s: Detected event that signals the end of taint issues with chat-based loot recording. Resuming data collection.", event_name)
+        block_chat_loot_data = false
+    end
+end
+
 
 -- For now, bonus roll data only pollutes the true drop percentages. We still want to capture the data from SPELL_CONFIRMATION_PROMPT because of legendary quest items though.
 function WDP:BONUS_ROLL_RESULT(event_name)
@@ -2292,6 +2317,7 @@ end -- do-block
 
 
 function WDP:MAIL_SHOW(event_name)
+    WDP:StopChatLootRecording(event_name)
     local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
 
     if not unit_idnum or unit_type ~= private.UNIT_TYPES.OBJECT then
@@ -2318,6 +2344,7 @@ do
     local merchant_standing
 
     function WDP:MERCHANT_CLOSED(event_name)
+        WDP:ResumeChatLootRecording(event_name)
         current_merchant = nil
         merchant_standing = nil
     end
@@ -2325,6 +2352,7 @@ do
 
     function WDP:UpdateMerchantItems(event_name)
         if not current_merchant or event_name == "MERCHANT_SHOW" then
+            WDP:StopChatLootRecording(event_name)
             local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
@@ -2853,7 +2881,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     end
 
     -- For spells cast by items that don't usually trigger loot toasts
-    if private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] then
+    if private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] and not block_chat_loot_data then
         -- Set up timer
         ClearChatLootData()
         Debug("%s: Beginning chat-based loot timer for spellID %d", event_name, spell_id)
@@ -2903,11 +2931,13 @@ do
 
 
     function WDP:AUCTION_HOUSE_SHOW(event_name)
+        WDP:StopChatLootRecording(event_name)
         SetUnitField("auctioneer", private.UNIT_TYPES.NPC)
     end
 
 
     function WDP:BANKFRAME_OPENED(event_name)
+        WDP:StopChatLootRecording(event_name)
         SetUnitField("banker", private.UNIT_TYPES.NPC)
     end
 
@@ -2940,6 +2970,7 @@ do
 
 
     function WDP:GOSSIP_SHOW(event_name)
+        WDP:StopChatLootRecording(event_name)
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
         if not unit_idnum then
             return
@@ -2952,6 +2983,7 @@ do
 
 
     function WDP:GUILDBANKFRAME_OPENED(event_name)
+        WDP:StopChatLootRecording(event_name)
         SetUnitField("guild_bank", private.UNIT_TYPES.OBJECT)
     end
 
