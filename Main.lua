@@ -170,7 +170,7 @@ local killed_npc_id
 local target_location_timer_handle
 local last_timber_spell_id
 local last_garrison_cache_object_id
-local chat_loot_data
+local chat_loot_data = {}
 local chat_loot_timer_handle
 local current_target_id
 local current_area_id
@@ -597,9 +597,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             ClearChatLootData()
             Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
             chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
-            chat_loot_data = chat_loot_data or {}
             chat_loot_data.identifier = item_id
-            chat_loot_data.sources = {}
         -- For normal item containers
         else
             table.wipe(current_action)
@@ -885,13 +883,14 @@ end
 
 function ClearChatLootData()
     if not chat_loot_timer_handle then
+        table.wipe(chat_loot_data)
         return
     end
     Debug("ClearChatLootData: Ending chat-based loot timer.")
     chat_loot_timer_handle:Cancel()
     chat_loot_timer_handle = nil
 
-    if chat_loot_data and chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) and chat_loot_data.sources and (#chat_loot_data.sources > 0) then
+    if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) and chat_loot_data.loot then
         -- A slimmed down (and more importantly, separate) version of GenericLootUpdate, specifically for AF.ITEM and chat_loot_data
         local entry = DBEntry("items", chat_loot_data.identifier)
 
@@ -899,7 +898,7 @@ function ClearChatLootData()
             local loot_table = LootTable(entry, "contains")
             entry["contains_count"] = (entry["contains_count"] or 0) + 1
 
-            for loot_token, quantity in pairs(chat_loot_data.sources[chat_loot_data.identifier]) do
+            for loot_token, quantity in pairs(chat_loot_data.loot) do
                 local label, currency_texture = (":"):split(loot_token)
 
                 if label == "currency" and currency_texture then
@@ -912,9 +911,7 @@ function ClearChatLootData()
             end
         end
     end
-    if chat_loot_data then
-        table.wipe(chat_loot_data)
-    end
+    table.wipe(chat_loot_data)
 end
 
 
@@ -1464,13 +1461,12 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle and loot_type == "currency" then
         local currency_texture = CurrencyLinkToTexture(item_link)
         if currency_texture and currency_texture ~= "" then
-            local container_id = chat_loot_data.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
-            if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
+            if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
                 local currency_token = ("currency:%s"):format(currency_texture)
                 Debug("%s: Captured currency for chat-based loot recording. %s X %d", event_name, currency_token, quantity)
-                chat_loot_data.sources[container_id] = chat_loot_data.sources[container_id] or {}
-                chat_loot_data.sources[container_id][currency_token] = (chat_loot_data.sources[container_id][currency_token] or 0) + quantity
+                chat_loot_data.loot = chat_loot_data.loot or {}
+                chat_loot_data.loot[currency_token] = (chat_loot_data.loot[currency_token] or 0) + quantity
             else -- If not, cancel the timer and wipe the loot table early
                 Debug("%s: Canceled chat-based loot recording because we would have assigned the wrong loot!", event_name)
                 ClearChatLootData()
@@ -1551,12 +1547,11 @@ do
 
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function(item_id, quantity)
-            local container_id = chat_loot_data.identifier -- For faster access, since this is going to be called 9 times in the next 3 lines
             -- Verify that we're still assigning data to the right items
-            if container_id and (private.CONTAINER_ITEM_ID_LIST[container_id] ~= nil) then
+            if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
                 Debug("CHAT_MSG_LOOT: AF.ITEM %d (%d)", item_id, quantity)
-                chat_loot_data.sources[container_id] = chat_loot_data.sources[container_id] or {}
-                chat_loot_data.sources[container_id][item_id] = (chat_loot_data.sources[container_id][item_id] or 0) + quantity
+                chat_loot_data.loot = chat_loot_data.loot or {}
+                chat_loot_data.loot[item_id] = (chat_loot_data.loot[item_id] or 0) + quantity
             else -- If not, cancel the timer and wipe the loot table early
                 Debug("CHAT_MSG_LOOT: We would have assigned the wrong loot!")
                 ClearChatLootData()
@@ -2863,9 +2858,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
         ClearChatLootData()
         Debug("%s: Beginning chat-based loot timer for spellID %d", event_name, spell_id)
         chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
-        chat_loot_data = chat_loot_data or {}
         chat_loot_data.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
-        chat_loot_data.sources = {}
         return
     end
 
