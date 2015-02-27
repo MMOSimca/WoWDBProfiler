@@ -1294,7 +1294,7 @@ end
 -- This function (and the following function) are to stop 'HandleItemUse' from triggering when you put an item that would normally be opened into the bank, guild bank, etc.
 function WDP:StopChatLootRecording(event_name)
     if not block_chat_loot_data then
-        Debug("%s: Detected event that will taint chat-based loot recording. Pausing data collection.", event_name)
+        Debug("%s: Pausing chat-based loot recording.", event_name)
         ClearChatLootData()
         block_chat_loot_data = true
     end
@@ -1303,7 +1303,7 @@ end
 
 function WDP:ResumeChatLootRecording(event_name)
     if block_chat_loot_data then
-        Debug("%s: Detected event that signals the end of taint issues with chat-based loot recording. Resuming data collection.", event_name)
+        Debug("%s: Resuming chat-based loot recording.", event_name)
         block_chat_loot_data = false
     end
 end
