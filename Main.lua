@@ -350,12 +350,16 @@ end -- do-block
 
 
 local function InstanceDifficultyToken()
-    local _, instance_type, instance_difficulty, _, _, _, is_dynamic = _G.GetInstanceInfo()
+    -- Sometimes, instance information is returned when not in an instance. This check protects against that.
+    if _G.IsInInstance() then
+        local _, instance_type, instance_difficulty, _, _, _, is_dynamic = _G.GetInstanceInfo()
 
-    if not instance_type or instance_type == "" then
-        instance_type = "NONE"
+        if not instance_type or instance_type == "" then
+            instance_type = "NONE"
+        end
+        return ("%s:%d:%s"):format(instance_type:upper(), instance_difficulty, tostring(is_dynamic))
     end
-    return ("%s:%d:%s"):format(instance_type:upper(), instance_difficulty, tostring(is_dynamic))
+    return "NONE:0:false"
 end
 
 
