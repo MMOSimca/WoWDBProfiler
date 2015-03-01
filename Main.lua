@@ -26,7 +26,6 @@ local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceE
 
 local deformat = LibStub("LibDeformat-3.0")
 local LPJ = LibStub("LibPetJournal-2.0")
-local MapData = LibStub("LibMapData-1.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -363,6 +362,46 @@ local function InstanceDifficultyToken()
 end
 
 
+local function CurrentLocationData()
+    if _G.GetCurrentMapAreaID() ~= current_area_id then
+        return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
+    end
+    local map_level = _G.GetCurrentMapDungeonLevel() or 0
+    local x, y = _G.GetPlayerMapPosition("player")
+
+    x = x or 0
+    y = y or 0
+
+    if x == 0 and y == 0 then
+        for level_index = 1, _G.GetNumDungeonMapLevels() do
+            _G.SetDungeonMapLevel(level_index)
+            x, y = _G.GetPlayerMapPosition("player")
+
+            if x and y and (x > 0 or y > 0) then
+                _G.SetDungeonMapLevel(map_level)
+                map_level = level_index
+                break
+            end
+        end
+    end
+
+    if _G.DungeonUsesTerrainMap() then
+        map_level = map_level - 1
+    end
+    local x = _G.floor(x * 1000)
+    local y = _G.floor(y * 1000)
+
+    if x % 2 ~= 0 then
+        x = x + 1
+    end
+
+    if y % 2 ~= 0 then
+        y = y + 1
+    end
+    return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
+end
+
+
 local function DBEntry(data_type, unit_id)
     if not data_type or not unit_id then
         return
@@ -406,44 +445,59 @@ do
 end
 
 
-local function CurrentLocationData()
-    if _G.GetCurrentMapAreaID() ~= current_area_id then
-        return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
+local UpdateDBEntryLocation
+do
+    -- Fishing node coordinate code based on code in GatherMate2 with permission from Kagaro.
+    local function FishingCoordinates(x, y, yard_width, yard_height)
+        local facing = _G.GetPlayerFacing()
+
+        if not facing then
+            return x, y
+        end
+        local rad = facing + math.pi
+        return x + math.sin(rad) * 15 / yard_width, y + math.cos(rad) * 15 / yard_height
     end
-    local map_level = _G.GetCurrentMapDungeonLevel() or 0
-    local x, y = _G.GetPlayerMapPosition("player")
 
-    x = x or 0
-    y = y or 0
 
-    if x == 0 and y == 0 then
-        for level_index = 1, _G.GetNumDungeonMapLevels() do
-            _G.SetDungeonMapLevel(level_index)
-            x, y = _G.GetPlayerMapPosition("player")
+    function UpdateDBEntryLocation(entry_type, identifier)
+        if not identifier then
+            return
+        end
+        local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
+        if not (zone_name and area_id and x and y and map_level) then
+            Debug("UpdateDBEntryLocation: Missing current location data - %s, %d, %d, %d, %d.", zone_name, area_id, x, y, map_level)
+            return
+        end
+        local entry = DBEntry(entry_type, identifier)
+        entry[difficulty_token] = entry[difficulty_token] or {}
+        entry[difficulty_token].locations = entry[difficulty_token].locations or {}
 
-            if x and y and (x > 0 or y > 0) then
-                _G.SetDungeonMapLevel(map_level)
-                map_level = level_index
-                break
+        local zone_token = ("%s:%d"):format(zone_name, area_id)
+        local zone_data = entry[difficulty_token].locations[zone_token]
+
+        if not zone_data then
+            zone_data = {}
+            entry[difficulty_token].locations[zone_token] = zone_data
+        end
+
+        -- Special case for Fishing.
+        if current_action.spell_label == "FISHING" then
+            local _, qx, qy = _G.GetWorldLocFromMapPos(0, 0)
+            local _, wx, wy = _G.GetWorldLocFromMapPos(1, 1)
+            local yard_width, yard_height = qy - wy, qx - wx
+
+            if yard_width > 0 and yard_height > 0 then
+                x, y = FishingCoordinates(x, y, yard_width, yard_height)
+                current_action.x = x
+                current_action.y = y
             end
         end
-    end
+        local location_token = ("%d:%d:%d"):format(map_level, x, y)
 
-    if _G.DungeonUsesTerrainMap() then
-        map_level = map_level - 1
+        zone_data[location_token] = zone_data[location_token] or true
+        return zone_data
     end
-    local x = _G.floor(x * 1000)
-    local y = _G.floor(y * 1000)
-
-    if x % 2 ~= 0 then
-        x = x + 1
-    end
-
-    if y % 2 ~= 0 then
-        y = y + 1
-    end
-    return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
-end
+end -- do-block
 
 
 local function CurrencyLinkToTexture(currency_link)
@@ -514,59 +568,6 @@ do
     end
 
     private.ParseGUID = ParseGUID
-end -- do-block
-
-
-local UpdateDBEntryLocation
-do
-    -- Fishing node coordinate code based on code in GatherMate2 with permission from Kagaro.
-    local function FishingCoordinates(x, y, yard_width, yard_height)
-        local facing = _G.GetPlayerFacing()
-
-        if not facing then
-            return x, y
-        end
-        local rad = facing + math.pi
-        return x + math.sin(rad) * 15 / yard_width, y + math.cos(rad) * 15 / yard_height
-    end
-
-
-    function UpdateDBEntryLocation(entry_type, identifier)
-        if not identifier then
-            return
-        end
-        local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
-        if not (zone_name and area_id and x and y and map_level) then
-            Debug("UpdateDBEntryLocation: Missing current location data - %s, %d, %d, %d, %d.", zone_name, area_id, x, y, map_level)
-            return
-        end
-        local entry = DBEntry(entry_type, identifier)
-        entry[difficulty_token] = entry[difficulty_token] or {}
-        entry[difficulty_token].locations = entry[difficulty_token].locations or {}
-
-        local zone_token = ("%s:%d"):format(zone_name, area_id)
-        local zone_data = entry[difficulty_token].locations[zone_token]
-
-        if not zone_data then
-            zone_data = {}
-            entry[difficulty_token].locations[zone_token] = zone_data
-        end
-
-        -- Special case for Fishing.
-        if current_action.spell_label == "FISHING" then
-            local yard_width, yard_height = MapData:MapArea(area_id, map_level)
-
-            if yard_width > 0 and yard_height > 0 then
-                x, y = FishingCoordinates(x, y, yard_width, yard_height)
-                current_action.x = x
-                current_action.y = y
-            end
-        end
-        local location_token = ("%d:%d:%d"):format(map_level, x, y)
-
-        zone_data[location_token] = zone_data[location_token] or true
-        return zone_data
-    end
 end -- do-block
 
 
