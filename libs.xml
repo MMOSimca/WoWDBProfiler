@@ -11,6 +11,5 @@
     <Include file="Libs\LibDeformat-3.0\lib.xml"/>
     <Include file="Libs\LibDialog-1.0\lib.xml"/>
     <Include file="Libs\LibQTip-1.0\lib.xml"/>
-    <Script file="Libs\LibPetJournal-2.0\LibPetJournal-2.0.lua"/>
     <!--@end-no-lib-strip@-->
 </Ui>

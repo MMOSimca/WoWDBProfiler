@@ -25,7 +25,6 @@ local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
-local LPJ = LibStub("LibPetJournal-2.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -2499,7 +2498,8 @@ end
 
 
 -- This function produces data currently unused by wowdb.com, and it causes unneeded bloat in the raw lua DB.
---[[function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
+--[[local LPJ = LibStub("LibPetJournal-2.0")
+function WDP:PET_JOURNAL_LIST_UPDATE(event_name)
     if DEBUGGING then
         return
     end
