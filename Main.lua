@@ -2085,7 +2085,7 @@ do
             end
 
             for index = 1, #current_loot.list do
-                table.insert(current_loot.zone_data[location_token].drops, current_loot.loot_list[index])
+                table.insert(current_loot.zone_data[location_token].drops, current_loot.list[index])
             end
         end,
     }
