@@ -1489,21 +1489,35 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         GenericLootUpdate("items")
         current_loot = nil
         container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
-    elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle and loot_type == "currency" then
-        local currency_texture = CurrencyLinkToTexture(item_link)
-        if currency_texture and currency_texture ~= "" then
+    elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle then
+        -- Handle currency loot toasts for chat-based loot (we do this instead of reading currency chat messages because the chat messages are very delayed)
+        if loot_type == "currency" then
+            local currency_texture = CurrencyLinkToTexture(item_link)
+            if currency_texture and currency_texture ~= "" then
+                -- Verify that we're still assigning data to the right items
+                if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
+                    local currency_token = ("currency:%s"):format(currency_texture)
+                    Debug("%s: Captured currency for chat-based loot recording. %s X %d", event_name, currency_token, quantity)
+                    chat_loot_data.loot = chat_loot_data.loot or {}
+                    chat_loot_data.loot[currency_token] = (chat_loot_data.loot[currency_token] or 0) + quantity
+                else -- If not, cancel the timer and wipe the loot table early
+                    Debug("%s: Canceled chat-based loot recording because we would have assigned the wrong loot!", event_name)
+                    ClearChatLootData()
+                end
+            else
+                Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+            end
+        -- Handle money loot toasts for chat-based loot (we do this instead of reading money chat messages because the chat messages are very delayed)
+        elseif loot_type == "money" then
             -- Verify that we're still assigning data to the right items
             if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
-                local currency_token = ("currency:%s"):format(currency_texture)
-                Debug("%s: Captured currency for chat-based loot recording. %s X %d", event_name, currency_token, quantity)
+                Debug("%s: Captured money for chat-based loot recording. money X %d", event_name, quantity)
                 chat_loot_data.loot = chat_loot_data.loot or {}
-                chat_loot_data.loot[currency_token] = (chat_loot_data.loot[currency_token] or 0) + quantity
+                chat_loot_data.loot["money"] = (chat_loot_data.loot["money"] or 0) + quantity
             else -- If not, cancel the timer and wipe the loot table early
                 Debug("%s: Canceled chat-based loot recording because we would have assigned the wrong loot!", event_name)
                 ClearChatLootData()
             end
-        else
-            Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
         end
     else
         Debug("%s: NPC and Container are nil, storing loot toast data for 5 seconds.", event_name)
