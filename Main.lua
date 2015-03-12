@@ -2590,6 +2590,10 @@ do
 
     function WDP:QUEST_COMPLETE(event_name)
         local quest = UpdateQuestJuncture("end")
+        
+        if not quest then
+            return
+        end
 
         if ALLOWED_LOCALES[CLIENT_LOCALE] then
             quest.reward_text = ReplaceKeywords(_G.GetRewardText())
