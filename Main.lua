@@ -1068,9 +1068,18 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
 
         local suffix_id = tonumber(item_results[8])
         local unique_id = item_results[9]
+        --local level = tonumber(item_results[10])
+        --IN 6.2: local unknown = tonumber(item_results[11])
         local upgrade_id = tonumber(item_results[11])
         local instance_difficulty_id = tonumber(item_results[12])
         local num_bonus_ids = tonumber(item_results[13])
+        -- INTEGRATE WHEN 6.2 IS LIVE
+        if (private.interface_num >= 60200) then
+            upgrade_id = tonumber(item_results[12])
+            instance_difficulty_id = tonumber(item_results[13])
+            num_bonus_ids = tonumber(item_results[14])
+        end
+        -- END INTEGRATE
 
         if not num_bonus_ids or num_bonus_ids == 0 or not process_bonus_ids then
             if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
@@ -1109,7 +1118,12 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
                 local min_bonus_id = 100000
                 for bonus_index = 1, num_bonus_ids do
                     local temp_bonus_id = tonumber(item_results[13 + bonus_index])
-                    if (not min_bonus_id_array[temp_bonus_id]) and (temp_bonus_id < min_bonus_id) then
+                    -- INTEGRATE WHEN 6.2 IS LIVE
+                    if (private.interface_num >= 60200) then
+                        temp_bonus_id = tonumber(item_results[14 + bonus_index])
+                    end
+                    -- END INTEGRATE
+                    if temp_bonus_id and (not min_bonus_id_array[temp_bonus_id]) and (temp_bonus_id < min_bonus_id) then
                         min_bonus_id = temp_bonus_id
                     end
                 end
