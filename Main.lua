@@ -47,7 +47,7 @@ local OBJECT_ID_ANVIL = 192628
 local OBJECT_ID_FISHING_BOBBER = 35591
 local OBJECT_ID_FORGE = 1685
 
-local PLAYER_CLASS = _G.select(2, _G.UnitClass("player"))
+local PLAYER_CLASS, PLAYER_CLASS_ID = _G.select(2, _G.UnitClass("player"))
 local PLAYER_FACTION = _G.UnitFactionGroup("player")
 local PLAYER_GUID
 local PLAYER_NAME = _G.UnitName("player")
@@ -2910,12 +2910,16 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     end
 
     -- For spells cast by items that don't usually trigger loot toasts
-    if private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] and not block_chat_loot_data then
+    if not block_chat_loot_data and (private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] or (private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id] and private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID])) then
         -- Set up timer
         ClearChatLootData()
         Debug("%s: Beginning chat-based loot timer for spellID %d", event_name, spell_id)
         chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
-        chat_loot_data.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
+        if (private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id] and private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID]) then
+            chat_loot_data.identifier = private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID]
+        else
+            chat_loot_data.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
+        end
         return
     end
 
