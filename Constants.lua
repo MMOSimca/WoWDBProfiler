@@ -442,6 +442,24 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [178847] = 81252, -- Drov Bonus (Drov the Ruiner)
     [178849] = 81535, -- Tarlna Bonus (Tarlna the Ageless)
     [178851] = 83746, -- Rukhmar Bonus (Rukhmar)
+    [188985] = 94015, -- 6.2 Raid Bonus Roll Prompt - World Boss 01 (Supreme Lord Kazzak)
+
+    -----------------------------------------------------------------------
+    -- Hellfire Citadel
+    -----------------------------------------------------------------------
+    [188972] = 93023, -- 6.2 Raid Bonus Roll Prompt - Boss 1 (Siegemaster Mar'tak)
+    [188973] = 90284, -- 6.2 Raid Bonus Roll Prompt - Boss 2 (Iron Reaver)
+    [188974] = 90435, -- 6.2 Raid Bonus Roll Prompt - Boss 3 (Kormrok)
+    [188975] = 92142, -- 6.2 Raid Bonus Roll Prompt - Boss 4 (Blademaster Jubei'thos)
+    [188976] = 90378, -- 6.2 Raid Bonus Roll Prompt - Boss 5 (Kilrogg Deadeye)
+    [188977] = 90199, -- 6.2 Raid Bonus Roll Prompt - Boss 6 (Gorefiend)
+    [188978] = 90316, -- 6.2 Raid Bonus Roll Prompt - Boss 7 (Shadow-Lord Iskar)
+    [188979] = 90296, -- 6.2 Raid Bonus Roll Prompt - Boss 8 (Soulbound Construct)
+    [188980] = 89890, -- 6.2 Raid Bonus Roll Prompt - Boss 9 (Fel Lord Zakuun)
+    [188981] = 93068, -- 6.2 Raid Bonus Roll Prompt - Boss 10 (Xhul'horac)
+    [188982] = 90269, -- 6.2 Raid Bonus Roll Prompt - Boss 11 (Tyrant Velhari)
+    [188983] = 91349, -- 6.2 Raid Bonus Roll Prompt - Boss 12 (Mannoroth)
+    [188984] = 91331, -- 6.2 Raid Bonus Roll Prompt - Boss 13 (Archimonde)
 
     -----------------------------------------------------------------------
     -- Blackrock Foundry
