@@ -1771,12 +1771,16 @@ do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
-    -- Spells that are cast by players that are mistakely assigned as being cast by the target; must be blacklisted
+    -- Spells that are cast by players/NPCs that are mistakely assigned as being cast by the target; must be blacklisted
     local BLACKLISTED_SPELLS = {
-        [117526] = true, -- Binding Shot
-        [132464] = true, -- Chi Wave
-        [132467] = true, -- Chi Wave
-        [121308] = true, -- Disguise
+        [117526] = true, -- Binding Shot (cast by Hunters)
+        [121308] = true, -- Disguise (cast by Rogues)
+        [132464] = true, -- Chi Wave (cast by Monks)
+        [132467] = true, -- Chi Wave (cast by Monks)
+        [176813] = true, -- Itchy Spores (cast by Marsh Creatures in Ashran)
+        [183901] = true, -- Stolen Strength (cast by Felblood NPCs in Tanaan Jungle)
+        [183904] = true, -- Stolen Speed (cast by Felblood NPCs in Tanaan Jungle)
+        [183907] = true, -- Stolen Fervor (cast by Felblood NPCs in Tanaan Jungle)
     }
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
