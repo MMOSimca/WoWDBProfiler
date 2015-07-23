@@ -990,15 +990,9 @@ function WDP:OnEnable()
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
 
-    -- These two timers loop indefinitely by constantly resetting their remaining iterations to 100k.
-    item_process_timer_handle = C_Timer.NewTicker(30, function()
-        item_process_timer_handle._remainingIterations = 100000
-        WDP:ProcessItems()
-    end, 100000)
-    target_location_timer_handle = C_Timer.NewTicker(0.5, function()
-        target_location_timer_handle._remainingIterations = 100000
-        WDP:UpdateTargetLocation()
-    end, 100000)
+    -- These two timers loop indefinitely using Lua's infinity constant
+    item_process_timer_handle = C_Timer.NewTicker(30, WDP.ProcessItems, math.huge)
+    target_location_timer_handle = C_Timer.NewTicker(0.5, WDP.UpdateTargetLocation, math.huge)
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
