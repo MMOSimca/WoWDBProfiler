@@ -1014,47 +1014,6 @@ function WDP:OnEnable()
 end
 
 
-local ScrapeItemUpgradeStats
-do
-    local intermediary = {}
-
-    function ScrapeItemUpgradeStats(item_id, upgrade_id, reforge_id)
-        if not ALLOWED_LOCALES[CLIENT_LOCALE] then
-            return
-        end
-        local create_entry
-
-        table.wipe(intermediary)
-
-        for line_index = 1, DatamineTT:NumLines() do
-            local left_text = _G["WDPDatamineTTTextLeft" .. line_index]:GetText():trim()
-
-            if not left_text or left_text == "" or left_text:find("Socket") or left_text:find("Set:") then
-                break
-            end
-            local amount, stat = left_text:match("+(.-) (.*)")
-
-            if amount and stat then
-                create_entry = true
-                intermediary[stat:lower():gsub(" ", "_"):gsub("|r", "")] = tonumber((amount:gsub(",", "")))
-            end
-        end
-
-        if not create_entry then
-            return
-        end
-        local item = DBEntry("items", item_id)
-        item.upgrade_id = upgrade_id
-        item.upgrades = item.upgrades or {}
-        item.upgrades[upgrade_id] = item.upgrades[upgrade_id] or {}
-
-        for stat, amount in pairs(intermediary) do
-            item.upgrades[upgrade_id][stat] = amount
-        end
-    end
-end -- do-block
-
-
 local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
     local _, _, item_string = item_link:find("^|%x+|H(.+)|h%[.+%]")
     local item
@@ -1062,75 +1021,63 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
     if item_string then
         local item_results = { (":"):split(item_string) }
 
-        local suffix_id = tonumber(item_results[8])
-        local unique_id = item_results[9]
+        local suffix_id = tonumber(item_results[8]) or 0
+        local unique_id = item_results[9] or 0
         --local level = tonumber(item_results[10])
-        --local unknown = tonumber(item_results[11])
-        local upgrade_id = tonumber(item_results[12])
-        local instance_difficulty_id = tonumber(item_results[13])
-        local num_bonus_ids = tonumber(item_results[14])
+        --local specialization_id = tonumber(item_results[11])
+        --local unknown_upgrade_related_id = tonumber(item_results[12])
+        local instance_difficulty_id = tonumber(item_results[13]) or 0
+        local num_bonus_ids = tonumber(item_results[14]) or 0
+        -- upgrade_id is optional since 6.2! can probably be detected using unknown_upgrade_related_id, but it's just as easy to check like this
+        local upgrade_id = tonumber(item_results[15 + num_bonus_ids]) or 0
 
-        if not num_bonus_ids or num_bonus_ids == 0 or not process_bonus_ids then
-            if (suffix_id and suffix_id ~= 0) or (instance_difficulty_id and instance_difficulty_id ~= 0) then
-                item = DBEntry("items", item_id)
-                item.unique_id = bit.band(unique_id, 0xFFFF)
+        -- If there is anything special (non-zero) for this item then we need to make note of everything
+        if math.max(suffix_id, instance_difficulty_id, num_bonus_ids, upgrade_id) ~= 0 then
+            item = DBEntry("items", item_id)
+            item.suffix_id = suffix_id
+            item.unique_id = bit.band(unique_id, 0xFFFF)
+            item.instance_difficulty_id = instance_difficulty_id
+            item.upgrade_id = upgrade_id
 
-                if suffix_id and suffix_id ~= 0 then
-                    item.suffix_id = suffix_id
-                end
+            if process_bonus_ids then
 
-                if instance_difficulty_id and instance_difficulty_id ~= 0 then
-                    item.instance_difficulty_id = instance_difficulty_id
-                end
-
+                -- Get ready for bonus IDs
                 if not item.seen_bonuses then
                     item.seen_bonuses = {}
                 end
-                item.seen_bonuses["0"] = true
-            end
-        elseif num_bonus_ids > 0 then
-            item = DBEntry("items", item_id)
+            
+                if num_bonus_ids > 0 then
+                    -- We want the bonus ID combo output to be in the form ["bonusID1:bonusID2:bonusID3"] = true
+                    -- And sorted numerically with the smallest bonusID first
+                    local sorted_bonus_string = ""
+                    local min_bonus_id_array = {}
+                    for iterations = 1, num_bonus_ids do
+                        -- Find minimum of this iteration
+                        local min_bonus_id = 100000
+                        for bonus_index = 1, num_bonus_ids do
+                            local temp_bonus_id = tonumber(item_results[14 + bonus_index])
+                            if temp_bonus_id and (not min_bonus_id_array[temp_bonus_id]) and (temp_bonus_id < min_bonus_id) then
+                                min_bonus_id = temp_bonus_id
+                            end
+                        end
 
-            item.unique_id = bit.band(unique_id, 0xFFFF)
-            item.instance_difficulty_id = instance_difficulty_id
+                        -- Keep track of already processed IDs
+                        min_bonus_id_array[min_bonus_id] = true
 
-            if not item.seen_bonuses then
-                item.seen_bonuses = {}
-            end
-
-            -- We want the bonus ID combo output to be in the form ["bonusID1:bonusID2:bonusID3"] = true
-            -- And sorted numerically with the smallest bonusID first
-            local sorted_bonus_string = ""
-            local min_bonus_id_array = {}
-            for iterations = 1, num_bonus_ids do
-                -- Find minimum of this iteration
-                local min_bonus_id = 100000
-                for bonus_index = 1, num_bonus_ids do
-                    local temp_bonus_id = tonumber(item_results[14 + bonus_index])
-                    if temp_bonus_id and (not min_bonus_id_array[temp_bonus_id]) and (temp_bonus_id < min_bonus_id) then
-                        min_bonus_id = temp_bonus_id
+                        -- Build string
+                        if iterations == 1 then
+                            sorted_bonus_string = sorted_bonus_string .. tostring(min_bonus_id)
+                        else
+                            sorted_bonus_string = sorted_bonus_string .. ":" .. tostring(min_bonus_id)
+                        end
                     end
-                end
 
-                -- Keep track of already processed IDs
-                min_bonus_id_array[min_bonus_id] = true
-
-                -- Build string
-                if iterations == 1 then
-                    sorted_bonus_string = sorted_bonus_string .. tostring(min_bonus_id)
+                    item.seen_bonuses[sorted_bonus_string] = true
+                    Debug("RecordItemData: Recorded bonus IDs %s for item %d.", sorted_bonus_string, item_id)
                 else
-                    sorted_bonus_string = sorted_bonus_string .. ":" .. tostring(min_bonus_id)
+                    item.seen_bonuses["0"] = true
                 end
             end
-
-            item.seen_bonuses[sorted_bonus_string] = true
-            Debug("RecordItemData: Recorded bonus IDs %s for item %d.", sorted_bonus_string, item_id)
-        else
-            Debug("RecordItemData: num_bonus_ids is supposed to be 0 or positive, instead it was %d.", num_bonus_ids)
-        end
-        if upgrade_id and upgrade_id ~= 0 then
-            DatamineTT:SetHyperlink(item_link)
-            ScrapeItemUpgradeStats(item_id, upgrade_id)
         end
     end
 
@@ -1771,6 +1718,8 @@ do
         [121308] = true, -- Disguise (cast by Rogues)
         [132464] = true, -- Chi Wave (cast by Monks)
         [132467] = true, -- Chi Wave (cast by Monks)
+        [167432] = true, -- Savagery (cast by Warsong Commander)
+        [175077] = true, -- Fearsome Battle Standard (cast by Fearsome Battle Standard item)
         [176813] = true, -- Itchy Spores (cast by Marsh Creatures in Ashran)
         [183901] = true, -- Stolen Strength (cast by Felblood NPCs in Tanaan Jungle)
         [183904] = true, -- Stolen Speed (cast by Felblood NPCs in Tanaan Jungle)
