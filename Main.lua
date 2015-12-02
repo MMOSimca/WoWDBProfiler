@@ -1022,7 +1022,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         local item_results = { (":"):split(item_string) }
 
         local suffix_id = tonumber(item_results[8]) or 0
-        local unique_id = item_results[9] or 0
+        local unique_id = tonumber(item_results[9]) or 0
         --local level = tonumber(item_results[10])
         --local specialization_id = tonumber(item_results[11])
         --local unknown_upgrade_related_id = tonumber(item_results[12])
@@ -1030,6 +1030,14 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         local num_bonus_ids = tonumber(item_results[14]) or 0
         -- upgrade_id is optional since 6.2! can probably be detected using unknown_upgrade_related_id, but it's just as easy to check like this
         local upgrade_id = tonumber(item_results[15 + num_bonus_ids]) or 0
+        
+        -- LEGION
+        if private.isLegion then
+            local unkItemField1 = tonumber(item_results[16 + num_bonus_ids]) or 0
+            local unkItemField2 = tonumber(item_results[17 + num_bonus_ids]) or 0
+            if unkItemField1 > 0 then Debug("unkItemField1 is non-zero, specifically %d.", unkItemField1) end
+            if unkItemField2 > 0 then Debug("unkItemField2 is non-zero, specifically %d.", unkItemField2) end
+        end
 
         -- If there is anything special (non-zero) for this item then we need to make note of everything
         if math.max(suffix_id, instance_difficulty_id, num_bonus_ids, upgrade_id) ~= 0 then
@@ -1190,7 +1198,8 @@ do
     local COORD_MAX = 5
 
     function WDP:UpdateTargetLocation()
-        if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapped("target") and not _G.UnitIsDead("target")) then
+        -- LEGION supported here
+        if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or not _G.UnitIsDead("target") then
             return
         end
 
