@@ -2227,11 +2227,10 @@ do
         loot_guid_registry[current_loot.label] = loot_guid_registry[current_loot.label] or {}
 
         for loot_slot = 1, _G.GetNumLootItems() do
-            local icon_texture, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+            local texturefiledataID, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
-            local loot_info = {
-                _G.GetLootSourceInfo(loot_slot)
-            }
+            local loot_info = { _G.GetLootSourceInfo(loot_slot) }
+			local loot_link = _G.GetLootSlotLink(loot_slot)
 
             -- Odd index is GUID, even is count.
             for loot_index = 1, #loot_info, 2 do
@@ -2249,11 +2248,15 @@ do
                         local source_key = ("%s:%d"):format(source_type, source_id)
 
                         if slot_type == LOOT_SLOT_ITEM then
-                            local item_id = ItemLinkToID(_G.GetLootSlotLink(loot_slot))
-                            Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
-                            current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-                            current_loot.sources[source_guid][item_id] = (current_loot.sources[source_guid][item_id] or 0) + loot_quantity
-                            guids_used[source_guid] = true
+							if loot_link then
+								local item_id = ItemLinkToID(loot_link)
+								Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
+								current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+								current_loot.sources[source_guid][item_id] = (current_loot.sources[source_guid][item_id] or 0) + loot_quantity
+								guids_used[source_guid] = true
+                            else
+                                Debug("%s: Loot link is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
+                            end
                         elseif slot_type == LOOT_SLOT_MONEY then
                             Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
                             if current_loot.target_type == AF.ZONE then
@@ -2265,24 +2268,25 @@ do
                             end
                         elseif slot_type == LOOT_SLOT_CURRENCY then
                             -- Same bug with GetLootSlotInfo() will screw up currency when it happens, so we won't process this slot's loot.
-                            if icon_texture then
+                            if loot_link then
+								local icon_texture = CurrencyLinkToTexture(loot_link)
                                 Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
                                 if current_loot.target_type == AF.ZONE then
-                                    table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture:match("[^\\]+$"):lower()))
+                                    table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture))
                                 else
-                                    local currency_token = ("currency:%s"):format(icon_texture:match("[^\\]+$"):lower())
+                                    local currency_token = ("currency:%s"):format(icon_texture)
 
                                     current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
                                     current_loot.sources[source_guid][currency_token] = (current_loot.sources[source_guid][currency_token] or 0) + loot_quantity
                                     guids_used[source_guid] = true
                                 end
                             else
-                                Debug("%s: Slot quantity is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
+                                Debug("%s: Loot link is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
                             end
                         end
                     else
                         -- If this is nil, then the item's quantity could be wrong if loot_quantity is wrong, so we won't process this slot's loot.
-                        Debug("%s: Slot quantity is nil for loot slot %d.", event_name, loot_slot)
+                        Debug("%s: Slot quantity is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
                     end
                 end
             end
