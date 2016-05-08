@@ -251,62 +251,75 @@ do
         if not _G.TradeSkillFrame or not _G.TradeSkillFrame:IsVisible() then
             return
         end
-        -- Clear the search box focus so the scan will have correct results.
-        local search_box = _G.TradeSkillFrameSearchBox
-        search_box:SetText("")
+		
+		if (private.isLegion) then
+			local recipes = _G.C_TradeSkillUI.GetAllRecipeIDs()
+			
+			if recipes and (#recipes > 0) then
+				for i = 1, #recipes do
+					if iter_func(_G.C_TradeSkillUI.GetRecipeInfo(recipes[i]).name, recipes[i]) then
+						break
+					end
+				end
+			end
+		else
+			-- Clear the search box focus so the scan will have correct results.
+			local search_box = _G.TradeSkillFrameSearchBox
+			search_box:SetText("")
 
-        _G.TradeSkillSearch_OnTextChanged(search_box)
-        search_box:ClearFocus()
-        search_box:GetScript("OnEditFocusLost")(search_box)
+			_G.TradeSkillSearch_OnTextChanged(search_box)
+			search_box:ClearFocus()
+			search_box:GetScript("OnEditFocusLost")(search_box)
 
-        table.wipe(header_list)
+			table.wipe(header_list)
 
-        -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
-        local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
-        local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
+			-- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
+			local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
+			local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
 
-        if have_materials then
-            _G.TradeSkillFrame.filterTbl.hasMaterials = false
-            _G.TradeSkillOnlyShowMakeable(false)
-        end
+			if have_materials then
+				_G.TradeSkillFrame.filterTbl.hasMaterials = false
+				_G.TradeSkillOnlyShowMakeable(false)
+			end
 
-        if have_skillup then
-            _G.TradeSkillFrame.filterTbl.hasSkillUp = false
-            _G.TradeSkillOnlyShowSkillUps(false)
-        end
-        _G.SetTradeSkillInvSlotFilter(0, true, true)
-        _G.TradeSkillUpdateFilterBar()
-        _G.TradeSkillFrame_Update()
+			if have_skillup then
+				_G.TradeSkillFrame.filterTbl.hasSkillUp = false
+				_G.TradeSkillOnlyShowSkillUps(false)
+			end
+			_G.SetTradeSkillInvSlotFilter(0, true, true)
+			_G.TradeSkillUpdateFilterBar()
+			_G.TradeSkillFrame_Update()
 
-        -- Expand all headers so we can see all the recipes there are
-        for tradeskill_index = 1, _G.GetNumTradeSkills() do
-            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+			-- Expand all headers so we can see all the recipes there are
+			for tradeskill_index = 1, _G.GetNumTradeSkills() do
+				local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
 
-            if tradeskill_type == "header" or tradeskill_type == "subheader" then
-                if not is_expanded then
-                    header_list[name] = true
-                    _G.ExpandTradeSkillSubClass(tradeskill_index)
-                end
-            elseif iter_func(name, tradeskill_index) then
-                break
-            end
-        end
+				if tradeskill_type == "header" or tradeskill_type == "subheader" then
+					if not is_expanded then
+						header_list[name] = true
+						_G.ExpandTradeSkillSubClass(tradeskill_index)
+					end
+				elseif iter_func(name, tradeskill_index) then
+					break
+				end
+			end
 
-        -- Restore the state of the things we changed.
-        for tradeskill_index = 1, _G.GetNumTradeSkills() do
-            local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+			-- Restore the state of the things we changed.
+			for tradeskill_index = 1, _G.GetNumTradeSkills() do
+				local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
 
-            if header_list[name] then
-                _G.CollapseTradeSkillSubClass(tradeskill_index)
-            end
-        end
-        _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
-        _G.TradeSkillOnlyShowMakeable(have_materials)
-        _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
-        _G.TradeSkillOnlyShowSkillUps(have_skillup)
+				if header_list[name] then
+					_G.CollapseTradeSkillSubClass(tradeskill_index)
+				end
+			end
+			_G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
+			_G.TradeSkillOnlyShowMakeable(have_materials)
+			_G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
+			_G.TradeSkillOnlyShowSkillUps(have_skillup)
 
-        _G.TradeSkillUpdateFilterBar()
-        _G.TradeSkillFrame_Update()
+			_G.TradeSkillUpdateFilterBar()
+			_G.TradeSkillFrame_Update()
+		end
     end
 end -- do-block
 
@@ -1654,7 +1667,11 @@ do
 
     local function RecordDiscovery(tradeskill_name, tradeskill_index)
         if tradeskill_name == private.discovered_recipe_name then
-            DBEntry("spells", tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
+			if (private.isLegion) then
+				DBEntry("spells", tonumber(_G.C_TradeSkillUI.GetRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
+			else
+				DBEntry("spells", tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
+			end
 
             private.discovered_recipe_name = nil
             private.profession_level = nil
@@ -1683,7 +1700,12 @@ do
                 local recipe_name = message:match(RECIPE_MATCH)
 
                 if recipe_name and private.previous_spell_id then
-                    local profession_name, prof_level = _G.GetTradeSkillLine()
+                    local profession_name, prof_level
+                    if private.isLegion then
+                        profession_name, prof_level= _G.C_TradeSkillUI.GetTradeSkillLine()
+                    else
+                        profession_name, prof_level= _G.GetTradeSkillLine()
+                    end
 
                     if profession_name == _G.UNKNOWN then
                         return
@@ -2230,7 +2252,7 @@ do
             local texturefiledataID, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
             local loot_info = { _G.GetLootSourceInfo(loot_slot) }
-			local loot_link = _G.GetLootSlotLink(loot_slot)
+            local loot_link = _G.GetLootSlotLink(loot_slot)
 
             -- Odd index is GUID, even is count.
             for loot_index = 1, #loot_info, 2 do
@@ -2248,12 +2270,12 @@ do
                         local source_key = ("%s:%d"):format(source_type, source_id)
 
                         if slot_type == LOOT_SLOT_ITEM then
-							if loot_link then
-								local item_id = ItemLinkToID(loot_link)
-								Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
-								current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
-								current_loot.sources[source_guid][item_id] = (current_loot.sources[source_guid][item_id] or 0) + loot_quantity
-								guids_used[source_guid] = true
+                            if loot_link then
+                                local item_id = ItemLinkToID(loot_link)
+                                Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
+                                current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
+                                current_loot.sources[source_guid][item_id] = (current_loot.sources[source_guid][item_id] or 0) + loot_quantity
+                                guids_used[source_guid] = true
                             else
                                 Debug("%s: Loot link is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
                             end
@@ -2269,7 +2291,7 @@ do
                         elseif slot_type == LOOT_SLOT_CURRENCY then
                             -- Same bug with GetLootSlotInfo() will screw up currency when it happens, so we won't process this slot's loot.
                             if loot_link then
-								local icon_texture = CurrencyLinkToTexture(loot_link)
+                                local icon_texture = CurrencyLinkToTexture(loot_link)
                                 Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
                                 if current_loot.target_type == AF.ZONE then
                                     table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture))
@@ -2631,10 +2653,21 @@ do
 
 
     local function RegisterTools(tradeskill_name, tradeskill_index)
-        local link = _G.GetTradeSkillRecipeLink(tradeskill_index)
+        local link
+        if (private.isLegion) then
+            link = _G.C_TradeSkillUI.GetRecipeLink(tradeskill_index)
+        else
+            link = _G.GetTradeSkillRecipeLink(tradeskill_index)
+        end
+        
         if link then
             local spell_id = tonumber(link:match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
-            local required_tool = _G.GetTradeSkillTools(tradeskill_index)
+            local required_tool
+            if (private.isLegion) then
+                required_tool = _G.C_TradeSkillUI.GetRecipeTools(tradeskill_index)
+            else
+                required_tool = _G.GetTradeSkillTools(tradeskill_index)
+            end
 
             if required_tool then
                 for tool_name, registry in pairs(TRADESKILL_TOOLS) do
@@ -2648,7 +2681,12 @@ do
 
 
     function WDP:TRADE_SKILL_SHOW(event_name)
-        local profession_name, prof_level = _G.GetTradeSkillLine()
+        local profession_name, prof_level
+        if private.isLegion then
+            profession_name, prof_level= _G.C_TradeSkillUI.GetTradeSkillLine()
+        else
+            profession_name, prof_level= _G.GetTradeSkillLine()
+        end
 
         if profession_name == _G.UNKNOWN then
             return
