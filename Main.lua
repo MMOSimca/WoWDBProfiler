@@ -25,6 +25,7 @@ local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
+local HereBeDragons = LibStub("HereBeDragons-1.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -144,9 +145,6 @@ local EVENT_MAPPING = {
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
     VOID_STORAGE_OPEN = true,
-    ZONE_CHANGED = "HandleZoneChange",
-    ZONE_CHANGED_INDOORS = "HandleZoneChange",
-    ZONE_CHANGED_NEW_AREA = "HandleZoneChange",
 }
 
 
@@ -181,7 +179,6 @@ local block_chat_loot_data
 local chat_loot_data = {}
 local chat_loot_timer_handle
 local current_target_id
-local current_area_id
 local current_loot
 
 
@@ -210,7 +207,7 @@ local function Debug(message, ...)
     if not DEBUGGING or not message then
         return
     end
-    
+
     if ... then
         local args = { ... }
 
@@ -251,75 +248,75 @@ do
         if not _G.TradeSkillFrame or not _G.TradeSkillFrame:IsVisible() then
             return
         end
-		
-		if (private.isLegion) then
-			local recipes = _G.C_TradeSkillUI.GetAllRecipeIDs()
-			
-			if recipes and (#recipes > 0) then
-				for i = 1, #recipes do
-					if iter_func(_G.C_TradeSkillUI.GetRecipeInfo(recipes[i]).name, recipes[i]) then
-						break
-					end
-				end
-			end
-		else
-			-- Clear the search box focus so the scan will have correct results.
-			local search_box = _G.TradeSkillFrameSearchBox
-			search_box:SetText("")
 
-			_G.TradeSkillSearch_OnTextChanged(search_box)
-			search_box:ClearFocus()
-			search_box:GetScript("OnEditFocusLost")(search_box)
+        if (private.isLegion) then
+            local recipes = _G.C_TradeSkillUI.GetAllRecipeIDs()
 
-			table.wipe(header_list)
+            if recipes and (#recipes > 0) then
+                for i = 1, #recipes do
+                    if iter_func(_G.C_TradeSkillUI.GetRecipeInfo(recipes[i]).name, recipes[i]) then
+                        break
+                    end
+                end
+            end
+        else
+            -- Clear the search box focus so the scan will have correct results.
+            local search_box = _G.TradeSkillFrameSearchBox
+            search_box:SetText("")
 
-			-- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
-			local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
-			local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
+            _G.TradeSkillSearch_OnTextChanged(search_box)
+            search_box:ClearFocus()
+            search_box:GetScript("OnEditFocusLost")(search_box)
 
-			if have_materials then
-				_G.TradeSkillFrame.filterTbl.hasMaterials = false
-				_G.TradeSkillOnlyShowMakeable(false)
-			end
+            table.wipe(header_list)
 
-			if have_skillup then
-				_G.TradeSkillFrame.filterTbl.hasSkillUp = false
-				_G.TradeSkillOnlyShowSkillUps(false)
-			end
-			_G.SetTradeSkillInvSlotFilter(0, true, true)
-			_G.TradeSkillUpdateFilterBar()
-			_G.TradeSkillFrame_Update()
+            -- Save the current state of the TradeSkillFrame so it can be restored after we muck with it.
+            local have_materials = _G.TradeSkillFrame.filterTbl.hasMaterials
+            local have_skillup = _G.TradeSkillFrame.filterTbl.hasSkillUp
 
-			-- Expand all headers so we can see all the recipes there are
-			for tradeskill_index = 1, _G.GetNumTradeSkills() do
-				local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+            if have_materials then
+                _G.TradeSkillFrame.filterTbl.hasMaterials = false
+                _G.TradeSkillOnlyShowMakeable(false)
+            end
 
-				if tradeskill_type == "header" or tradeskill_type == "subheader" then
-					if not is_expanded then
-						header_list[name] = true
-						_G.ExpandTradeSkillSubClass(tradeskill_index)
-					end
-				elseif iter_func(name, tradeskill_index) then
-					break
-				end
-			end
+            if have_skillup then
+                _G.TradeSkillFrame.filterTbl.hasSkillUp = false
+                _G.TradeSkillOnlyShowSkillUps(false)
+            end
+            _G.SetTradeSkillInvSlotFilter(0, true, true)
+            _G.TradeSkillUpdateFilterBar()
+            _G.TradeSkillFrame_Update()
 
-			-- Restore the state of the things we changed.
-			for tradeskill_index = 1, _G.GetNumTradeSkills() do
-				local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+            -- Expand all headers so we can see all the recipes there are
+            for tradeskill_index = 1, _G.GetNumTradeSkills() do
+                local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
 
-				if header_list[name] then
-					_G.CollapseTradeSkillSubClass(tradeskill_index)
-				end
-			end
-			_G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
-			_G.TradeSkillOnlyShowMakeable(have_materials)
-			_G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
-			_G.TradeSkillOnlyShowSkillUps(have_skillup)
+                if tradeskill_type == "header" or tradeskill_type == "subheader" then
+                    if not is_expanded then
+                        header_list[name] = true
+                        _G.ExpandTradeSkillSubClass(tradeskill_index)
+                    end
+                elseif iter_func(name, tradeskill_index) then
+                    break
+                end
+            end
 
-			_G.TradeSkillUpdateFilterBar()
-			_G.TradeSkillFrame_Update()
-		end
+            -- Restore the state of the things we changed.
+            for tradeskill_index = 1, _G.GetNumTradeSkills() do
+                local name, tradeskill_type, _, is_expanded = _G.GetTradeSkillInfo(tradeskill_index)
+
+                if header_list[name] then
+                    _G.CollapseTradeSkillSubClass(tradeskill_index)
+                end
+            end
+            _G.TradeSkillFrame.filterTbl.hasMaterials = have_materials
+            _G.TradeSkillOnlyShowMakeable(have_materials)
+            _G.TradeSkillFrame.filterTbl.hasSkillUp = have_skillup
+            _G.TradeSkillOnlyShowSkillUps(have_skillup)
+
+            _G.TradeSkillUpdateFilterBar()
+            _G.TradeSkillFrame_Update()
+        end
     end
 end -- do-block
 
@@ -377,42 +374,19 @@ end
 
 
 local function CurrentLocationData()
-    if _G.GetCurrentMapAreaID() ~= current_area_id then
-        return _G.GetRealZoneText(), current_area_id, 0, 0, 0, InstanceDifficultyToken()
+    local x, y, current_area_id, map_level = HereBeDragons:GetPlayerZonePosition(true)
+
+    -- Put coordinates into expected format (as integers, they don't get a billion decimals output in the SavedVariables)
+    local x_int = _G.floor(x * 1000)
+    local y_int = _G.floor(y * 1000)
+    if x_int % 2 ~= 0 then
+        x_int = x_int + 1
     end
-    local map_level = _G.GetCurrentMapDungeonLevel() or 0
-    local x, y = _G.GetPlayerMapPosition("player")
-
-    x = x or 0
-    y = y or 0
-
-    if x == 0 and y == 0 then
-        for level_index = 1, _G.GetNumDungeonMapLevels() do
-            _G.SetDungeonMapLevel(level_index)
-            x, y = _G.GetPlayerMapPosition("player")
-
-            if x and y and (x > 0 or y > 0) then
-                _G.SetDungeonMapLevel(map_level)
-                map_level = level_index
-                break
-            end
-        end
+    if y_int % 2 ~= 0 then
+        y_int = y_int + 1
     end
 
-    if _G.DungeonUsesTerrainMap() then
-        map_level = map_level - 1
-    end
-    local x = _G.floor(x * 1000)
-    local y = _G.floor(y * 1000)
-
-    if x % 2 ~= 0 then
-        x = x + 1
-    end
-
-    if y % 2 ~= 0 then
-        y = y + 1
-    end
-    return _G.GetRealZoneText(), current_area_id, x, y, map_level, InstanceDifficultyToken()
+    return _G.GetRealZoneText(), current_area_id, x_int, y_int, map_level, InstanceDifficultyToken()
 end
 
 
@@ -612,7 +586,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             any_loot = true
         end
     end
-    
+
     -- Check if we've marked this item as one Blizzard provides bad is_lootable data for
     if private.CONTAINER_ITEM_ID_LIST[item_id] ~= nil then
         any_loot = true
@@ -815,59 +789,6 @@ do
 end -- do-block
 
 
--- Contains a dirty hack due to Blizzard's strange handling of Micro Dungeons; GetMapInfo() will not return correct information
--- unless the WorldMapFrame is shown.
-do
-    -- MapFileName = MapAreaID
-    local MICRO_DUNGEON_IDS = {
-        ShrineofTwoMoons = 903,
-        ShrineofSevenStars = 905,
-    }
-
-    local function SetCurrentAreaID()
-        if private.in_combat then
-            private.set_area_id = true
-            return
-        end
-        local map_area_id = _G.GetCurrentMapAreaID()
-
-        if map_area_id == current_area_id then
-            return
-        end
-        local world_map = _G.WorldMapFrame
-        local map_visible = world_map:IsVisible()
-        local sfx_value = tonumber(_G.GetCVar("Sound_EnableSFX"))
-
-        if not map_visible then
-            _G.SetCVar("Sound_EnableSFX", 0)
-            world_map:Show()
-        end
-        local _, _, _, _, micro_dungeon_map_name = _G.GetMapInfo()
-        local micro_dungeon_id = MICRO_DUNGEON_IDS[micro_dungeon_map_name]
-
-        _G.SetMapToCurrentZone()
-
-        if micro_dungeon_id then
-            current_area_id = micro_dungeon_id
-        else
-            current_area_id = _G.GetCurrentMapAreaID()
-        end
-
-        if map_visible then
-            _G.SetMapByID(map_area_id)
-        else
-            world_map:Hide()
-            _G.SetCVar("Sound_EnableSFX", sfx_value)
-        end
-    end
-
-    function WDP:HandleZoneChange(event_name)
-        in_instance = _G.IsInInstance()
-        SetCurrentAreaID()
-    end
-end
-
-
 -- TIMERS -------------------------------------------------------------
 
 function ClearKilledNPC()
@@ -1043,7 +964,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         local num_bonus_ids = tonumber(item_results[14]) or 0
         -- upgrade_id is optional since 6.2! can probably be detected using unknown_upgrade_related_id, but it's just as easy to check like this
         local upgrade_id = tonumber(item_results[15 + num_bonus_ids]) or 0
-        
+
         -- LEGION
         if private.isLegion then
             local unkItemField1 = tonumber(item_results[16 + num_bonus_ids]) or 0
@@ -1066,7 +987,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
                 if not item.seen_bonuses then
                     item.seen_bonuses = {}
                 end
-            
+
                 if num_bonus_ids > 0 then
                     -- We want the bonus ID combo output to be in the form ["bonusID1:bonusID2:bonusID3"] = true
                     -- And sorted numerically with the smallest bonusID first
@@ -1376,7 +1297,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         else
             Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
         end
-        
+
         -- Wipe object ID until future mouseover
         last_garrison_cache_object_id = nil
     elseif raid_boss_id then
@@ -1667,11 +1588,11 @@ do
 
     local function RecordDiscovery(tradeskill_name, tradeskill_index)
         if tradeskill_name == private.discovered_recipe_name then
-			if (private.isLegion) then
-				DBEntry("spells", tonumber(_G.C_TradeSkillUI.GetRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
-			else
-				DBEntry("spells", tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
-			end
+            if (private.isLegion) then
+                DBEntry("spells", tonumber(_G.C_TradeSkillUI.GetRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
+            else
+                DBEntry("spells", tonumber(_G.GetTradeSkillRecipeLink(tradeskill_index):match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))).discovery = ("%d:%d"):format(private.previous_spell_id, private.profession_level)
+            end
 
             private.discovered_recipe_name = nil
             private.profession_level = nil
@@ -1858,7 +1779,7 @@ do
         end
     end
 
-    
+
     local DIPLOMACY_SPELL_ID = 20599
     local MR_POP_RANK1_SPELL_ID = 78634
     local MR_POP_RANK2_SPELL_ID = 78635
@@ -1935,7 +1856,7 @@ do
                 end
             end
         end
-        
+
         npc.reputations = npc.reputations or {}
         npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
     end
@@ -2576,7 +2497,7 @@ do
 
     function WDP:QUEST_COMPLETE(event_name)
         local quest = UpdateQuestJuncture("end")
-        
+
         if not quest then
             return
         end
@@ -2659,7 +2580,7 @@ do
         else
             link = _G.GetTradeSkillRecipeLink(tradeskill_index)
         end
-        
+
         if link then
             local spell_id = tonumber(link:match("^|c%x%x%x%x%x%x%x%x|H%w+:(%d+)"))
             local required_tool
