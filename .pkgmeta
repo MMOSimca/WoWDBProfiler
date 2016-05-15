@@ -9,7 +9,6 @@ externals:
         tag: latest
     Libs/HereBeDragons-1.0:
         url: git://git.wowace.com/wow/herebedragons/mainline.git
-        tag: latest
     Libs/AceAddon-3.0:
         url: svn://svn.wowace.com/wow/ace3/mainline/trunk/AceAddon-3.0
     Libs/AceConsole-3.0:
