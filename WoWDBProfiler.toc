@@ -4,7 +4,7 @@
 ## Author: James D. Callahan III (Torhal)
 ## X-Email: jcallahan@curse.com
 ## SavedVariables: WoWDBProfilerData
-## OptionalDeps: Ace3, LibDeformat-3.0, LibDialog-1.0, LibQTip-1.0
+## OptionalDeps: Ace3, HereBeDragons-1.0, LibDeformat-3.0, LibDialog-1.0, LibQTip-1.0
 
 libs.xml
 

@@ -943,7 +943,6 @@ function WDP:OnEnable()
         HandleItemUse(item_link)
     end)
 
-    self:HandleZoneChange("OnEnable")
     self:GROUP_ROSTER_UPDATE()
 end
 
@@ -2458,11 +2457,6 @@ end
 
 function WDP:PLAYER_REGEN_ENABLED(event_name)
     private.in_combat = nil
-
-    if private.set_area_id then
-        self:HandleZoneChange(event_name)
-        private.set_area_id = nil
-    end
 end
 
 
