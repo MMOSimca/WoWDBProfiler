@@ -1682,6 +1682,8 @@ do
         [183901] = true, -- Stolen Strength (cast by Felblood NPCs in Tanaan Jungle)
         [183904] = true, -- Stolen Speed (cast by Felblood NPCs in Tanaan Jungle)
         [183907] = true, -- Stolen Fervor (cast by Felblood NPCs in Tanaan Jungle)
+        [213738] = true, -- Taste of Blood (applied by Fate and Fortune, Combat Rogue Artifacts)
+        [224762] = true, -- Leyline Rift (summoned by players with Leyline Mastery in Suramar)
     }
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
