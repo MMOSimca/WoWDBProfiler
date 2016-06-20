@@ -965,11 +965,11 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         local unique_id = tonumber(item_results[9]) or 0
         --local level = tonumber(item_results[10])
         --local specialization_id = tonumber(item_results[11])
-        --local unknown_upgrade_related_id = tonumber(item_results[12])
+        --local upgrade_type_id = tonumber(item_results[12])
         local instance_difficulty_id = tonumber(item_results[13]) or 0
         local num_bonus_ids = tonumber(item_results[14]) or 0
-        -- upgrade_id is optional since 6.2! can probably be detected using unknown_upgrade_related_id, but it's just as easy to check like this
-        local upgrade_id = tonumber(item_results[15 + num_bonus_ids]) or 0
+        -- upgrade_value is optional since 6.2! can probably be detected using unknown_upgrade_related_id, but it's just as easy to check like this
+        local upgrade_value = tonumber(item_results[15 + num_bonus_ids]) or 0
 
         -- LEGION
         if private.isLegion then
