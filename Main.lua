@@ -968,7 +968,7 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         --local upgrade_type_id = tonumber(item_results[12])
         local instance_difficulty_id = tonumber(item_results[13]) or 0
         local num_bonus_ids = tonumber(item_results[14]) or 0
-        -- upgrade_value is optional since 6.2! can probably be detected using unknown_upgrade_related_id, but it's just as easy to check like this
+        -- upgrade_value is optional in 6.2! can be detected using upgrade_type_id, but it's just as easy to check like this
         local upgrade_value = tonumber(item_results[15 + num_bonus_ids]) or 0
 
         -- LEGION
@@ -980,12 +980,12 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         end
 
         -- If there is anything special (non-zero) for this item then we need to make note of everything
-        if math.max(suffix_id, instance_difficulty_id, num_bonus_ids, upgrade_id) ~= 0 then
+        if math.max(suffix_id, instance_difficulty_id, num_bonus_ids, upgrade_value) ~= 0 then
             item = DBEntry("items", item_id)
             item.suffix_id = suffix_id
             item.unique_id = bit.band(unique_id, 0xFFFF)
             item.instance_difficulty_id = instance_difficulty_id
-            item.upgrade_id = upgrade_id
+            item.upgrade_value = upgrade_value
 
             if process_bonus_ids then
 
