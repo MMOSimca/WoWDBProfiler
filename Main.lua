@@ -375,18 +375,25 @@ end
 
 local function CurrentLocationData()
     local x, y, current_area_id, map_level = HereBeDragons:GetPlayerZonePosition(true)
+    local zone_name = _G.GetRealZoneText()
 
     -- Put coordinates into expected format (as integers, they don't get a billion decimals output in the SavedVariables)
-    local x_int = _G.floor(x * 1000)
-    local y_int = _G.floor(y * 1000)
-    if x_int % 2 ~= 0 then
-        x_int = x_int + 1
+    local x_int = nil
+    if (x and type(x) == "number") then
+        x_int = _G.floor(x * 1000)
+        if x_int % 2 ~= 0 then
+            x_int = x_int + 1
+        end
     end
-    if y_int % 2 ~= 0 then
-        y_int = y_int + 1
+    local y_int = nil
+    if (y and type(y) == "number") then
+        y_int = _G.floor(y * 1000)
+        if y_int % 2 ~= 0 then
+            y_int = y_int + 1
+        end
     end
 
-    return _G.GetRealZoneText(), current_area_id, x_int, y_int, map_level, InstanceDifficultyToken()
+    return zone_name, current_area_id, x_int, y_int, map_level, InstanceDifficultyToken()
 end
 
 
@@ -453,7 +460,7 @@ do
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
         if not (zone_name and area_id and x and y and map_level) then
-            Debug("UpdateDBEntryLocation: Missing current location data - %s, %d, %d, %d, %d.", zone_name, area_id, x, y, map_level)
+            Debug("UpdateDBEntryLocation: Missing current location data - %s, %s, %s, %s, %s.", tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
             return
         end
         local entry = DBEntry(entry_type, identifier)
@@ -1148,7 +1155,7 @@ do
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
         if not (zone_name and area_id and x and y and map_level) then
-            Debug("UpdateTargetLocation: Missing current location data - %s, %d, %d, %d, %d.", zone_name, area_id, x, y, map_level)
+            Debug("UpdateTargetLocation: Missing current location data - %s, %s, %s, %s, %s.", tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
             return
         end
         local npc_data = npc:EncounterData(difficulty_token).stats[("level_%d"):format(_G.UnitLevel("target"))]
@@ -2028,7 +2035,7 @@ do
             -- Set up a proper 'fishing' current_action table
             local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
             if not (zone_name and area_id and x and y and map_level) then
-                Debug("%s: Missing current location data - %s, %d, %d, %d, %d.", log_source, zone_name, area_id, x, y, map_level)
+                Debug("%s: Missing current location data - %s, %s, %s, %s, %s.", log_source, tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
                 return
             end
             current_action.instance_token = instance_token
@@ -2695,7 +2702,7 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     local spell_flags = private.SPELL_FLAGS_BY_LABEL[spell_label]
     local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
     if not (zone_name and area_id and x and y and map_level) then
-        Debug("%s: Missing current location data - %s, %d, %d, %d, %d.", event_name, zone_name, area_id, x, y, map_level)
+        Debug("%s: Missing current location data - %s, %s, %s, %s, %s.", event_name, tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
         return
     end
 
