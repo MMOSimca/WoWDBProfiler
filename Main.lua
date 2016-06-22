@@ -58,6 +58,10 @@ local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
 local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
 local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
 
+-- Removed in Legion but still needed
+local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
+local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
+
 local ALLOWED_LOCALES = {
     enUS = true,
     enGB = true,
@@ -1615,9 +1619,9 @@ do
 
 
     function WDP:CHAT_MSG_SYSTEM(event_name, message)
-        local item_link, quantity = deformat(message, _G.ERR_QUEST_REWARD_ITEM_MULT_IS)
+        local item_link, quantity = deformat(message, ERR_QUEST_REWARD_ITEM_MULT_IS)
         if not item_link then
-            quantity, item_link = 1, deformat(message, _G.ERR_QUEST_REWARD_ITEM_S)
+            quantity, item_link = 1, deformat(message, ERR_QUEST_REWARD_ITEM_S)
         end
         local item_id = ItemLinkToID(item_link)
 
