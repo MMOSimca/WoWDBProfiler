@@ -2836,13 +2836,13 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     end
 
     -- For spells cast by items that don't usually trigger loot toasts
-    if not block_chat_loot_data and (private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] or (private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id] and private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID])) then
+    if not block_chat_loot_data and (private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id] or (private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id] and private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID])) then
         -- Set up timer
         ClearChatLootData()
         Debug("%s: Beginning chat-based loot timer for spellID %d", event_name, spell_id)
         chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
-        if (private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id] and private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID]) then
-            chat_loot_data.identifier = private.CLASS_BASED_DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID]
+        if (private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id] and private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID]) then
+            chat_loot_data.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP[spell_id][PLAYER_CLASS_ID]
         else
             chat_loot_data.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         end
