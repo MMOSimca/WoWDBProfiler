@@ -807,9 +807,6 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
 -- Fundamental Constants.
 -----------------------------------------------------------------------
 private.wow_version, private.build_num, _, private.interface_num = _G.GetBuildInfo()
--- LEGION
-private.isLegion = false
-if private.interface_num == 70000 then private.isLegion = true end
 private.region = GetCVar("portal"):sub(0,2):upper()
 -- PTR/Beta return "public-test", but they are properly called "XX"
 if private.region == "PU" then private.region = "XX" end
