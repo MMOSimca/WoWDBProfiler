@@ -1080,7 +1080,7 @@ do
     local COORD_MAX = 5
 
     function WDP:UpdateTargetLocation()
-        if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or not _G.UnitIsDead("target") or _G.UnitIsTapDenied("target") then
+        if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapDenied("target") and not _G.UnitIsDead("target")) then
             return
         end
 
