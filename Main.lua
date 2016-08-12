@@ -326,15 +326,29 @@ local function CurrentLocationData()
     local x_int = nil
     if (x and type(x) == "number") then
         x_int = _G.floor(x * 1000)
+        
+        -- Limit precision to 0.2
         if x_int % 2 ~= 0 then
             x_int = x_int + 1
+        end
+        
+        -- Prevent out of bounds coordinates
+        if (x_int < 0 or x_int > 1000) then
+            x_int = nil
         end
     end
     local y_int = nil
     if (y and type(y) == "number") then
         y_int = _G.floor(y * 1000)
+        
+        -- Limit precision to 0.2
         if y_int % 2 ~= 0 then
             y_int = y_int + 1
+        end
+        
+        -- Prevent out of bounds coordinates
+        if (y_int < 0 or y_int > 1000) then
+            y_int = nil
         end
     end
 
