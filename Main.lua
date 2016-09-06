@@ -26,6 +26,7 @@ local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceE
 
 local deformat = LibStub("LibDeformat-3.0")
 local HereBeDragons = LibStub("HereBeDragons-1.0")
+local LibRealmInfo = LibStub("LibRealmInfo")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -840,14 +841,18 @@ function WDP:OnInitialize()
 
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
+    
+    -- Get current region from LibRealmInfo (and account for the fact that PTR and Beta return nil)
+    local current_region = LibRealmInfo:GetCurrentRegion() or "XX"
 
+    -- Wipe all data if DB version or build number changed
     if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
         for entry in pairs(DATABASE_DEFAULTS.global) do
             global_db[entry] = {}
         end
     end
     raw_db.build_num = build_num
-    raw_db.region = private.region
+    raw_db.region = current_region
     raw_db.version = DB_VERSION
 
     private.InitializeCommentSystem()
@@ -930,10 +935,10 @@ local function RecordItemData(item_id, item_link, process_bonus_ids, durability)
         -- upgrade_value is optional in 6.2! can be detected using upgrade_type_id, but it's just as easy to check like this
         local upgrade_value = tonumber(item_results[15 + num_bonus_ids]) or 0
 
-        local unkItemField1 = tonumber(item_results[16 + num_bonus_ids]) or 0
-        local unkItemField2 = tonumber(item_results[17 + num_bonus_ids]) or 0
-        if unkItemField1 > 0 then Debug("unkItemField1 is non-zero, specifically %d.", unkItemField1) end
-        if unkItemField2 > 0 then Debug("unkItemField2 is non-zero, specifically %d.", unkItemField2) end
+        local unk_item_field_1 = tonumber(item_results[16 + num_bonus_ids]) or 0
+        local unk_item_field_2 = tonumber(item_results[17 + num_bonus_ids]) or 0
+        --if unk_item_field_1 > 0 then Debug("unk_item_field_1 for %s is non-zero, specifically %d.", item_link, unk_item_field_1) end
+        --if unk_item_field_2 > 0 then Debug("unk_item_field_2 for %s is non-zero, specifically %d.", item_link, unk_item_field_2) end
 
         -- If there is anything special (non-zero) for this item then we need to make note of everything
         if math.max(suffix_id, instance_difficulty_id, num_bonus_ids, upgrade_value) ~= 0 then
