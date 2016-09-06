@@ -12,6 +12,7 @@ local table = _G.table
 
 local next = _G.next
 local select = _G.select
+local type = _G.type
 local unpack = _G.unpack
 
 local C_Timer = _G.C_Timer
@@ -40,6 +41,11 @@ local DB_VERSION = 18
 local DEBUGGING = false
 local EVENT_DEBUG = false
 
+-- Timer durations in seconds
+local DELAY_PROCESS_ITEMS = 30
+local DELAY_PROCESS_WORLD_QUESTS = 60
+local DELAY_UPDATE_TARGET_LOCATION = 0.5
+
 local ITEM_ID_TIMBER = 114781
 
 local LOOT_SOURCE_ID_REDUNDANT = 3
@@ -52,12 +58,15 @@ local OBJECT_ID_FORGE = 1685
 local PLAYER_CLASS, PLAYER_CLASS_ID = _G.select(2, _G.UnitClass("player"))
 local PLAYER_FACTION = _G.UnitFactionGroup("player")
 local PLAYER_GUID
+local PLAYER_LEVEL = _G.UnitLevel("player")
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
 local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
 local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
 local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
+
+local WORLD_MAP_ID_BROKEN_ISLES = 1007
 
 -- Removed in Legion but still needed
 local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
@@ -183,6 +192,8 @@ local last_garrison_cache_object_id
 local block_chat_loot_data
 local chat_loot_data = {}
 local chat_loot_timer_handle
+local world_quest_timer_handle
+local world_quest_event_timestamp = 0
 local current_target_id
 local current_loot
 
@@ -327,12 +338,12 @@ local function CurrentLocationData()
     local x_int = nil
     if (x and type(x) == "number") then
         x_int = _G.floor(x * 1000)
-        
+
         -- Limit precision to 0.2
         if x_int % 2 ~= 0 then
             x_int = x_int + 1
         end
-        
+
         -- Prevent out of bounds coordinates
         if (x_int < 0 or x_int > 1000) then
             x_int = nil
@@ -341,12 +352,12 @@ local function CurrentLocationData()
     local y_int = nil
     if (y and type(y) == "number") then
         y_int = _G.floor(y * 1000)
-        
+
         -- Limit precision to 0.2
         if y_int % 2 ~= 0 then
             y_int = y_int + 1
         end
-        
+
         -- Prevent out of bounds coordinates
         if (y_int < 0 or y_int > 1000) then
             y_int = nil
@@ -841,7 +852,7 @@ function WDP:OnInitialize()
 
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
-    
+
     -- Get current region from LibRealmInfo (and account for the fact that PTR and Beta return nil)
     local current_region = LibRealmInfo:GetCurrentRegion() or "XX"
 
@@ -851,6 +862,11 @@ function WDP:OnInitialize()
             global_db[entry] = {}
         end
     end
+    -- Wipe World Quest data if region changed
+    if raw_db.region and raw_db.region ~= current_region and global_db["world_quests"] then
+        global_db["world_quests"] = {}
+    end
+
     raw_db.build_num = build_num
     raw_db.region = current_region
     raw_db.version = DB_VERSION
@@ -895,9 +911,10 @@ function WDP:OnEnable()
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
 
-    -- These two timers loop indefinitely using Lua's infinity constant
-    item_process_timer_handle = C_Timer.NewTicker(30, WDP.ProcessItems, math.huge)
-    target_location_timer_handle = C_Timer.NewTicker(0.5, WDP.UpdateTargetLocation, math.huge)
+    -- These timers loop indefinitely using Lua's infinity constant
+    item_process_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_ITEMS, WDP.ProcessItems, math.huge)
+    target_location_timer_handle = C_Timer.NewTicker(DELAY_UPDATE_TARGET_LOCATION, WDP.UpdateTargetLocation, math.huge)
+    world_quest_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_WORLD_QUESTS, WDP.ProcessWorldQuests, math.huge)
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
@@ -915,6 +932,113 @@ function WDP:OnEnable()
     end)
 
     self:GROUP_ROSTER_UPDATE()
+end
+
+
+-- Record data for a specific quest ID; reward data must be available or nothing will be recorded
+-- When we reach this point, we've already checked for a valid mapID, questID, quest data, and worldQuestType
+local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
+
+    -- Ensure we have location data and rewards (barely readable so putting it on multiple lines)
+    if not api_data_table.x or not api_data_table.y or not api_data_table.floor or not
+      (_G.GetQuestLogRewardXP(quest_id) > 0 or _G.GetNumQuestLogRewardCurrencies(quest_id) > 0
+      or _G.GetNumQuestLogRewards(quest_id) > 0 or _G.GetQuestLogRewardMoney(quest_id) > 0
+      or _G.GetQuestLogRewardArtifactXP(quest_id) > 0 or _G.GetQuestLogRewardHonor(quest_id) > 0) then
+        return
+    end
+
+    local entry = DBEntry("world_quests", quest_id)
+
+    if entry then
+
+        -- Record location
+        entry["location"] = {}
+        entry["location"]["world_map_id"] = world_map_id
+        entry["location"]["x"] = (tonumber(api_data_table.x) or 0) * 100
+        entry["location"]["y"] = (tonumber(api_data_table.y) or 0) * 100
+        entry["location"]["floor"] = tonumber(api_data_table.floor) or 0
+
+        -- Record simple rewards (XP, money, artifact XP, honor)
+        entry["rewards"] = {}
+        entry["rewards"]["xp"] = tonumber(_G.GetQuestLogRewardXP(quest_id)) or 0
+        entry["rewards"]["money"] = tonumber(_G.GetQuestLogRewardMoney(quest_id)) or 0
+        local actualXP, scaling = _G.GetQuestLogRewardArtifactXP(quest_id)
+        entry["rewards"]["artifact_xp"] = ("%d:%d"):format(tonumber(actualXP) or 0, tonumber(scaling) or 0)
+        entry["rewards"]["honor"] = tonumber(_G.GetQuestLogRewardHonor(quest_id)) or 0
+
+        -- Record currencies
+        entry["rewards"]["currency_count"] = tonumber(_G.GetNumQuestLogRewardCurrencies(quest_id)) or 0
+
+        if entry["rewards"]["currency_count"] > 0 then
+
+            -- Create currency rewards sub-table and fill
+            entry["rewards"]["currencies"] = {}
+            for i = 1, entry["rewards"]["currency_count"] do
+                local name, texture_path, quantity = _G.GetQuestLogRewardCurrencyInfo(i, quest_id)
+                local currency_texture = texture_path:match("[^\\]+$"):lower()
+                table.insert(entry["rewards"]["currencies"], ("%d:%s"):format(quantity, currency_texture))
+            end
+        end
+
+        -- Record items
+        entry["rewards"]["item_count"] = tonumber(_G.GetNumQuestLogRewards(quest_id)) or 0
+
+        if entry["rewards"]["item_count"] > 0 then
+
+            -- Create item rewards sub-table and fill
+            entry["rewards"]["items"] = {}
+            for i = 1, entry["rewards"]["item_count"] do
+                local item_name, item_texture, quantity, quality, is_usable, item_id = _G.GetQuestLogRewardInfo(i, quest_id)
+                table.insert(entry["rewards"]["items"], ("%d:%d"):format(item_id, quantity))
+            end
+        end
+
+        -- Record time remaining
+        entry["estimated_end_time"] = _G.GetServerTime() + ((_G.C_TaskQuest.GetQuestTimeLeftMinutes(quest_id) or 0) * 60)
+    end
+end
+
+
+function WDP:ProcessWorldQuests()
+    -- Ignore if player is low level
+    if _G.UnitLevel("player") ~= 110 then return end
+
+    local current_world_map_id = _G.GetCurrentMapAreaID()
+
+    -- Iterate over known World Quest maps
+    for i = 1, #private.WORLD_QUEST_MAP_IDS do
+        local world_map_id = private.WORLD_QUEST_MAP_IDS[i]
+
+        -- Only bother checking the API if the world map in question is currently displayed OR its continent is currently displayed
+        if current_world_map_id == WORLD_MAP_ID_BROKEN_ISLES or current_world_map_id == world_map_id then
+
+            -- Get data for World Quests on map
+            local api_data = _G.C_TaskQuest.GetQuestsForPlayerByMapID(world_map_id)
+
+            -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
+            if api_data and type(api_data) == "table" and #api_data > 0 then
+                for j = 1, #api_data do
+                    local current_data = api_data[j]
+
+                    -- Check if we had a valid API table returned to us
+                    if current_data and type(current_data) == "table" and current_data["questId"] then
+                        local quest_id = tonumber(current_data["questId"]) or 0
+
+                        -- Check if we have quest data
+                        if _G.HaveQuestData(quest_id) then
+                            local tag_id, tag_name, world_quest_type, rarity, is_elite, tradeskill_line_index = _G.GetQuestTagInfo(quest_id)
+
+                            -- Check for valid questID and whether or not it is a World Quest
+                            if quest_id > 0 and world_quest_type ~= nil then
+                                _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
+                                RecordWorldQuestData(world_map_id, quest_id, current_data)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 
@@ -1163,6 +1287,15 @@ function WDP:ResumeChatLootRecording(event_name)
     if block_chat_loot_data then
         Debug("%s: Resuming chat-based loot recording.", event_name)
         block_chat_loot_data = false
+    end
+end
+
+
+-- Process world quests if the map is moved to the Broken Isles continent world map (this provides us an opportunity to get data for all zones on the continent without moving the map)
+function WDP:WORLD_MAP_UPATE(event_name)
+    if _G.GetCurrentMapAreaID() == WORLD_MAP_ID_BROKEN_ISLES and _G.GetServerTime() > (world_quest_event_timestamp + DELAY_PROCESS_WORLD_QUESTS) then
+        world_quest_event_timestamp = _G.GetServerTime()
+        WDP:ProcessWorldQuests()
     end
 end
 
