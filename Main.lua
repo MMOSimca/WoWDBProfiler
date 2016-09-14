@@ -940,10 +940,11 @@ end
 local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
 
     -- Ensure we have location data and rewards (barely readable so putting it on multiple lines)
+    -- (Honor is built in to the quest; it is not a sign rewards have been loaded)
     if not api_data_table.x or not api_data_table.y or not api_data_table.floor or not
       (_G.GetQuestLogRewardXP(quest_id) > 0 or _G.GetNumQuestLogRewardCurrencies(quest_id) > 0
       or _G.GetNumQuestLogRewards(quest_id) > 0 or _G.GetQuestLogRewardMoney(quest_id) > 0
-      or _G.GetQuestLogRewardArtifactXP(quest_id) > 0 or _G.GetQuestLogRewardHonor(quest_id) > 0) then
+      or _G.GetQuestLogRewardArtifactXP(quest_id) > 0) then
         return
     end
 
