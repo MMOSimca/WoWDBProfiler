@@ -331,8 +331,14 @@ end
 
 
 local function CurrentLocationData()
-    local x, y, current_area_id, map_level = HereBeDragons:GetPlayerZonePosition(true)
+    local x, y, current_area_id, map_level, map_file, is_micro_dungeon = HereBeDragons:GetPlayerZonePosition(false)
     local zone_name = _G.GetRealZoneText()
+
+    -- Remove micro-dungeon-ness by translating back to the parent world map (at floor 0) if possible
+    if (is_micro_dungeon and x and y and current_area_id and map_level and map_level > 0) then
+        x, y = HereBeDragons:TranslateZoneCoordinates(x, y, current_area_id, map_level, current_area_id, 0, false)
+        map_level = 0
+    end
 
     -- Put coordinates into expected format (as integers, they don't get a billion decimals output in the SavedVariables)
     local x_int = nil
