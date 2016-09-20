@@ -721,6 +721,16 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [178849] = 81535, -- Tarlna Bonus (Tarlna the Ageless)
     [178851] = 83746, -- Rukhmar Bonus (Rukhmar)
     [188985] = 94015, -- 6.2 Raid Bonus Roll Prompt - World Boss 01 (Supreme Lord Kazzak)
+    [227135] = 107023, -- 7.0 Raid World Boss - Bonus Roll Prompt (Nithogg)
+    --[] = 106981, -- 7.0 Raid World Boss - Bonus Roll Prompt (Captain Hring)
+    --[] = 99929, -- 7.0 Raid World Boss - Bonus Roll Prompt (Flotsam)
+    --[] = 110321, -- 7.0 Raid World Boss - Bonus Roll Prompt (Na'zak the Fiend)
+    --[] = 108879, -- 7.0 Raid World Boss - Bonus Roll Prompt (Humongris)
+    --[] = 109331, -- 7.0 Raid World Boss - Bonus Roll Prompt (Calamir)
+    --[] = 110378, -- 7.0 Raid World Boss - Bonus Roll Prompt (Drugon the Frostblood)
+    --[] = 108678, -- 7.0 Raid World Boss - Bonus Roll Prompt (Shar'thos)
+    --[] = 109943, -- 7.0 Raid World Boss - Bonus Roll Prompt (Ana-Mouz)
+    --[] = 108829, -- 7.0 Raid World Boss - Bonus Roll Prompt (Levantus)
 
     -----------------------------------------------------------------------
     -- Hellfire Citadel
@@ -948,6 +958,7 @@ private.FACTION_DATA = {
     VIVIANNE = { 1739, true, _G.GetFactionInfoByID(1739) },
     AEDA_BRIGHTDAWN = { 1740, true, _G.GetFactionInfoByID(1740) },
     LEORAJH = { 1741, true, _G.GetFactionInfoByID(1741) },
+    -- Legion reps (blacklisted because of world quests)
 }
 
 private.REP_BUFFS = {
