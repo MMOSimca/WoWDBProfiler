@@ -25,5 +25,5 @@ externals:
     Libs/LibQTip-1.0:
         url: svn://svn.wowace.com/wow/libqtip-1-0/mainline/trunk
         tag: latest
-	Libs/LibRealmInfo:
-		url: git://git.curseforge.com/wow/librealminfo/mainline.git
+    Libs/LibRealmInfo:
+        url: git://git.curseforge.com/wow/librealminfo/mainline.git
