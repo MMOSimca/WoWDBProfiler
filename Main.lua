@@ -1781,6 +1781,7 @@ do
         [215377] = true, -- The Maw Must Feed (applied by Maw of the Damned, Blood Death Knight artifact)
         [224762] = true, -- Leyline Rift (summoned by players with Leyline Mastery in Suramar)
         [225832] = true, -- Nightglow Wisp (cast by players using Wisp in a Bottle toy)
+        
     }
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
