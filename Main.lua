@@ -16,6 +16,7 @@ local type = _G.type
 local unpack = _G.unpack
 
 local C_Timer = _G.C_Timer
+local GetCurrencyInfo = _G.GetCurrencyInfo
 
 
 -- ADDON NAMESPACE ----------------------------------------------------
@@ -316,6 +317,42 @@ do
 end -- do-block
 
 
+local CurrencyInfoToID
+local PopulateCurrencyInfoLookup
+do
+    local MAX_CURRENCY_ID_GAP = 800
+
+    local currency_info_lookup = {}
+
+
+    function CurrencyInfoToID(name, texture)
+        return currency_info_lookup[("%s:%s"):format(name, texture)]
+    end
+
+
+    function PopulateCurrencyInfoLookup()
+        local currency_index = 1
+        local gap_since_last_currency = 0
+        repeat
+            -- Store ID by info (name and texture combined)
+            local name, _, texture = GetCurrencyInfo(currency_index)
+            currency_info_lookup[("%s:%s"):format(name, texture)] = currency_index
+
+            -- If we found nothing, increment gap
+            if not name or not texture or (name == "" and texture == "") then
+                gap_since_last_currency = gap_since_last_currency + 1
+            else
+                gap_since_last_currency = 0
+            end
+
+            -- Increment loop counter
+            currency_index = currency_index + 1
+
+        until (gap_since_last_currency > MAX_CURRENCY_ID_GAP)
+    end
+end
+
+
 local function InstanceDifficultyToken()
     -- Sometimes, instance information is returned when not in an instance. This check protects against that.
     if _G.IsInInstance() then
@@ -472,12 +509,12 @@ do
 end -- do-block
 
 
-local function CurrencyLinkToTexture(currency_link)
+local function CurrencyLinkToID(currency_link)
     if not currency_link then
-        return
+        return nil
     end
-    local _, _, texture_path = _G.GetCurrencyInfo(tonumber(currency_link:match("currency:(%d+)")))
-    return texture_path:match("[^\\]+$"):lower()
+    return tonumber(currency_link:match("currency:(%d+)")) or 0
+    --texture_path:match("[^\\]+$"):lower()
 end
 
 
@@ -698,10 +735,14 @@ do
                         end
                     else
                         for loot_token, quantity in pairs(loot_data) do
-                            local label, currency_texture = (":"):split(loot_token)
+                            local label, currency_id = (":"):split(loot_token)
 
-                            if label == "currency" and currency_texture then
-                                table.insert(loot_table, ("currency:%d:%s"):format(quantity, currency_texture))
+                            if label == "currency" and currency_id then
+                                -- Convert currency_id back into number from string
+                                currency_id = tonumber(currency_id) or 0
+                                if currency_id ~= 0 then
+                                    table.insert(loot_table, ("currency:%d:%d"):format(quantity, currency_id))
+                                end
                             elseif loot_token == "money" then
                                 table.insert(loot_table, ("money:%d"):format(quantity))
                             else
@@ -832,10 +873,14 @@ function ClearChatLootData()
             entry["contains_count"] = (entry["contains_count"] or 0) + 1
 
             for loot_token, quantity in pairs(chat_loot_data.loot) do
-                local label, currency_texture = (":"):split(loot_token)
+                local label, currency_id = (":"):split(loot_token)
 
-                if label == "currency" and currency_texture then
-                    table.insert(loot_table, ("currency:%d:%s"):format(quantity, currency_texture))
+                if label == "currency" and currency_id then
+                    -- Convert currency_id back into number from string
+                    currency_id = tonumber(currency_id) or 0
+                    if currency_id ~= 0 then
+                        table.insert(loot_table, ("currency:%d:%d"):format(quantity, currency_id))
+                    end
                 elseif loot_token == "money" then
                     table.insert(loot_table, ("money:%d"):format(quantity))
                 else
@@ -913,9 +958,13 @@ function WDP:OnEnable()
         end
     end
 
+    -- Gather known languages
     for index = 1, _G.GetNumLanguages() do
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
+    
+    -- Populate currency data from known currency information
+    PopulateCurrencyInfoLookup()
 
     -- These timers loop indefinitely using Lua's infinity constant
     item_process_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_ITEMS, WDP.ProcessItems, math.huge)
@@ -976,23 +1025,21 @@ local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
         -- Record currencies
         entry["rewards"]["currency_count"] = tonumber(_G.GetNumQuestLogRewardCurrencies(quest_id)) or 0
 
+        -- Create currency rewards sub-table and fill
         if entry["rewards"]["currency_count"] > 0 then
-
-            -- Create currency rewards sub-table and fill
             entry["rewards"]["currencies"] = {}
             for i = 1, entry["rewards"]["currency_count"] do
                 local name, texture_path, quantity = _G.GetQuestLogRewardCurrencyInfo(i, quest_id)
-                local currency_texture = texture_path:match("[^\\]+$"):lower()
-                table.insert(entry["rewards"]["currencies"], ("%d:%s"):format(quantity, currency_texture))
+                local currency_id = CurrencyInfoToID(name, texture_path)
+                table.insert(entry["rewards"]["currencies"], ("%d:%d"):format(quantity, currency_id))
             end
         end
 
         -- Record items
         entry["rewards"]["item_count"] = tonumber(_G.GetNumQuestLogRewards(quest_id)) or 0
 
+        -- Create item rewards sub-table and fill
         if entry["rewards"]["item_count"] > 0 then
-
-            -- Create item rewards sub-table and fill
             entry["rewards"]["items"] = {}
             for i = 1, entry["rewards"]["item_count"] do
                 local item_name, item_texture, quantity, quality, is_usable, item_id = _G.GetQuestLogRewardInfo(i, quest_id)
@@ -1172,6 +1219,7 @@ do
     }
 
 
+    -- We should just use IDs here someday; WoWDB site knows all about different power types
     local POWER_TYPE_NAMES = {
         ["0"] = "MANA",
         ["1"] = "RAGE",
@@ -1212,6 +1260,7 @@ do
         end
         level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
 
+        -- May not capture as much data as it could, since the API changed in Legion to report multiple types of power
         if not level_data.power then
             local max_power = _G.UnitPowerMax("target")
 
@@ -1385,8 +1434,8 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         UpdateDBEntryLocation("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
 
         -- Add drop data
-        local currency_texture = CurrencyLinkToTexture(item_link)
-        if currency_texture and currency_texture ~= "" then
+        local currency_id = CurrencyLinkToID(item_link)
+        if currency_id and currency_id ~= 0 then
             -- Check for top level object data
             local object_entry = DBEntry("objects", ("OPENING:%d"):format(last_garrison_cache_object_id))
             local difficulty_token = InstanceDifficultyToken()
@@ -1394,14 +1443,14 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
                 -- Increment loot count
                 object_entry[difficulty_token]["opening_count"] = (object_entry[difficulty_token]["opening_count"] or 0) + 1
 
-                Debug("%s: %s X %d", event_name, currency_texture, quantity)
+                Debug("%s: %d X %d", event_name, currency_id, quantity)
                 object_entry[difficulty_token]["opening"] = object_entry[difficulty_token]["opening"] or {}
-                table.insert(object_entry[difficulty_token]["opening"], ("currency:%d:%s"):format(quantity, currency_texture))
+                table.insert(object_entry[difficulty_token]["opening"], ("currency:%d:%d"):format(quantity, currency_id))
             else
                 Debug("%s: When handling the Garrison cache, the top level loot data was missing for objectID %d.", event_name, last_garrison_cache_object_id)
             end
         else
-            Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+            Debug("%s: Currency ID is nil or 0, from currency link %s", event_name, item_link)
         end
 
         -- Wipe object ID until future mouseover
@@ -1428,12 +1477,12 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
                 Debug("%s: money X %d", event_name, quantity)
                 table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
             elseif loot_type == "currency" then
-                local currency_texture = CurrencyLinkToTexture(item_link)
-                if currency_texture and currency_texture ~= "" then
-                    Debug("%s: %s X %d", event_name, currency_texture, quantity)
-                    table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
+                local currency_id = CurrencyLinkToID(item_link)
+                if currency_id and currency_id ~= 0 then
+                    Debug("%s: %d X %d", event_name, currency_id, quantity)
+                    table.insert(encounter_data[loot_label], ("currency:%d:%d"):format(quantity, currency_id))
                 else
-                    Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+                    Debug("%s: Currency ID is nil or 0, from currency link %s", event_name, item_link)
                     return
                 end
             end
@@ -1468,13 +1517,13 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
             Debug("%s: money X %d", event_name, quantity)
             current_loot.sources[loot_toast_container_id]["money"] = (current_loot.sources[loot_toast_container_id]["money"] or 0) + quantity
         elseif loot_type == "currency" then
-            local currency_texture = CurrencyLinkToTexture(item_link)
-            if currency_texture and currency_texture ~= "" then
-                Debug("%s: %s X %d", event_name, currency_texture, quantity)
-                local currency_token = ("currency:%s"):format(currency_texture)
+            local currency_id = CurrencyLinkToID(item_link)
+            if currency_id and currency_id ~= 0 then
+                Debug("%s: %d X %d", event_name, currency_id, quantity)
+                local currency_token = ("currency:%d"):format(currency_id)
                 current_loot.sources[loot_toast_container_id][currency_token] = (current_loot.sources[loot_toast_container_id][currency_token] or 0) + quantity
             else
-                Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+                Debug("%s: Currency ID is nil or 0, from currency link %s", event_name, item_link)
                 current_loot = nil
                 return
             end
@@ -1486,12 +1535,12 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
     elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle then
         -- Handle currency loot toasts for chat-based loot (we do this instead of reading currency chat messages because the chat messages are very delayed)
         if loot_type == "currency" then
-            local currency_texture = CurrencyLinkToTexture(item_link)
-            if currency_texture and currency_texture ~= "" then
+            local currency_id = CurrencyLinkToID(item_link)
+            if currency_id and currency_id ~= 0 then
                 -- Verify that we're still assigning data to the right items
                 if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
-                    local currency_token = ("currency:%s"):format(currency_texture)
-                    Debug("%s: Captured currency for chat-based loot recording. %s X %d", event_name, currency_token, quantity)
+                    Debug("%s: Captured currency for chat-based loot recording. %d X %d", event_name, currency_id, quantity)
+                    local currency_token = ("currency:%d"):format(currency_id)
                     chat_loot_data.loot = chat_loot_data.loot or {}
                     chat_loot_data.loot[currency_token] = (chat_loot_data.loot[currency_token] or 0) + quantity
                 else -- If not, cancel the timer and wipe the loot table early
@@ -1499,7 +1548,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
                     ClearChatLootData()
                 end
             else
-                Debug("%s: Currency texture is nil, from currency link %s", event_name, item_link)
+                Debug("%s: Currency ID is nil or 0, from currency link %s", event_name, item_link)
             end
         -- Handle money loot toasts for chat-based loot (we do this instead of reading money chat messages because the chat messages are very delayed)
         elseif loot_type == "money" then
@@ -1531,14 +1580,13 @@ end
 
 do
     local CHAT_MSG_CURRENCY_UPDATE_FUNCS = {
-        [AF.NPC] = function(currency_texture, quantity)
-            Debug("CHAT_MSG_CURRENCY: AF.NPC currency:%s (%d)", currency_texture, quantity)
+        [AF.NPC] = function(currency_id, quantity)
+            Debug("CHAT_MSG_CURRENCY: AF.NPC currency:%d (%d)", currency_id, quantity)
         end,
-        [AF.ZONE] = function(currency_texture, quantity)
-            local currency_token = ("currency:%s"):format(currency_texture)
-            Debug("CHAT_MSG_CURRENCY: AF.ZONE %s (%d)", currency_token, quantity)
+        [AF.ZONE] = function(currency_id, quantity)
+            Debug("CHAT_MSG_CURRENCY: AF.ZONE currency:%d (%d)", currency_id, quantity)
             InitializeCurrentLoot()
-            current_loot.list[1] = ("%s:%d"):format(currency_token, quantity)
+            current_loot.list[1] = ("currency:%d:%d"):format(quantity, currency_id)
             GenericLootUpdate("zones")
             current_loot = nil
         end,
@@ -1552,9 +1600,9 @@ do
         if not currency_link then
             quantity, currency_link = 1, deformat(message, _G.CURRENCY_GAINED)
         end
-        local currency_texture = CurrencyLinkToTexture(currency_link)
+        local currency_id = CurrencyLinkToID(currency_link)
 
-        if not currency_texture or currency_texture == "" then
+        if not currency_id or currency_id == 0 then
             return
         end
 
@@ -1570,7 +1618,7 @@ do
         if not category or not update_func then
             return
         end
-        update_func(currency_texture, quantity)
+        update_func(currency_id, quantity)
     end
 
 
@@ -1785,7 +1833,6 @@ do
         [215377] = true, -- The Maw Must Feed (applied by Maw of the Damned, Blood Death Knight artifact)
         [224762] = true, -- Leyline Rift (summoned by players with Leyline Mastery in Suramar)
         [225832] = true, -- Nightglow Wisp (cast by players using Wisp in a Bottle toy)
-        
     }
 
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
@@ -2068,10 +2115,14 @@ do
                     end
 
                     for loot_token, quantity in pairs(loot_data) do
-                        local loot_type, currency_texture = (":"):split(loot_token)
+                        local loot_type, currency_id = (":"):split(loot_token)
 
-                        if loot_type == "currency" and currency_texture then
-                            table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
+                        if loot_type == "currency" and currency_id then
+                            -- Convert currency_id back into number from string
+                            currency_id = tonumber(currency_id) or 0
+                            if currency_id ~= 0 then
+                                table.insert(encounter_data[loot_label], ("currency:%d:%d"):format(quantity, currency_id))
+                            end
                         elseif loot_token == "money" then
                             table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
                         else
@@ -2280,7 +2331,7 @@ do
         loot_guid_registry[current_loot.label] = loot_guid_registry[current_loot.label] or {}
 
         for loot_slot = 1, _G.GetNumLootItems() do
-            local texturefiledataID, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+            local texture_filedata_id, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
             local loot_info = { _G.GetLootSourceInfo(loot_slot) }
             local loot_link = _G.GetLootSlotLink(loot_slot)
@@ -2322,12 +2373,12 @@ do
                         elseif slot_type == LOOT_SLOT_CURRENCY then
                             -- Same bug with GetLootSlotInfo() will screw up currency when it happens, so we won't process this slot's loot.
                             if loot_link then
-                                local icon_texture = CurrencyLinkToTexture(loot_link)
-                                Debug("GUID: %s - Type:ID: %s - Currency: %s - Amount: %d (%d)", loot_info[loot_index], source_key, icon_texture, loot_info[loot_index + 1], slot_quantity)
+                                local currency_id = CurrencyLinkToID(loot_link)
+                                Debug("GUID: %s - Type:ID: %s - Currency: %d - Amount: %d (%d)", loot_info[loot_index], source_key, currency_id, loot_info[loot_index + 1], slot_quantity)
                                 if current_loot.target_type == AF.ZONE then
-                                    table.insert(current_loot.list, ("currency:%d:%s"):format(loot_quantity, icon_texture))
+                                    table.insert(current_loot.list, ("currency:%d:%d"):format(loot_quantity, currency_id))
                                 else
-                                    local currency_token = ("currency:%s"):format(icon_texture)
+                                    local currency_token = ("currency:%d"):format(currency_id)
 
                                     current_loot.sources[source_guid] = current_loot.sources[source_guid] or {}
                                     current_loot.sources[source_guid][currency_token] = (current_loot.sources[source_guid][currency_token] or 0) + loot_quantity
@@ -2485,15 +2536,14 @@ do
 
                     for cost_index = 1, item_count do
                         -- The third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0.
-                        local icon_texture, amount_required, item_link = _G.GetMerchantItemCostItem(item_index, cost_index)
-                        local currency_identifier = item_link and ItemLinkToID(item_link) or nil
+                        local texture_path, amount_required, item_link, name = _G.GetMerchantItemCostItem(item_index, cost_index)
 
-                        if (not currency_identifier or currency_identifier < 1) and icon_texture then
-                            currency_identifier = icon_texture:match("[^\\]+$"):lower()
-                        end
+                        -- Try to detect if this is actually a currency by looking for a nil item_link or item ID
+                        local is_item = item_link and ItemLinkToID(item_link)
 
-                        if currency_identifier then
-                            currency_list[#currency_list + 1] = ("(%s:%s)"):format(amount_required, currency_identifier)
+                        if not is_item then
+                            local currency_id = CurrencyInfoToID(name, texture_path)
+                            currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
                         end
                     end
 
@@ -2873,9 +2923,9 @@ function WDP:SPELL_CONFIRMATION_PROMPT(event_name, spell_id, confirm_type, text,
                     Debug("%s: Assigned stored money loot data - money:%d", event_name, quantity)
                     table.insert(encounter_data[loot_label], ("money:%d"):format(quantity))
                 elseif loot_type == "currency" then
-                    local currency_texture = CurrencyLinkToTexture(hyperlink)
-                    Debug("%s: Assigned stored currency loot data - %s - currency:%d:%s", event_name, hyperlink, currency_texture, quantity)
-                    table.insert(encounter_data[loot_label], ("currency:%d:%s"):format(quantity, currency_texture))
+                    local currency_id = CurrencyLinkToID(hyperlink)
+                    Debug("%s: Assigned stored currency loot data - %s - currency:%d (%d)", event_name, hyperlink, currency_id, quantity)
+                    table.insert(encounter_data[loot_label], ("currency:%d:%d"):format(quantity, currency_id))
                 end
             end
 
