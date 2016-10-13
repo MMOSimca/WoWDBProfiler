@@ -1844,6 +1844,7 @@ do
         [213738] = true, -- Taste of Blood (applied by Fate and Fortune, Combat Rogue artifacts)
         [213877] = true, -- Vampiric Aura (used by Nathrezim Invasion bosses and transformed players)
         [215377] = true, -- The Maw Must Feed (applied by Maw of the Damned, Blood Death Knight artifact)
+        [218136] = true, -- Arcane Invigoration (cast by Duskwatch Rune Scribes in The Arcway)
         [224762] = true, -- Leyline Rift (summoned by players with Leyline Mastery in Suramar)
         [225832] = true, -- Nightglow Wisp (cast by players using Wisp in a Bottle toy)
     }
