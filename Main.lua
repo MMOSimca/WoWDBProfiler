@@ -326,6 +326,7 @@ do
 
 
     function CurrencyInfoToID(name, texture)
+        if not name or not texture then return nil end
         return currency_info_lookup[("%s:%s"):format(name, texture)]
     end
 
@@ -1044,7 +1045,9 @@ local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
             for i = 1, entry["rewards"]["currency_count"] do
                 local name, texture_path, quantity = _G.GetQuestLogRewardCurrencyInfo(i, quest_id)
                 local currency_id = CurrencyInfoToID(name, texture_path)
-                table.insert(entry["rewards"]["currencies"], ("%d:%d"):format(quantity, currency_id))
+                if currency_id and currency_id ~= 0 then
+                    table.insert(entry["rewards"]["currencies"], ("%d:%d"):format(quantity, currency_id))
+                end
             end
         end
 
@@ -2553,11 +2556,13 @@ do
                         local texture_path, amount_required, item_link, name = _G.GetMerchantItemCostItem(item_index, cost_index)
 
                         -- Try to detect if this is actually a currency by looking for a nil item_link or item ID
-                        local is_item = item_link and ItemLinkToID(item_link)
+                        local is_currency = (not item_link) or (not ItemLinkToID(item_link))
 
-                        if not is_item then
+                        if is_currency then
                             local currency_id = CurrencyInfoToID(name, texture_path)
-                            currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
+                            if currency_id and currency_id ~= 0 then
+                                currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
+                            end
                         end
                     end
 
