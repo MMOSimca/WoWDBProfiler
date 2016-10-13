@@ -561,19 +561,32 @@ do
         end
 
         -- We might want to use some of this new information later, but leaving the returns alone for now
-        local unit_type_name, unk_id1, server_id, instance_id, unk_id2, unit_idnum, spawn_id = ("-"):split(guid)
+        local guid_pieces = { ("-"):split(guid) }
+        local unit_type_name, unk_field, server_id, instance_id, zone_uid, unit_id, spawn_uid, player_uid = guid_pieces[1]
 
         local unit_type = MatchUnitTypes(unit_type_name)
+        
+        -- Creatures, GameObjects, Vehicles, and Vignettes
         if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET and unit_type ~= UNIT_TYPES.ITEM then
+            unk_field, server_id, instance_id, zone_uid, unit_id, spawn_uid = guid_pieces[2], guid_pieces[3], guid_pieces[4], guid_pieces[5], guid_pieces[6], guid_pieces[7]
 
-            local id_mapping = NPC_ID_MAPPING[unit_idnum]
+            local id_mapping = NPC_ID_MAPPING[unit_id]
 
             if id_mapping and UnitTypeIsNPC(unit_type) then
-                unit_idnum = id_mapping
+                unit_id = id_mapping
             end
-            return unit_type, unit_idnum
+
+        -- Players
+        elseif unit_type == UNIT_TYPES.PLAYER then
+            server_id, player_uid = guid_pieces[2], guid_pieces[3]
+
+        -- Items
+        elseif unit_type == UNIT_TYPES.ITEM then
+            server_id, unk_field, spawn_uid = guid_pieces[2], guid_pieces[3], guid_pieces[4]
         end
-        return unit_type
+        
+        -- Pets and other (i.e. do nothing)
+        return unit_type, unit_id
     end
 
     private.ParseGUID = ParseGUID
