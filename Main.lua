@@ -1043,11 +1043,8 @@ local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
         if entry["rewards"]["currency_count"] > 0 then
             entry["rewards"]["currencies"] = {}
             for i = 1, entry["rewards"]["currency_count"] do
-                local name, texture_path, quantity = _G.GetQuestLogRewardCurrencyInfo(i, quest_id)
-                local currency_id = CurrencyInfoToID(name, texture_path)
-                if currency_id and currency_id ~= 0 then
-                    table.insert(entry["rewards"]["currencies"], ("%d:%d"):format(quantity, currency_id))
-                end
+                local name, texture_path, quantity, currency_id = _G.GetQuestLogRewardCurrencyInfo(i, quest_id)
+                table.insert(entry["rewards"]["currencies"], ("%d:%d"):format(quantity, currency_id))
             end
         end
 
