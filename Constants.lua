@@ -721,20 +721,18 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [178849] = 81535, -- Tarlna Bonus (Tarlna the Ageless)
     [178851] = 83746, -- Rukhmar Bonus (Rukhmar)
     [188985] = 94015, -- 6.2 Raid Bonus Roll Prompt - World Boss 01 (Supreme Lord Kazzak)
+    [227130] = 110378, -- 7.0 Raid World Boss - Bonus Roll Prompt (Drugon the Frostblood)
     [227133] = 108829, -- 7.0 Raid World Boss - Bonus Roll Prompt (Levantus)
     [227135] = 107023, -- 7.0 Raid World Boss - Bonus Roll Prompt (Nithogg)
     [227138] = 102075, -- 7.0 Raid World Boss - Bonus Roll Prompt (Withered J'im)
     --[] = 109943, -- 7.0 Raid World Boss - Bonus Roll Prompt (Ana-Mouz)
     --[] = 109331, -- 7.0 Raid World Boss - Bonus Roll Prompt (Calamir)
     --[] = 106981, -- 7.0 Raid World Boss - Bonus Roll Prompt (Captain Hring)
-    --[] = 110378, -- 7.0 Raid World Boss - Bonus Roll Prompt (Drugon the Frostblood)
     --[] = 99929, -- 7.0 Raid World Boss - Bonus Roll Prompt (Flotsam)
     --[] = 108879, -- 7.0 Raid World Boss - Bonus Roll Prompt (Humongris)
     --[] = 110321, -- 7.0 Raid World Boss - Bonus Roll Prompt (Na'zak the Fiend)
     --[] = 108678, -- 7.0 Raid World Boss - Bonus Roll Prompt (Shar'thos)
 
-    
-    -- 221049 ursoc
     -----------------------------------------------------------------------
     -- Hellfire Citadel
     -----------------------------------------------------------------------
