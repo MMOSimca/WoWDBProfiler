@@ -475,7 +475,9 @@ do
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
         if not (zone_name and area_id and x and y and map_level) then
-            Debug("UpdateDBEntryLocation: Missing current location data - %s, %s, %s, %s, %s.", tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+            if not (_G.IsInInstance()) then
+                Debug("UpdateDBEntryLocation: Missing current location data - %s, %s, %s, %s, %s.", tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+            end
             return
         end
         local entry = DBEntry(entry_type, identifier)
@@ -1308,7 +1310,9 @@ do
         end
         local zone_name, area_id, x, y, map_level, difficulty_token = CurrentLocationData()
         if not (zone_name and area_id and x and y and map_level) then
-            Debug("UpdateTargetLocation: Missing current location data - %s, %s, %s, %s, %s.", tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+            if not (_G.IsInInstance()) then
+                Debug("UpdateTargetLocation: Missing current location data - %s, %s, %s, %s, %s.", tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+            end
             return
         end
         local npc_data = npc:EncounterData(difficulty_token).stats[("level_%d"):format(_G.UnitLevel("target"))]
@@ -2204,7 +2208,9 @@ do
             -- Set up a proper 'fishing' current_action table
             local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
             if not (zone_name and area_id and x and y and map_level) then
-                Debug("%s: Missing current location data - %s, %s, %s, %s, %s.", log_source, tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+                if not (_G.IsInInstance()) then
+                    Debug("%s: Missing current location data - %s, %s, %s, %s, %s.", log_source, tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+                end
                 return
             end
             current_action.instance_token = instance_token
@@ -2857,7 +2863,9 @@ function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, ta
     local spell_flags = private.SPELL_FLAGS_BY_LABEL[spell_label]
     local zone_name, area_id, x, y, map_level, instance_token = CurrentLocationData()
     if not (zone_name and area_id and x and y and map_level) then
-        Debug("%s: Missing current location data - %s, %s, %s, %s, %s.", event_name, tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+        if not (_G.IsInInstance()) then
+            Debug("%s: Missing current location data - %s, %s, %s, %s, %s.", event_name, tostring(zone_name), tostring(area_id), tostring(x), tostring(y), tostring(map_level))
+        end
         return
     end
 
