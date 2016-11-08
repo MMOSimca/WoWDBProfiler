@@ -1779,14 +1779,18 @@ do
 
 
     function WDP:CHAT_MSG_SYSTEM(event_name, message)
+        -- This code no longer works, as of Patch 7.0.3, because Blizzard unified the text from quest rewards and loot to match (and now there is no way to distinguish between them)
         local item_link, quantity = deformat(message, ERR_QUEST_REWARD_ITEM_MULT_IS)
         if not item_link then
             quantity, item_link = 1, deformat(message, ERR_QUEST_REWARD_ITEM_S)
         end
         local item_id = ItemLinkToID(item_link)
 
-        -- If it isn't a quest message, check the other uses of system messages
-        if not item_id then
+        if item_id then
+            -- If it was a quest message (that we can decode), parse its link
+            RecordItemData(item_id, item_link, true)
+        else
+            -- If it isn't a quest message, check the other uses of system messages
             if not private.trainer_shown then
                 local recipe_name = message:match(RECIPE_MATCH)
 
@@ -1816,11 +1820,7 @@ do
                     break
                 end
             end
-            return
         end
-
-        -- If it is an item, parse its link
-        RecordItemData(item_id, item_link, true)
     end
 end
 
