@@ -70,8 +70,8 @@ local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
 local WORLD_MAP_ID_BROKEN_ISLES = 1007
 
 -- Removed in Patch 7.0.3; previously used to determine if a system message was a quest reward or not
---local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
---local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
+local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
+local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
 
 local ALLOWED_LOCALES = {
     enUS = true,
