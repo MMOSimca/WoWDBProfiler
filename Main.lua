@@ -1891,7 +1891,7 @@ do
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
-                Debug("%s: %s is not an NPC, or has no ID.", sub_event, dest_name or _G.UNKNOWN)
+                --Debug("%s: %s is not an NPC, or has no ID.", sub_event, dest_name or _G.UNKNOWN) -- we really don't need to know this
                 ClearKilledNPC()
                 private.harvesting = nil
                 return
