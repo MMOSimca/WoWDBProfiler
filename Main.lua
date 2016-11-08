@@ -69,9 +69,9 @@ local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
 
 local WORLD_MAP_ID_BROKEN_ISLES = 1007
 
--- Removed in Legion but still needed
-local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
-local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
+-- Removed in Patch 7.0.3; previously used to determine if a system message was a quest reward or not
+--local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
+--local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
 
 local ALLOWED_LOCALES = {
     enUS = true,
@@ -2267,7 +2267,7 @@ do
 
         for source_guid, guid_data in pairs(extrapolated_guid_registry) do
             local unit_type = guid_data[1]
-            local loot_label = (unit_type == private.UNIT_TYPES.OBJECT) and "opening" or (UnitTypeIsNPC(unit_type) and "drops") or ((unit_type == private.UNIT_TYPES.PLAYER) and "contains")
+            local loot_label = (unit_type == private.UNIT_TYPES.OBJECT) and "opening" or (UnitTypeIsNPC(unit_type) and "drops") or ((unit_type == private.UNIT_TYPES.ITEM) and "contains")
 
             if loot_label then
                 local unit_idnum = guid_data[2]
@@ -2285,8 +2285,7 @@ do
                     current_action.target_type = AF.NPC
                     current_action.identifier = unit_idnum
                     num_npcs = num_npcs + 1
-                elseif unit_type == private.UNIT_TYPES.PLAYER then
-                    -- Item container GUIDs are currently of the 'PLAYER' type; this may be unintended and could change in the future.
+                elseif unit_type == private.UNIT_TYPES.ITEM then
                     current_action.loot_label = loot_label
                     current_action.target_type = AF.ITEM
                     -- current_action.identifier assigned during loot verification.
