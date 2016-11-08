@@ -1076,7 +1076,7 @@ private.REP_BUFFS = {
         ignore = true,
     },
 
-    -- Banner Buffs (can't tell them apart via ingame API, so blacklist)
+    -- Banner Buffs (can't tell the different levels of them apart via ingame API, so blacklist)
     [_G.GetSpellInfo(90216)] = { -- ALLIANCE GUILD STANDARD
         ignore = true,
     },
@@ -1108,6 +1108,12 @@ private.REP_BUFFS = {
     },
     [_G.GetSpellInfo(150986)] = { -- WOW 10TH ANNIVERSARY
         modifier = 0.1,
+    },
+    [_G.GetSpellInfo(188454)] = { -- WOW 11TH ANNIVERSARY
+        modifier = 0.11,
+    },
+    [_G.GetSpellInfo(219159)] = { -- WOW 12TH ANNIVERSARY
+        modifier = 0.12,
     },
 
     -- Situational Buffs
