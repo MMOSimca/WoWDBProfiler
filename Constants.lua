@@ -906,6 +906,7 @@ private.SPELL_FLAGS_BY_LABEL = {
 -- Faction/Reputation Data Constants.
 -----------------------------------------------------------------------
 
+-- Table has: factionID, isBlacklisted, and then the returns from GetFactionInfoByID
 private.FACTION_DATA = {
     -- Used only for private.REP_BUFFS
     ARGENT_CRUSADE = { 1106, false, _G.GetFactionInfoByID(1106) },
@@ -960,6 +961,12 @@ private.FACTION_DATA = {
     AEDA_BRIGHTDAWN = { 1740, true, _G.GetFactionInfoByID(1740) },
     LEORAJH = { 1741, true, _G.GetFactionInfoByID(1741) },
     -- Legion reps (blacklisted because of world quests)
+    COURT_OF_FARONDIS = { 1900, true, _G.GetFactionInfoByID(1900) },
+    DREAMWEAVERS = { 1883, true, _G.GetFactionInfoByID(1883) },
+    HIGHMOUNTAIN_TRIBE = { 1828, true, _G.GetFactionInfoByID(1828) },
+    NIGHTFALLEN = { 1859, true, _G.GetFactionInfoByID(1859) },
+    VALARJAR = { 1948, true, _G.GetFactionInfoByID(1948) },
+    WARDENS = { 1894, true, _G.GetFactionInfoByID(1894) },
 }
 
 private.REP_BUFFS = {
