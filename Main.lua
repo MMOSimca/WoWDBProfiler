@@ -49,6 +49,10 @@ local DELAY_UPDATE_TARGET_LOCATION = 0.5
 
 local ITEM_ID_TIMBER = 114781
 
+local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
+local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
+local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
+
 local LOOT_SOURCE_ID_REDUNDANT = 3
 local LOOT_SOURCE_ID_GARRISON_CACHE = 10
 
@@ -63,9 +67,7 @@ local PLAYER_LEVEL = _G.UnitLevel("player")
 local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
-local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
-local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
-local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
+local SPELL_ID_UPDATE_INTERACTIONS = 161006
 
 local WORLD_MAP_ID_BROKEN_ISLES = 1007
 
@@ -3008,6 +3010,14 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
             chat_loot_data.identifier = private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP[spell_id]
         end
         return
+    end
+
+    -- For Ephemeral Crystals (uses a combination of mouseover text and a 'Update Interactions' spell cast to detect the object - this is incredibly hacky but there is no alternative)
+    local text = _G["GameTooltipTextLeft1"] and _G["GameTooltipTextLeft1"]:GetText() or nil
+    if spell_id == SPELL_ID_UPDATE_INTERACTIONS and text and text == "Ephemeral Crystal" then
+        for index = 1, #private.EPHEMERAL_CRYSTAL_OBJECT_IDS do
+            UpdateDBEntryLocation("objects", private.EPHEMERAL_CRYSTAL_OBJECT_IDS[index])
+        end
     end
 
     if anvil_spell_ids[spell_id] then

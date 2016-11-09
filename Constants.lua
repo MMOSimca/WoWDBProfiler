@@ -15,6 +15,14 @@ local ADDON_NAME, private = ...
 -----------------------------------------------------------------------
 -- Boss/Loot Data Constants.
 -----------------------------------------------------------------------
+private.EPHEMERAL_CRYSTAL_OBJECT_IDS = {
+    251168,
+    251183,
+    251185,
+    251186,
+    251187,
+}
+
 -- Map of Alliance Logging NPC Summon spells to all possible Timber objectIDs of the proper tree size
 private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP = {
     [167902] = 234021,
