@@ -568,7 +568,7 @@ do
         local unit_type_name, unk_field, server_id, instance_id, zone_uid, unit_id, spawn_uid, player_uid = guid_pieces[1]
 
         local unit_type = MatchUnitTypes(unit_type_name)
-        
+
         -- Creatures, GameObjects, Vehicles, and Vignettes
         if unit_type ~= UNIT_TYPES.PLAYER and unit_type ~= UNIT_TYPES.PET and unit_type ~= UNIT_TYPES.ITEM then
             unk_field, server_id, instance_id, zone_uid, unit_id, spawn_uid = guid_pieces[2], guid_pieces[3], guid_pieces[4], guid_pieces[5], guid_pieces[6], guid_pieces[7]
@@ -587,7 +587,7 @@ do
         elseif unit_type == UNIT_TYPES.ITEM then
             server_id, unk_field, spawn_uid = guid_pieces[2], guid_pieces[3], guid_pieces[4]
         end
-        
+
         -- Pets and other (i.e. do nothing)
         return unit_type, unit_id
     end
@@ -978,7 +978,7 @@ function WDP:OnEnable()
     for index = 1, _G.GetNumLanguages() do
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
-    
+
     -- Populate currency data from known currency information
     PopulateCurrencyInfoLookup()
 
@@ -2549,8 +2549,8 @@ do
                     local currency_list = {}
                     local item_count = _G.GetMerchantItemCostInfo(item_index)
 
-                    -- Keeping this around in case Blizzard makes the two points diverge at some point.
-                    --                    price_string = ("%s:%s:%s:%s"):format(price_string, battleground_rating, personal_rating, required_season_amount or 0)
+                    -- Keeping this around in case Blizzard makes the two ratings (personal and battleground) diverge at some point
+                    --price_string = ("%s:%s:%s:%s"):format(price_string, battleground_rating, personal_rating, required_season_amount or 0)
                     price_string = ("%s:%s:%s"):format(price_string, personal_rating, required_season_amount or 0)
 
                     for cost_index = 1, item_count do
