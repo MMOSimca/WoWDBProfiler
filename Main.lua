@@ -2557,12 +2557,17 @@ do
                         -- The third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0.
                         local texture_path, amount_required, item_link, name = _G.GetMerchantItemCostItem(item_index, cost_index)
 
-                        -- Try to detect if this is actually a currency by looking for a nil item_link or item ID
-                        local is_currency = (not item_link) or (not ItemLinkToID(item_link))
+                        -- Try to get item ID
+                        local item_id = ItemLinkToID(item_link)
 
-                        if is_currency then
+                        -- FUTURE: At some point, we should make the output from these two cases (item_id vs currency_id) slightly different, so that WoWDB doesn't have to guess if it is a currency or item
+                        -- Handle cases when the additional cost is another item
+                        if item_id and item_id > 0 then
+                            currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, item_id)
+                        -- Handle cases when the additional cost is another currency
+                        else
                             local currency_id = CurrencyInfoToID(name, texture_path)
-                            if currency_id and currency_id ~= 0 then
+                            if currency_id and currency_id > 0 then
                                 currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
                             end
                         end
