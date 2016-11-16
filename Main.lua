@@ -957,9 +957,9 @@ function WDP:EventDispatcher(...)
     end
     local func = EVENT_MAPPING[event_name]
 
-    if _G.type(func) == "boolean" then
+    if type(func) == "boolean" then
         self[event_name](self, ...)
-    elseif _G.type(func) == "function" then
+    elseif type(func) == "function" then
         self[func](self, ...)
     end
 end
@@ -972,7 +972,7 @@ function WDP:OnEnable()
         if EVENT_DEBUG then
             self:RegisterEvent(event_name, "EventDispatcher")
         else
-            self:RegisterEvent(event_name, (_G.type(mapping) ~= "boolean") and mapping or nil)
+            self:RegisterEvent(event_name, (type(mapping) ~= "boolean") and mapping or nil)
         end
     end
 
@@ -2162,7 +2162,7 @@ do
             local location_token = ("%d:%d:%d"):format(current_loot.map_level, current_loot.x, current_loot.y)
 
             -- This will start life as a boolean true.
-            if _G.type(current_loot.zone_data[location_token]) ~= "table" then
+            if type(current_loot.zone_data[location_token]) ~= "table" then
                 current_loot.zone_data[location_token] = {
                     drops = {}
                 }
@@ -2342,7 +2342,7 @@ do
             return
         end
 
-        if _G.type(verify_func) == "function" and not verify_func() then
+        if type(verify_func) == "function" and not verify_func() then
             Debug("%s: The current action type, %s, is supported but has failed loot verification.", event_name, private.ACTION_TYPE_NAMES[current_action.target_type])
             return
         end
@@ -3015,6 +3015,7 @@ function WDP:UNIT_SPELLCAST_SUCCEEDED(event_name, unit_id, spell_name, spell_ran
     -- For Ephemeral Crystals (uses a combination of mouseover text and a 'Update Interactions' spell cast to detect the object - this is incredibly hacky but there is no alternative)
     local text = _G["GameTooltipTextLeft1"] and _G["GameTooltipTextLeft1"]:GetText() or nil
     if spell_id == SPELL_ID_UPDATE_INTERACTIONS and text and text == "Ephemeral Crystal" then
+        Debug("%s: Detected location for an Ephemeral Crystal.", event_name)
         for index = 1, #private.EPHEMERAL_CRYSTAL_OBJECT_IDS do
             UpdateDBEntryLocation("objects", private.EPHEMERAL_CRYSTAL_OBJECT_IDS[index])
         end
