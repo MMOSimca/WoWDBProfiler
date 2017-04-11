@@ -821,10 +821,10 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [227136] = 108678, -- 7.0 Raid World Boss - Bonus Roll Prompt (Shar'thos)
     [227137] = 106981, -- 7.0 Raid World Boss - Bonus Roll Prompt (Captain Hring) (Soultakers)
     [227138] = 102075, -- 7.0 Raid World Boss - Bonus Roll Prompt (Withered J'im)
-    --[242969] = ???, -- 7.2 Raid World Boss - Bonus Roll Prompt (???)
-    --[242970] = ???, -- 7.2 Raid World Boss - Bonus Roll Prompt (???)
-    --[242971] = ???, -- 7.2 Raid World Boss - Bonus Roll Prompt (???)
-    --[242972] = ???, -- 7.2 Raid World Boss - Bonus Roll Prompt (???)
+    [242969] = 121124, -- 7.2 Raid World Boss - Bonus Roll Prompt (Apocron)
+    [242970] = 117239, -- 7.2 Raid World Boss - Bonus Roll Prompt (Brutallus)
+    [242971] = 117303, -- 7.2 Raid World Boss - Bonus Roll Prompt (Malificus)
+    [242972] = 117470, -- 7.2 Raid World Boss - Bonus Roll Prompt (Si'vash)
 
     -----------------------------------------------------------------------
     -- Hellfire Citadel
