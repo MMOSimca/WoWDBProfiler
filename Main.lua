@@ -28,7 +28,6 @@ local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceE
 
 local deformat = LibStub("LibDeformat-3.0")
 local HereBeDragons = LibStub("HereBeDragons-1.0")
-local LibRealmInfo = LibStub("LibRealmInfo")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -916,8 +915,8 @@ function WDP:OnInitialize()
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
 
-    -- Get current region from LibRealmInfo (and account for the fact that PTR and Beta return nil)
-    local current_region = LibRealmInfo:GetCurrentRegion() or "XX"
+    -- Get current region from API (flawed)
+    local current_region = _G.GetCurrentRegionName() or "XX"
 
     -- Wipe all data if DB version or build number changed
     if (raw_db.version and raw_db.version < DB_VERSION) or (raw_db.build_num and raw_db.build_num < build_num) then
