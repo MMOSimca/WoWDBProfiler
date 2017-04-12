@@ -69,12 +69,6 @@ local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
 local SPELL_ID_UPDATE_INTERACTIONS = 161006
 
-local WORLD_MAP_ID_BROKEN_ISLES = 1007
-
--- Removed in Patch 7.0.3; previously used to determine if a system message was a quest reward or not
-local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
-local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
-
 local ALLOWED_LOCALES = {
     enUS = true,
     enGB = true,
@@ -1071,7 +1065,7 @@ end
 
 
 function WDP:ProcessWorldQuests()
-    -- Ignore if player is low level
+    -- Ignore if player is low level (there are some world quests before max level now, but we can collect enough data from 110s alone still)
     if _G.UnitLevel("player") ~= 110 then return end
 
     local current_world_map_id = _G.GetCurrentMapAreaID()
@@ -1080,8 +1074,8 @@ function WDP:ProcessWorldQuests()
     for i = 1, #private.WORLD_QUEST_MAP_IDS do
         local world_map_id = private.WORLD_QUEST_MAP_IDS[i]
 
-        -- Only bother checking the API if the world map in question is currently displayed OR its continent is currently displayed
-        if current_world_map_id == WORLD_MAP_ID_BROKEN_ISLES or current_world_map_id == world_map_id then
+        -- Only bother checking the API if the world map in question is currently displayed
+        if current_world_map_id == world_map_id then
 
             -- Get data for World Quests on map
             local api_data = _G.C_TaskQuest.GetQuestsForPlayerByMapID(world_map_id)
@@ -1362,15 +1356,6 @@ function WDP:ResumeChatLootRecording(event_name)
     if block_chat_loot_data then
         Debug("%s: Resuming chat-based loot recording.", event_name)
         block_chat_loot_data = false
-    end
-end
-
-
--- Process world quests if the map is moved to the Broken Isles continent world map (this provides us an opportunity to get data for all zones on the continent without moving the map)
-function WDP:WORLD_MAP_UPATE(event_name)
-    if _G.GetCurrentMapAreaID() == WORLD_MAP_ID_BROKEN_ISLES and _G.GetServerTime() > (world_quest_event_timestamp + DELAY_PROCESS_WORLD_QUESTS) then
-        world_quest_event_timestamp = _G.GetServerTime()
-        WDP:ProcessWorldQuests()
     end
 end
 
@@ -1782,6 +1767,11 @@ do
 
     function WDP:CHAT_MSG_SYSTEM(event_name, message)
         -- This code no longer works, as of Patch 7.0.3, because Blizzard unified the text from quest rewards and loot to match (and now there is no way to distinguish between them)
+        --[[
+        -- Removed in Patch 7.0.3; previously used to determine if a system message was a quest reward or not
+        local ERR_QUEST_REWARD_ITEM_MULT_IS = _G.ERR_QUEST_REWARD_ITEM_MULT_IS or "Received %d of item: %s."
+        local ERR_QUEST_REWARD_ITEM_S = _G.ERR_QUEST_REWARD_ITEM_S or "Received item: %s."
+
         local item_link, quantity = deformat(message, ERR_QUEST_REWARD_ITEM_MULT_IS)
         if not item_link then
             quantity, item_link = 1, deformat(message, ERR_QUEST_REWARD_ITEM_S)
@@ -1793,34 +1783,36 @@ do
             RecordItemData(item_id, item_link, true)
         else
             -- If it isn't a quest message, check the other uses of system messages
-            if not private.trainer_shown then
-                local recipe_name = message:match(RECIPE_MATCH)
+        end
+        ]]--
 
-                if recipe_name and private.previous_spell_id then
-                    local profession_name, prof_level = _G.C_TradeSkillUI.GetTradeSkillLine()
+        if not private.trainer_shown then
+            local recipe_name = message:match(RECIPE_MATCH)
 
-                    if profession_name == _G.UNKNOWN then
-                        return
-                    end
-                    private.discovered_recipe_name = recipe_name
-                    private.profession_level = prof_level
+            if recipe_name and private.previous_spell_id then
+                local profession_name, prof_level = _G.C_TradeSkillUI.GetTradeSkillLine()
 
-                    C_Timer.After(0.2, IterativeRecordDiscovery)
+                if profession_name == _G.UNKNOWN then
+                    return
                 end
+                private.discovered_recipe_name = recipe_name
+                private.profession_level = prof_level
+
+                C_Timer.After(0.2, IterativeRecordDiscovery)
             end
+        end
 
-            if currently_drunk then
-                if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
-                    currently_drunk = nil
-                end
-                return
+        if currently_drunk then
+            if message == _G.DRUNK_MESSAGE_SELF1 or message:match(SOBER_MATCH) then
+                currently_drunk = nil
             end
+            return
+        end
 
-            for index = 1, #DRUNK_MATCHES do
-                if message == DRUNK_COMPARES[index] or message:match(DRUNK_MATCHES[index]) then
-                    currently_drunk = true
-                    break
-                end
+        for index = 1, #DRUNK_MATCHES do
+            if message == DRUNK_COMPARES[index] or message:match(DRUNK_MATCHES[index]) then
+                currently_drunk = true
+                break
             end
         end
     end
