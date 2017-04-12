@@ -47,6 +47,7 @@ private.WORLD_QUEST_MAP_IDS = {
     1015, -- Azsuna
     1017, -- Stormheim
     1018, -- Val'sharah
+    1021, -- Broken Shore
     1024, -- Highmountain
     1033, -- Suramar
     1096, -- Eye of Azshara (uninstanced)
