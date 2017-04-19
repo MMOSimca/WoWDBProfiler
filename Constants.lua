@@ -41,18 +41,6 @@ private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP = {
     ["Hefty Garrison Cache"] = 237723,
 }
 
--- List of WorldMapIDs to try to get World Quests for
-private.WORLD_QUEST_MAP_IDS = {
-    1014, -- Dalaran (new)
-    1015, -- Azsuna
-    1017, -- Stormheim
-    1018, -- Val'sharah
-    1021, -- Broken Shore
-    1024, -- Highmountain
-    1033, -- Suramar
-    1096, -- Eye of Azshara (uninstanced)
-}
-
 -- Mapping of items that, when right-clicked, fire a spell (which can fail, so we have to check success).
 -- They reward loot via loot toast popups upon completion of that spell.
 -- SHOW_LOOT_TOAST can be used to track loot.

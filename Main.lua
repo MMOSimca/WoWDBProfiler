@@ -1003,7 +1003,7 @@ end
 
 -- Record data for a specific quest ID; reward data must be available or nothing will be recorded
 -- When we reach this point, we've already checked for a valid mapID, questID, quest data, and worldQuestType
-local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
+local function RecordWorldQuestData(quest_id, continent_world_map_id, zone_world_map_id, api_data_table)
 
     -- Ensure we have location data and rewards (barely readable so putting it on multiple lines)
     -- (Honor is built in to the quest; it is not a sign rewards have been loaded)
@@ -1014,16 +1014,22 @@ local function RecordWorldQuestData(world_map_id, quest_id, api_data_table)
         return
     end
 
-    local entry = DBEntry("world_quests", quest_id)
+    -- Translate continent-level coordinates to zone-coordinates
+    local oX, oY, dFloor = tonumber(api_data_table.x) or 0, tonumber(api_data_table.y) or 0, tonumber(api_data_table.floor) or 0
+    local dX, dY = HereBeDragons:TranslateZoneCoordinates(oX, oY, continent_world_map_id, 0, zone_world_map_id, dFloor, false)
+    
+    -- If the translation failed, stop here
+    if not dX or not dY then return end
 
+    local entry = DBEntry("world_quests", quest_id)
     if entry then
 
         -- Record location
         entry["location"] = {}
-        entry["location"]["world_map_id"] = world_map_id
-        entry["location"]["x"] = (tonumber(api_data_table.x) or 0) * 100
-        entry["location"]["y"] = (tonumber(api_data_table.y) or 0) * 100
-        entry["location"]["floor"] = tonumber(api_data_table.floor) or 0
+        entry["location"]["world_map_id"] = zone_world_map_id
+        entry["location"]["x"] = dX * 100
+        entry["location"]["y"] = dY * 100
+        entry["location"]["floor"] = dFloor
 
         -- Record simple rewards (XP, money, artifact XP, honor)
         entry["rewards"] = {}
@@ -1067,36 +1073,32 @@ function WDP:ProcessWorldQuests()
     -- Ignore if player is low level (there are some world quests before max level now, but we can collect enough data from 110s alone still)
     if _G.UnitLevel("player") ~= 110 then return end
 
-    local current_world_map_id = _G.GetCurrentMapAreaID()
+    -- Get current continent and zones in current continent
+    local continentIndex, continentID = GetCurrentMapContinent()
+	local continentMaps = { GetMapZones(continentIndex) }
 
-    -- Iterate over known World Quest maps
-    for i = 1, #private.WORLD_QUEST_MAP_IDS do
-        local world_map_id = private.WORLD_QUEST_MAP_IDS[i]
+    -- Iterate over zones in continent
+	for i = 1, #continentMaps, 2 do
+    
+        -- Get data for World Quests
+		local api_data = C_TaskQuest.GetQuestsForPlayerByMapID(continentMaps[i], continentID);
 
-        -- Only bother checking the API if the world map in question is currently displayed
-        if current_world_map_id == world_map_id then
+        -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
+        if api_data and type(api_data) == "table" and #api_data > 0 then
+            for _, current_data in ipairs(api_data) do
 
-            -- Get data for World Quests on map
-            local api_data = _G.C_TaskQuest.GetQuestsForPlayerByMapID(world_map_id)
+                -- Check if we had a valid API table returned to us
+                if current_data and type(current_data) == "table" and current_data["questId"] then
+                    local quest_id = tonumber(current_data["questId"]) or 0
 
-            -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
-            if api_data and type(api_data) == "table" and #api_data > 0 then
-                for j = 1, #api_data do
-                    local current_data = api_data[j]
+                    -- Check if we have quest data
+                    if _G.HaveQuestData(quest_id) then
+                        local tag_id, tag_name, world_quest_type, rarity, is_elite, tradeskill_line_index = _G.GetQuestTagInfo(quest_id)
 
-                    -- Check if we had a valid API table returned to us
-                    if current_data and type(current_data) == "table" and current_data["questId"] then
-                        local quest_id = tonumber(current_data["questId"]) or 0
-
-                        -- Check if we have quest data
-                        if _G.HaveQuestData(quest_id) then
-                            local tag_id, tag_name, world_quest_type, rarity, is_elite, tradeskill_line_index = _G.GetQuestTagInfo(quest_id)
-
-                            -- Check for valid questID and whether or not it is a World Quest
-                            if quest_id > 0 and world_quest_type ~= nil then
-                                _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
-                                RecordWorldQuestData(world_map_id, quest_id, current_data)
-                            end
+                        -- Check for valid questID and whether or not it is a World Quest
+                        if quest_id > 0 and world_quest_type ~= nil then
+                            _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
+                            RecordWorldQuestData(quest_id, continentID, continentMaps[i], current_data)
                         end
                     end
                 end
