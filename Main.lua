@@ -320,25 +320,27 @@ do
     local currency_info_lookup = {}
 
 
-    function CurrencyInfoToID(name, texture)
-        if not name or not texture then return nil end
-        return currency_info_lookup[("%s:%s"):format(name, texture)]
+	-- Going to have to support paths until Patch 7.2.5 comes out (after that, the 'tostring' use can go away)
+    function CurrencyInfoToID(name, texture_id)
+        if not name or not texture_id then return nil end
+        return currency_info_lookup[("%s:%s"):format(name, tostring(texture_id))]
     end
 
 
+	-- Going to have to support paths until Patch 7.2.5 comes out (after that, the 'tostring' use can go away)
     function PopulateCurrencyInfoLookup()
         local currency_index = 1
         local gap_since_last_currency = 0
         repeat
-            -- Store ID by info (name and texture combined)
-            local name, _, texture = GetCurrencyInfo(currency_index)
-            currency_info_lookup[("%s:%s"):format(name, texture)] = currency_index
+            -- Store ID by info (name and texture_id combined)
+            local name, _, texture_id = GetCurrencyInfo(currency_index)
 
             -- If we found nothing, increment gap
-            if not name or not texture or (name == "" and texture == "") then
-                gap_since_last_currency = gap_since_last_currency + 1
-            else
+            if name and texture_id and name ~= "" and tostring(texture_id) ~= "0" and tostring(texture_id) ~= "" then
+				currency_info_lookup[("%s:%s"):format(name, tostring(texture_id))] = currency_index
                 gap_since_last_currency = 0
+            else
+                gap_since_last_currency = gap_since_last_currency + 1
             end
 
             -- Increment loop counter
@@ -2550,7 +2552,7 @@ do
 
                     for cost_index = 1, item_count do
                         -- The third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0.
-                        local texture_path, amount_required, item_link, name = _G.GetMerchantItemCostItem(item_index, cost_index)
+                        local texture_id, amount_required, item_link, name = _G.GetMerchantItemCostItem(item_index, cost_index)
 
                         -- Try to get item ID
                         local item_id = ItemLinkToID(item_link)
@@ -2561,7 +2563,7 @@ do
                             currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, item_id)
                         -- Handle cases when the additional cost is another currency
                         else
-                            local currency_id = CurrencyInfoToID(name, texture_path)
+                            local currency_id = CurrencyInfoToID(name, texture_id)
                             if currency_id and currency_id > 0 then
                                 currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
                             end
