@@ -52,7 +52,8 @@ local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
 local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
 local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
 
-local LOOT_SOURCE_ID_REDUNDANT = 3
+--local LOOT_SOURCE_ID_UNKNOWN = 1 -- Technically unused right now, but has future use potential
+--local LOOT_SOURCE_ID_REDUNDANT = 3 -- Technically unused right now, but has future use potential
 local LOOT_SOURCE_ID_GARRISON_CACHE = 10
 
 local OBJECT_ID_ANVIL = 192628
@@ -1539,7 +1540,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         GenericLootUpdate("items")
         current_loot = nil
         container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
-    elseif loot_source and (loot_source == LOOT_SOURCE_ID_REDUNDANT) and chat_loot_timer_handle then
+    elseif loot_source and chat_loot_timer_handle then
         -- Handle currency loot toasts for chat-based loot (we do this instead of reading currency chat messages because the chat messages are very delayed)
         if loot_type == "currency" then
             local currency_id = CurrencyLinkToID(item_link)
