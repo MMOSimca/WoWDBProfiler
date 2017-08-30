@@ -313,45 +313,6 @@ do
 end -- do-block
 
 
-local CurrencyInfoToID
-local PopulateCurrencyInfoLookup
-do
-    local MAX_CURRENCY_ID_GAP = 800
-
-    local currency_info_lookup = {}
-
-
-	-- Going to have to support paths until Patch 7.2.5 comes out (after that, the 'tostring' use can go away)
-    function CurrencyInfoToID(name, texture_id)
-        if not name or not texture_id then return nil end
-        return currency_info_lookup[("%s:%s"):format(name, tostring(texture_id))]
-    end
-
-
-	-- Going to have to support paths until Patch 7.2.5 comes out (after that, the 'tostring' use can go away)
-    function PopulateCurrencyInfoLookup()
-        local currency_index = 1
-        local gap_since_last_currency = 0
-        repeat
-            -- Store ID by info (name and texture_id combined)
-            local name, _, texture_id = GetCurrencyInfo(currency_index)
-
-            -- If we found nothing, increment gap
-            if name and texture_id and name ~= "" and tostring(texture_id) ~= "0" and tostring(texture_id) ~= "" then
-				currency_info_lookup[("%s:%s"):format(name, tostring(texture_id))] = currency_index
-                gap_since_last_currency = 0
-            else
-                gap_since_last_currency = gap_since_last_currency + 1
-            end
-
-            -- Increment loop counter
-            currency_index = currency_index + 1
-
-        until (gap_since_last_currency > MAX_CURRENCY_ID_GAP)
-    end
-end
-
-
 local function InstanceDifficultyToken()
     -- Sometimes, instance information is returned when not in an instance. This check protects against that.
     if _G.IsInInstance() then
@@ -514,8 +475,7 @@ local function CurrencyLinkToID(currency_link)
     if not currency_link then
         return nil
     end
-    return tonumber(currency_link:match("currency:(%d+)")) or 0
-    --texture_path:match("[^\\]+$"):lower()
+    return tonumber(tostring(currency_link):match("currency:(%d+)"))
 end
 
 
@@ -977,9 +937,6 @@ function WDP:OnEnable()
         languages_known[_G.GetLanguageByIndex(index)] = true
     end
 
-    -- Populate currency data from known currency information
-    PopulateCurrencyInfoLookup()
-
     -- These timers loop indefinitely using Lua's infinity constant
     item_process_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_ITEMS, WDP.ProcessItems, math.huge)
     target_location_timer_handle = C_Timer.NewTicker(DELAY_UPDATE_TARGET_LOCATION, WDP.UpdateTargetLocation, math.huge)
@@ -1078,13 +1035,13 @@ function WDP:ProcessWorldQuests()
 
     -- Get current continent and zones in current continent
     local continentIndex, continentID = GetCurrentMapContinent()
-	local continentMaps = { GetMapZones(continentIndex) }
+    local continentMaps = { GetMapZones(continentIndex) }
 
     -- Iterate over zones in continent
-	for i = 1, #continentMaps, 2 do
+    for i = 1, #continentMaps, 2 do
     
         -- Get data for World Quests
-		local api_data = C_TaskQuest.GetQuestsForPlayerByMapID(continentMaps[i], continentID);
+        local api_data = C_TaskQuest.GetQuestsForPlayerByMapID(continentMaps[i], continentID);
 
         -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
         if api_data and type(api_data) == "table" and #api_data > 0 then
@@ -2553,20 +2510,22 @@ do
 
                     for cost_index = 1, item_count do
                         -- The third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0.
-                        local texture_id, amount_required, item_link, name = _G.GetMerchantItemCostItem(item_index, cost_index)
+                        local texture_id, amount_required, hyperlink, name = _G.GetMerchantItemCostItem(item_index, cost_index)
 
                         -- Try to get item ID
-                        local item_id = ItemLinkToID(item_link)
+                        local item_id = ItemLinkToID(hyperlink)
 
                         -- FUTURE: At some point, we should make the output from these two cases (item_id vs currency_id) slightly different, so that WoWDB doesn't have to guess if it is a currency or item
                         -- Handle cases when the additional cost is another item
                         if item_id and item_id > 0 then
                             currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, item_id)
-                        -- Handle cases when the additional cost is another currency
                         else
-                            local currency_id = CurrencyInfoToID(name, texture_id)
+                            -- Try to get currency ID
+                            local currency_id = CurrencyLinkToID(hyperlink)
                             if currency_id and currency_id > 0 then
                                 currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
+                            else
+                                Debug("UpdateMerchantItems: Failed to get item ID and failed to get currency ID for item index %d and cost index %d", item_index, cost_index)
                             end
                         end
                     end
