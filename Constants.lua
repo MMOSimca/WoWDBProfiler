@@ -867,12 +867,12 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [242970] = 117239, -- 7.2 Raid World Boss - Bonus Roll Prompt (Brutallus)
     [242971] = 117303, -- 7.2 Raid World Boss - Bonus Roll Prompt (Malificus)
     [242972] = 117470, -- 7.2 Raid World Boss - Bonus Roll Prompt (Si'vash)
-    --[254435] = ???, -- 7.3 Raid World Boss - Bonus Roll Prompt (Unknown)
-    --[254437] = ???, -- 7.3 Raid World Boss - Bonus Roll Prompt (Unknown)
-    --[254439] = ???, -- 7.3 Raid World Boss - Bonus Roll Prompt (Unknown)
-    --[254441] = ???, -- 7.3 Raid World Boss - Bonus Roll Prompt (Unknown)
-    --[254443] = ???, -- 7.3 Raid World Boss - Bonus Roll Prompt (Unknown)
-    --[254446] = ???, -- 7.3 Raid World Boss - Bonus Roll Prompt (Unknown)
+    [254435] = 124592, -- 7.3 Raid World Boss - Bonus Roll Prompt (Inquisitor Meto)
+    [254437] = 124625, -- 7.3 Raid World Boss - Bonus Roll Prompt (Mistress Alluradel)
+    [254439] = 124719, -- 7.3 Raid World Boss - Bonus Roll Prompt (Pit Lord Vilemus)
+    [254441] = 124514, -- 7.3 Raid World Boss - Bonus Roll Prompt (Matron Folnuna)
+    [254443] = 124492, -- 7.3 Raid World Boss - Bonus Roll Prompt (Occularus)
+    [254446] = 124555, -- 7.3 Raid World Boss - Bonus Roll Prompt (Sotanathor)
 
     -----------------------------------------------------------------------
     -- Hellfire Citadel
