@@ -873,6 +873,12 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [254441] = 124514, -- 7.3 Raid World Boss - Bonus Roll Prompt (Matron Folnuna)
     [254443] = 124492, -- 7.3 Raid World Boss - Bonus Roll Prompt (Occularus)
     [254446] = 124555, -- 7.3 Raid World Boss - Bonus Roll Prompt (Sotanathor)
+    [244164] = 121818, -- 7.2.5 Raid World Boss - Bonus Roll Prompt (Lord Kazzak)
+    [244165] = 121820, -- 7.2.5 Raid World Boss - Bonus Roll Prompt (Azuregos)
+    [244166] = 121911, -- 7.2.5 Raid World Boss - Bonus Roll Prompt (Taerar)
+    --[244182] = , -- 7.2.5 Raid World Boss - Bonus Roll Prompt ()
+    --[244183] = , -- 7.2.5 Raid World Boss - Bonus Roll Prompt ()
+    --[244184] = , -- 7.2.5 Raid World Boss - Bonus Roll Prompt ()
 
     -----------------------------------------------------------------------
     -- Hellfire Citadel
