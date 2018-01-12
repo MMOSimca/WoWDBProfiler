@@ -499,6 +499,31 @@ private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP = {
     [254792] = 153066,
     [254793] = 153067,
     [254794] = 153068,
+    [257630] = 154903,
+    [257631] = 154904,
+    [257632] = 154905,
+    [257633] = 154906,
+    [257634] = 154907,
+    [257635] = 154908,
+    [257636] = 154909,
+    [257637] = 154910,
+    [257638] = 154911,
+    [257639] = 154912,
+    [257992] = 153135,
+    [257993] = 153151,
+    [257994] = 152741,
+    [257995] = 153143,
+    [262946] = 157796,
+    [263148] = 157822,
+    [263149] = 157823,
+    [263150] = 157824,
+    [263151] = 157825,
+    [263152] = 157826,
+    [263153] = 157827,
+    [263154] = 157828,
+    [263155] = 157829,
+    [263156] = 157830,
+    [263157] = 157831,
 }
 private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_BY_CLASS_ID_MAP = {
     [178209] = { [1] = 119318, [2] = 119305, [3] = 119318, [4] = 119315, [5] = 119305, [6] = 119315, [7] = 119318, [8] = 119315, [9] = 119305, [10] = 119318, [11] = 119315, },
@@ -763,19 +788,12 @@ private.CONTAINER_ITEM_ID_LIST = {
     [139486] = true,
     [139487] = true,
     [139488] = true,
-    [139706] = true,
     [139771] = true,
     [139879] = true,
-    [139888] = true,
-    [139892] = true,
-    [140038] = true,
     [140148] = true,
     [140150] = true,
     [140152] = true,
     [140154] = true,
-    [140155] = true,
-    [140157] = true,
-    [140158] = true,
     [140200] = true,
     [140997] = true,
     [140998] = true,
@@ -831,6 +849,17 @@ private.CONTAINER_ITEM_ID_LIST = {
     [151557] = true,
     [151558] = true,
     [153132] = true,
+    [153501] = true,
+    [153502] = true,
+    [153503] = true,
+    [153504] = true,
+    [154991] = true,
+    [154992] = true,
+    [156682] = true,
+    [156683] = true,
+    [156688] = true,
+    [156689] = true,
+    [156698] = true,
 }
 for key, value in next, private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP do
     private.CONTAINER_ITEM_ID_LIST[value] = false
@@ -879,6 +908,21 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [254441] = 124514, -- 7.3 Raid World Boss - Bonus Roll Prompt (Matron Folnuna)
     [254443] = 124492, -- 7.3 Raid World Boss - Bonus Roll Prompt (Occularus)
     [254446] = 124555, -- 7.3 Raid World Boss - Bonus Roll Prompt (Sotanathor)
+
+    -----------------------------------------------------------------------
+    -- Antorus, the Burning Throne
+    -----------------------------------------------------------------------
+    [250588] = 122450, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 01 (Garothi Worldbreaker)
+    [250598] = 122135, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 02 (Shatug)
+    [250600] = 122104, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 03 (Portal Keeper Hasabel)
+    [250601] = 122367, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 04 (Admiral Svirax)
+    [250602] = 122500, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 05 (Essence of Eonar)
+    [250603] = 124158, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 06 (Imonar the Soulhunter)
+    [250604] = 122578, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 07 (Kin'garoth)
+    [250605] = 122366, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 08 (Varimathras)
+    [250606] = 122467, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 09 (Asara, Mother of Night)
+    [250607] = 121975, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 10 (Aggramar)
+    [250608] = 124828, -- 7.3 Raid Antorus - Bonus Roll Prompt - Boss 11 (Argus)
 
     -----------------------------------------------------------------------
     -- Hellfire Citadel
