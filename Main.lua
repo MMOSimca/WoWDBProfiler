@@ -89,6 +89,7 @@ local DATABASE_DEFAULTS = {
         objects = {},
         quests = {},
         spells = {},
+        world_quests = {},
         zones = {},
     }
 }
