@@ -27,7 +27,7 @@ local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
-local HereBeDragons = LibStub("HereBeDragons-1.0")
+local HereBeDragons -- This is set later, using 2.0 for BFA
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -37,9 +37,10 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 
 local AF = private.ACTION_TYPE_FLAGS
 local CLIENT_LOCALE = _G.GetLocale()
-local DB_VERSION = 18
+local DB_VERSION = 18 -- This is increased to 19 later for BFA
 local DEBUGGING = false
 local EVENT_DEBUG = false
+local IS_BFA = false -- This is set later if the Interface version is 80000
 
 -- Timer durations in seconds
 local DELAY_PROCESS_ITEMS = 30
@@ -878,6 +879,15 @@ function WDP:OnInitialize()
 
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
+    
+    -- Check if it is Battle for Azeroth
+    if (tonumber(private.interface_num) == 80000) then
+        IS_BFA = true
+        HereBeDragons = LibStub("HereBeDragons-2.0")
+        DB_VERSION = 19
+    else
+        HereBeDragons = LibStub("HereBeDragons-1.0")
+    end
 
     -- Get current region from API (flawed)
     local current_region = _G.GetCurrentRegionName() or "XX"
@@ -1809,7 +1819,7 @@ do
         [225832] = true, -- Nightglow Wisp (cast by players using Wisp in a Bottle toy)
     }
 
-    local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+    local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
         if not spell_id or BLACKLISTED_SPELLS[spell_id] then
             return
         end
@@ -1833,7 +1843,7 @@ do
     local COMBAT_LOG_FUNCS = {
         SPELL_AURA_APPLIED = RecordNPCSpell,
         SPELL_CAST_START = RecordNPCSpell,
-        SPELL_CAST_SUCCESS = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+        SPELL_CAST_SUCCESS = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
             if spell_id == HEAL_BATTLE_PETS_SPELL_ID then
                 local unit_type, unit_idnum = ParseGUID(source_guid)
 
@@ -1841,9 +1851,9 @@ do
                     NPCEntry(unit_idnum).stable_master = true
                 end
             end
-            RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+            RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
         end,
-        UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id, spell_name)
+        UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
             local unit_type, unit_idnum = ParseGUID(dest_guid)
 
             if not unit_idnum or not UnitTypeIsNPC(unit_type) then
@@ -1889,7 +1899,11 @@ do
     }
 
 
-    function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, ...)
+    function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id, ...)
+        if IS_BFA then
+            time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id = CombatLogGetCurrentEventInfo()
+        end
+
         local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
 
         if not combat_log_func then
@@ -1903,7 +1917,7 @@ do
             end
             return
         end
-        combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, ...)
+        combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
 
         if NON_DAMAGE_EVENTS[sub_event] then
             table.wipe(previous_combat_event)
