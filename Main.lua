@@ -112,7 +112,6 @@ local EVENT_MAPPING = {
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
     CURSOR_UPDATE = true,
-    FORGE_MASTER_OPENED = true,
     GARRISON_MISSION_NPC_CLOSED = "ResumeChatLootRecording",
     GARRISON_MISSION_NPC_OPENED = "StopChatLootRecording",
     GARRISON_SHIPYARD_NPC_CLOSED = "ResumeChatLootRecording",
@@ -1043,6 +1042,9 @@ end
 function WDP:ProcessWorldQuests()
     -- Ignore if player is low level (there are some world quests before max level now, but we can collect enough data from 110s alone still)
     if _G.UnitLevel("player") ~= 110 then return end
+    
+    -- Ignore if BFA for now; Map API's lack of completion causes issues here
+    if IS_BFA then return end
 
     -- Get current continent and zones in current continent
     local continentIndex, continentID = GetCurrentMapContinent()
@@ -3045,11 +3047,6 @@ do
 
     function WDP:BATTLEFIELDS_SHOW(event_name)
         SetUnitField("battlemaster", private.UNIT_TYPES.NPC)
-    end
-
-
-    function WDP:FORGE_MASTER_OPENED(event_name)
-        SetUnitField("arcane_reforger", private.UNIT_TYPES.NPC)
     end
 
 
