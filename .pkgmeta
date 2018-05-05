@@ -7,7 +7,7 @@ externals:
     Libs/CallbackHandler-1.0:
         url: svn://svn.wowace.com/wow/callbackhandler/mainline/trunk/CallbackHandler-1.0
         tag: latest
-    Libs/HereBeDragons-1.0:
+    Libs/HereBeDragons:
         url: git://git.wowace.com/wow/herebedragons/mainline.git
     Libs/AceAddon-3.0:
         url: svn://svn.wowace.com/wow/ace3/mainline/trunk/AceAddon-3.0
