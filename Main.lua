@@ -27,7 +27,7 @@ local LibStub = _G.LibStub
 local WDP = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceConsole-3.0", "AceEvent-3.0")
 
 local deformat = LibStub("LibDeformat-3.0")
-local HereBeDragons -- This is set later, using 2.0 for BFA
+local HereBeDragons = LibStub("HereBeDragons-2.0")
 
 local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "GameTooltipTemplate")
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
@@ -37,10 +37,9 @@ DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 
 local AF = private.ACTION_TYPE_FLAGS
 local CLIENT_LOCALE = _G.GetLocale()
-local DB_VERSION = 18 -- This is increased to 19 later for BFA
+local DB_VERSION = 18
 local DEBUGGING = false
 local EVENT_DEBUG = false
-local IS_BFA = false -- This is set later if the Interface version is 80000
 
 -- Timer durations in seconds
 local DELAY_PROCESS_ITEMS = 30
@@ -280,18 +279,6 @@ local ActualCopperCost
 do
     local BARTERING_SPELL_ID = 83964
 
-    local STANDING_DISCOUNTS = {
-        HATED = 0,
-        HOSTILE = 0,
-        UNFRIENDLY = 0,
-        NEUTRAL = 0,
-        FRIENDLY = 0.05,
-        HONORED = 0.1,
-        REVERED = 0.15,
-        EXALTED = 0.2,
-    }
-
-
     function ActualCopperCost(copper_cost, rep_standing)
         if not copper_cost or copper_cost == 0 then
             return 0
@@ -304,9 +291,9 @@ do
 
         if rep_standing then
             if PLAYER_RACE == "Goblin" then
-                modifier = modifier - STANDING_DISCOUNTS["EXALTED"]
-            elseif STANDING_DISCOUNTS[rep_standing] then
-                modifier = modifier - STANDING_DISCOUNTS[rep_standing]
+                modifier = modifier - private.STANDING_DISCOUNTS["EXALTED"]
+            elseif private.STANDING_DISCOUNTS[rep_standing] then
+                modifier = modifier - private.STANDING_DISCOUNTS[rep_standing]
             end
         end
         return math.floor(copper_cost / modifier)
@@ -878,15 +865,6 @@ function WDP:OnInitialize()
 
     local raw_db = _G.WoWDBProfilerData
     local build_num = tonumber(private.build_num)
-    
-    -- Check if it is Battle for Azeroth
-    if (tonumber(private.interface_num) == 80000) then
-        IS_BFA = true
-        HereBeDragons = LibStub("HereBeDragons-2.0")
-        DB_VERSION = 19
-    else
-        HereBeDragons = LibStub("HereBeDragons-1.0")
-    end
 
     -- Get current region from API (flawed)
     local current_region = _G.GetCurrentRegionName() or "XX"
@@ -1183,81 +1161,49 @@ function WDP:ProcessItems()
 end
 
 
-local TargetedNPC
-do
-    local GENDER_NAMES = {
-        "UNKNOWN",
-        "MALE",
-        "FEMALE",
-    }
-
-
-    local REACTION_NAMES = {
-        "HATED",
-        "HOSTILE",
-        "UNFRIENDLY",
-        "NEUTRAL",
-        "FRIENDLY",
-        "HONORED",
-        "REVERED",
-        "EXALTED",
-    }
-
-
-    -- We should just use IDs here someday; WoWDB site knows all about different power types
-    local POWER_TYPE_NAMES = {
-        ["0"] = "MANA",
-        ["1"] = "RAGE",
-        ["2"] = "FOCUS",
-        ["3"] = "ENERGY",
-        ["6"] = "RUNIC_POWER",
-    }
-
-
-    function TargetedNPC()
-        if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
-            current_target_id = nil
-            return
-        end
-        local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
-
-        if not unit_idnum or not UnitTypeIsNPC(unit_type) then
-            return
-        end
-        current_target_id = unit_idnum
-
-        local npc = NPCEntry(unit_idnum)
-        local _, class_token = _G.UnitClass("target")
-        npc.class = class_token
-        npc.faction = UnitFactionStanding("target")
-        npc.genders = npc.genders or {}
-        npc.genders[GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
-        npc.is_pvp = _G.UnitIsPVP("target") and true or nil
-        npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), REACTION_NAMES[_G.UnitReaction("player", "target")])
-
-        local encounter_data = npc:EncounterData(InstanceDifficultyToken()).stats
-        local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
-        local level_data = encounter_data[npc_level]
-
-        if not level_data then
-            level_data = {}
-            encounter_data[npc_level] = level_data
-        end
-        level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
-
-        -- May not capture as much data as it could, since the API changed in Legion to report multiple types of power
-        if not level_data.power then
-            local max_power = _G.UnitPowerMax("target")
-
-            if max_power > 0 then
-                local power_type = _G.UnitPowerType("target")
-                level_data.power = ("%s:%d"):format(POWER_TYPE_NAMES[tostring(power_type)] or power_type, max_power)
-            end
-        end
-        name_to_id_map[_G.UnitName("target")] = unit_idnum
-        return npc, unit_idnum
+local function TargetedNPC()
+    if not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or currently_drunk then
+        current_target_id = nil
+        return
     end
-end -- do-block
+    local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("target"))
+
+    if not unit_idnum or not UnitTypeIsNPC(unit_type) then
+        return
+    end
+    current_target_id = unit_idnum
+
+    local npc = NPCEntry(unit_idnum)
+    local _, class_token = _G.UnitClass("target")
+    npc.class = class_token
+    npc.faction = UnitFactionStanding("target")
+    npc.genders = npc.genders or {}
+    npc.genders[private.GENDER_NAMES[_G.UnitSex("target")] or "UNDEFINED"] = true
+    npc.is_pvp = _G.UnitIsPVP("target") and true or nil
+    npc.reaction = ("%s:%s:%s"):format(_G.UnitLevel("player"), _G.UnitFactionGroup("player"), private.REACTION_NAMES[_G.UnitReaction("player", "target")])
+
+    local encounter_data = npc:EncounterData(InstanceDifficultyToken()).stats
+    local npc_level = ("level_%d"):format(_G.UnitLevel("target"))
+    local level_data = encounter_data[npc_level]
+
+    if not level_data then
+        level_data = {}
+        encounter_data[npc_level] = level_data
+    end
+    level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
+
+    -- May not capture as much data as it could, since the API changed in Legion to report multiple types of power
+    if not level_data.power then
+        local max_power = _G.UnitPowerMax("target")
+
+        if max_power > 0 then
+            local power_type = _G.UnitPowerType("target")
+            level_data.power = ("%s:%d"):format(private.POWER_TYPE_NAMES[tostring(power_type)] or power_type, max_power)
+        end
+    end
+    name_to_id_map[_G.UnitName("target")] = unit_idnum
+    return npc, unit_idnum
+end
 
 
 do
@@ -1600,19 +1546,6 @@ do
     end
 
 
-    local BLACKLISTED_ITEMS = {
-        [114116] = true,
-        [114119] = true,
-        [114120] = true,
-        [116980] = true,
-        [120319] = true,
-        [120320] = true,
-        [139593] = true,
-        [139594] = true,
-        [140590] = true,
-    }
-
-
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
         [AF.ITEM] = function(item_id, quantity)
             -- Verify that we're still assigning data to the right items
@@ -1684,7 +1617,7 @@ do
 
         -- Take action based on update category
         local update_func = CHAT_MSG_LOOT_UPDATE_FUNCS[category]
-        if not category or not update_func or BLACKLISTED_ITEMS[item_id] then
+        if not category or not update_func or private.BLACKLISTED_ITEMS[item_id] then
             return
         end
         update_func(item_id, quantity)
@@ -1797,32 +1730,8 @@ do
     local FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
     local FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
 
-    -- Spells that are cast by players/NPCs that are mistakely assigned as being cast by the target; must be blacklisted
-    local BLACKLISTED_SPELLS = {
-        [117526] = true, -- Binding Shot (cast by Hunters)
-        [121308] = true, -- Disguise (cast by Rogues)
-        [132464] = true, -- Chi Wave (cast by Monks)
-        [132467] = true, -- Chi Wave (cast by Monks)
-        [167432] = true, -- Savagery (cast by Warsong Commander)
-        [175077] = true, -- Fearsome Battle Standard (cast by Fearsome Battle Standard item)
-        [176813] = true, -- Itchy Spores (cast by Marsh Creatures in Ashran)
-        [183901] = true, -- Stolen Strength (cast by Felblood NPCs in Tanaan Jungle)
-        [183904] = true, -- Stolen Speed (cast by Felblood NPCs in Tanaan Jungle)
-        [183907] = true, -- Stolen Fervor (cast by Felblood NPCs in Tanaan Jungle)
-        [195802] = true, -- Moonkin Feather (applied by Moonfeather Statue; first stage buff)
-        [195805] = true, -- Moonkin Molting (applied by Moonfeather Statue; second stage buff)
-        [195810] = true, -- Feeling Moonkin (applied by Moonfeather Statue; third stage buff)
-        [195816] = true, -- Owlvercome wth the Fever (applied by Moonfeather Statue; final stage buff)
-        [213738] = true, -- Taste of Blood (applied by Fate and Fortune, Combat Rogue artifacts)
-        [213877] = true, -- Vampiric Aura (used by Nathrezim Invasion bosses and transformed players)
-        [215377] = true, -- The Maw Must Feed (applied by Maw of the Damned, Blood Death Knight artifact)
-        [218136] = true, -- Arcane Invigoration (cast by Duskwatch Rune Scribes in The Arcway)
-        [224762] = true, -- Leyline Rift (summoned by players with Leyline Mastery in Suramar)
-        [225832] = true, -- Nightglow Wisp (cast by players using Wisp in a Bottle toy)
-    }
-
     local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
-        if not spell_id or BLACKLISTED_SPELLS[spell_id] then
+        if not spell_id or private.BLACKLISTED_SPELLS[spell_id] then
             return
         end
         local source_type, source_id = ParseGUID(source_guid)
@@ -1902,9 +1811,7 @@ do
 
 
     function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id, ...)
-        if IS_BFA then
-            time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id = CombatLogGetCurrentEventInfo()
-        end
+        time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id = CombatLogGetCurrentEventInfo()
 
         local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
 

@@ -13,8 +13,45 @@ local ADDON_NAME, private = ...
 
 
 -----------------------------------------------------------------------
--- Boss/Loot Data Constants.
+-- Boss/Item/Spell Data Constants.
 -----------------------------------------------------------------------
+private.BLACKLISTED_ITEMS = {
+    [114116] = true,
+    [114119] = true,
+    [114120] = true,
+    [116980] = true,
+    [120319] = true,
+    [120320] = true,
+    [139593] = true,
+    [139594] = true,
+    [140590] = true,
+}
+
+-- Spells that are cast by players/NPCs that are mistakenly assigned as being cast by the target; must be blacklisted
+private.BLACKLISTED_SPELLS = {
+    [117526] = true, -- Binding Shot (cast by Hunters)
+    [121308] = true, -- Disguise (cast by Rogues)
+    [132464] = true, -- Chi Wave (cast by Monks)
+    [132467] = true, -- Chi Wave (cast by Monks)
+    [167432] = true, -- Savagery (cast by Warsong Commander)
+    [175077] = true, -- Fearsome Battle Standard (cast by Fearsome Battle Standard item)
+    [176813] = true, -- Itchy Spores (cast by Marsh Creatures in Ashran)
+    [183901] = true, -- Stolen Strength (cast by Felblood NPCs in Tanaan Jungle)
+    [183904] = true, -- Stolen Speed (cast by Felblood NPCs in Tanaan Jungle)
+    [183907] = true, -- Stolen Fervor (cast by Felblood NPCs in Tanaan Jungle)
+    [195802] = true, -- Moonkin Feather (applied by Moonfeather Statue; first stage buff)
+    [195805] = true, -- Moonkin Molting (applied by Moonfeather Statue; second stage buff)
+    [195810] = true, -- Feeling Moonkin (applied by Moonfeather Statue; third stage buff)
+    [195816] = true, -- Owlvercome wth the Fever (applied by Moonfeather Statue; final stage buff)
+    [213738] = true, -- Taste of Blood (applied by Fate and Fortune, Combat Rogue artifacts)
+    [213877] = true, -- Vampiric Aura (used by Nathrezim Invasion bosses and transformed players)
+    [215377] = true, -- The Maw Must Feed (applied by Maw of the Damned, Blood Death Knight artifact)
+    [218136] = true, -- Arcane Invigoration (cast by Duskwatch Rune Scribes in The Arcway)
+    [223971] = true, -- Hunter's Rush (applied by Fangs of Ashamane, Feral Druid artifacts)
+    [224762] = true, -- Leyline Rift (summoned by players with Leyline Mastery in Suramar)
+    [225832] = true, -- Nightglow Wisp (cast by players using Wisp in a Bottle toy)
+}
+
 private.EPHEMERAL_CRYSTAL_OBJECT_IDS = {
     251168,
     251183,
@@ -860,6 +897,28 @@ private.CONTAINER_ITEM_ID_LIST = {
     [156688] = true,
     [156689] = true,
     [156698] = true,
+    [159783] = true,
+    [160439] = true,
+    [161083] = true,
+    [161084] = true,
+    [163059] = true,
+    [163139] = true,
+    [163141] = true,
+    [163142] = true,
+    [163144] = true,
+    [163146] = true,
+    [163148] = true,
+    [163734] = true,
+    [164251] = true,
+    [164252] = true,
+    [164257] = true,
+    [164258] = true,
+    [164259] = true,
+    [164260] = true,
+    [164261] = true,
+    [164262] = true,
+    [164263] = true,
+    [164264] = true,
 }
 for key, value in next, private.DELAYED_CONTAINER_SPELL_ID_TO_ITEM_ID_MAP do
     private.CONTAINER_ITEM_ID_LIST[value] = false
@@ -908,6 +967,10 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [254441] = 124514, -- 7.3 Raid World Boss - Bonus Roll Prompt (Matron Folnuna)
     [254443] = 124492, -- 7.3 Raid World Boss - Bonus Roll Prompt (Occularus)
     [254446] = 124555, -- 7.3 Raid World Boss - Bonus Roll Prompt (Sotanathor)
+
+    -----------------------------------------------------------------------
+    -- Uldir
+    -----------------------------------------------------------------------
 
     -----------------------------------------------------------------------
     -- Antorus, the Burning Throne
@@ -1020,6 +1083,43 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
 -- Fundamental Constants.
 -----------------------------------------------------------------------
 private.wow_version, private.build_num, _, private.interface_num = _G.GetBuildInfo()
+
+private.GENDER_NAMES = {
+    "UNKNOWN",
+    "MALE",
+    "FEMALE",
+}
+
+private.REACTION_NAMES = {
+    "HATED",
+    "HOSTILE",
+    "UNFRIENDLY",
+    "NEUTRAL",
+    "FRIENDLY",
+    "HONORED",
+    "REVERED",
+    "EXALTED",
+}
+
+private.STANDING_DISCOUNTS = {
+    HATED = 0,
+    HOSTILE = 0,
+    UNFRIENDLY = 0,
+    NEUTRAL = 0,
+    FRIENDLY = 0.05,
+    HONORED = 0.1,
+    REVERED = 0.15,
+    EXALTED = 0.2,
+}
+    
+-- We should just use IDs here someday; WoWDB site knows all about different power types
+private.POWER_TYPE_NAMES = {
+    ["0"] = "MANA",
+    ["1"] = "RAGE",
+    ["2"] = "FOCUS",
+    ["3"] = "ENERGY",
+    ["6"] = "RUNIC_POWER",
+}
 
 private.UNIT_TYPES = {
     PLAYER = "Player",
@@ -1158,6 +1258,20 @@ private.FACTION_DATA = {
     NIGHTFALLEN = { 1859, true, _G.GetFactionInfoByID(1859) },
     VALARJAR = { 1948, true, _G.GetFactionInfoByID(1948) },
     WARDENS = { 1894, true, _G.GetFactionInfoByID(1894) },
+    ARMIES_OF_LEGIONFALL = { 2045, true, _G.GetFactionInfoByID(2045) },
+    ARMY_OF_THE_LIGHT = { 2165, true, _G.GetFactionInfoByID(2165) },
+    ARGUSSIAN_REACH = { 2170, true, _G.GetFactionInfoByID(2170) },
+    -- BFA reps (blacklisted because of world quests)
+    ZANDALARI_EMPIRE = { 2103, true, _G.GetFactionInfoByID(2103) },
+    PROUDMOORE_ADMIRALITY = { 2160, true, _G.GetFactionInfoByID(2160) },
+    TALNAJIS_EXPEDITION = { 2156, true, _G.GetFactionInfoByID(2156) },
+    ORDER_OF_EMBERS = { 2161, true, _G.GetFactionInfoByID(2161) },
+    VOLDUNAI = { 2158, true, _G.GetFactionInfoByID(2158) },
+    STORMS_WAKE = { 2162, true, _G.GetFactionInfoByID(2162) },
+    THE_HONORBOUND = { 2157, true, _G.GetFactionInfoByID(2157) },
+    SEVENTH_LEGION = { 2159, true, _G.GetFactionInfoByID(2159) },
+    CHAMPIONS_OF_AZEROTH = { 2164, true, _G.GetFactionInfoByID(2164) },
+    TORTOLLAN_SEEKERS = { 2163, true, _G.GetFactionInfoByID(2163) },
 }
 
 private.REP_BUFFS = {
