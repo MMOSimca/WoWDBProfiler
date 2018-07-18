@@ -1019,20 +1019,17 @@ end
 
 function WDP:ProcessWorldQuests()
     -- Ignore if player is low level (there are some world quests before max level now, but we can collect enough data from 110s alone still)
-    if _G.UnitLevel("player") ~= 110 then return end
-    
-    -- Ignore if BFA for now; Map API's lack of completion causes issues here
-    if IS_BFA then return end
+    if _G.UnitLevel("player") >= 110 then return end
 
-    -- Get current continent and zones in current continent
-    local continentIndex, continentID = GetCurrentMapContinent()
-    local continentMaps = { GetMapZones(continentIndex) }
+    local current_ui_map_id = C_Map.GetBestMapForUnit("player")
+    local bounty_maps = MapUtil.GetRelatedBountyZoneMaps(current_ui_map_id)
 
     -- Iterate over zones in continent
-    for i = 1, #continentMaps, 2 do
+    for i = 1, #bounty_maps do
     
         -- Get data for World Quests
-        local api_data = C_TaskQuest.GetQuestsForPlayerByMapID(continentMaps[i], continentID);
+        local api_data = C_TaskQuest.GetQuestsForPlayerByMapID(bounty_maps[i]);
+        local continent_ui_map_id = MapUtil.GetMapParentInfo(bounty_maps[i], _G.Enum.UIMapType.Continent)
 
         -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
         if api_data and type(api_data) == "table" and #api_data > 0 then
@@ -1043,14 +1040,9 @@ function WDP:ProcessWorldQuests()
                     local quest_id = tonumber(current_data["questId"]) or 0
 
                     -- Check if we have quest data
-                    if _G.HaveQuestData(quest_id) then
-                        local tag_id, tag_name, world_quest_type, rarity, is_elite, tradeskill_line_index = _G.GetQuestTagInfo(quest_id)
-
-                        -- Check for valid questID and whether or not it is a World Quest
-                        if quest_id > 0 and world_quest_type ~= nil then
-                            _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
-                            RecordWorldQuestData(quest_id, continentID, continentMaps[i], current_data)
-                        end
+                    if quest_id > 0 and _G.HaveQuestData(quest_id) and QuestUtils_IsQuestWorldQuest(quest_id) and current_data["mapID"] == bounty_maps[i] then
+                        _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
+                        RecordWorldQuestData(quest_id, continent_ui_map_id, bounty_maps[i], current_data)
                     end
                 end
             end
