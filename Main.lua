@@ -441,9 +441,9 @@ do
 
         -- Special case for Fishing.
         if current_action.spell_label == "FISHING" then
-            local _, qx, qy = _G.GetWorldLocFromMapPos(0, 0)
-            local _, wx, wy = _G.GetWorldLocFromMapPos(1, 1)
-            local yard_width, yard_height = qy - wy, qx - wx
+            local _, q_vector = _G.C_Map.GetWorldPosFromMapPos(area_id, _G.CreateVector2D(0,0))
+            local _, w_vector = _G.C_Map.GetWorldPosFromMapPos(area_id, _G.CreateVector2D(1,1))
+            local yard_width, yard_height = q_vector.y - w_vector.y, q_vector.x - w_vector.x
 
             if yard_width > 0 and yard_height > 0 then
                 x, y = FishingCoordinates(x, y, yard_width, yard_height)
