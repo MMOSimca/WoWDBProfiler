@@ -926,9 +926,9 @@ function WDP:OnEnable()
     end
 
     -- These timers loop indefinitely using Lua's infinity constant
-    item_process_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_ITEMS, WDP.ProcessItems, math.huge)
-    target_location_timer_handle = C_Timer.NewTicker(DELAY_UPDATE_TARGET_LOCATION, WDP.UpdateTargetLocation, math.huge)
-    world_quest_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_WORLD_QUESTS, WDP.ProcessWorldQuests, math.huge)
+    item_process_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_ITEMS, WDP.ProcessItems, nil)
+    target_location_timer_handle = C_Timer.NewTicker(DELAY_UPDATE_TARGET_LOCATION, WDP.UpdateTargetLocation, nil)
+    world_quest_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_WORLD_QUESTS, WDP.ProcessWorldQuests, nil)
 
     _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
@@ -951,40 +951,31 @@ end
 
 -- Record data for a specific quest ID; reward data must be available or nothing will be recorded
 -- When we reach this point, we've already checked for a valid mapID, questID, quest data, and worldQuestType
-local function RecordWorldQuestData(quest_id, continent_world_map_id, zone_world_map_id, api_data_table)
-
+local function RecordWorldQuestData(quest_id, api_data_table)
     -- Ensure we have location data and rewards (barely readable so putting it on multiple lines)
     -- (Honor is built in to the quest; it is not a sign rewards have been loaded)
-    if not api_data_table.x or not api_data_table.y or not api_data_table.floor or not
+    if not api_data_table or not api_data_table.x or not api_data_table.y or not api_data_table.mapID or not
       (_G.GetQuestLogRewardXP(quest_id) > 0 or _G.GetNumQuestLogRewardCurrencies(quest_id) > 0
-      or _G.GetNumQuestLogRewards(quest_id) > 0 or _G.GetQuestLogRewardMoney(quest_id) > 0
-      or _G.GetQuestLogRewardArtifactXP(quest_id) > 0) then
+      or _G.GetNumQuestLogRewards(quest_id) > 0 or _G.GetQuestLogRewardMoney(quest_id) > 0) then
+    --or _G.GetQuestLogRewardArtifactXP(quest_id) > 0)
         return
     end
-
-    -- Translate continent-level coordinates to zone-coordinates
-    local oX, oY, dFloor = tonumber(api_data_table.x) or 0, tonumber(api_data_table.y) or 0, tonumber(api_data_table.floor) or 0
-    local dX, dY = HereBeDragons:TranslateZoneCoordinates(oX, oY, continent_world_map_id, 0, zone_world_map_id, dFloor, false)
-    
-    -- If the translation failed, stop here
-    if not dX or not dY then return end
 
     local entry = DBEntry("world_quests", quest_id)
     if entry then
 
         -- Record location
         entry["location"] = {}
-        entry["location"]["world_map_id"] = zone_world_map_id
-        entry["location"]["x"] = dX * 100
-        entry["location"]["y"] = dY * 100
-        entry["location"]["floor"] = dFloor
+        entry["location"]["world_map_id"] = api_data_table.mapID
+        entry["location"]["x"] = api_data_table.x * 100
+        entry["location"]["y"] = api_data_table.y * 100
 
         -- Record simple rewards (XP, money, artifact XP, honor)
         entry["rewards"] = {}
         entry["rewards"]["xp"] = tonumber(_G.GetQuestLogRewardXP(quest_id)) or 0
         entry["rewards"]["money"] = tonumber(_G.GetQuestLogRewardMoney(quest_id)) or 0
-        local actualXP, scaling = _G.GetQuestLogRewardArtifactXP(quest_id)
-        entry["rewards"]["artifact_xp"] = ("%d:%d"):format(tonumber(actualXP) or 0, tonumber(scaling) or 0)
+        --local actualXP, scaling = _G.GetQuestLogRewardArtifactXP(quest_id)
+        --entry["rewards"]["artifact_xp"] = ("%d:%d"):format(tonumber(actualXP) or 0, tonumber(scaling) or 0)
         entry["rewards"]["honor"] = tonumber(_G.GetQuestLogRewardHonor(quest_id)) or 0
 
         -- Record currencies
@@ -1019,7 +1010,7 @@ end
 
 function WDP:ProcessWorldQuests()
     -- Ignore if player is low level (there are some world quests before max level now, but we can collect enough data from 110s alone still)
-    if _G.UnitLevel("player") >= 110 then return end
+    if _G.UnitLevel("player") < 110 then return end
 
     local current_ui_map_id = C_Map.GetBestMapForUnit("player")
     local bounty_maps = MapUtil.GetRelatedBountyZoneMaps(current_ui_map_id)
@@ -1033,16 +1024,16 @@ function WDP:ProcessWorldQuests()
 
         -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
         if api_data and type(api_data) == "table" and #api_data > 0 then
-            for _, current_data in ipairs(api_data) do
+            for j = 1, #api_data do
 
                 -- Check if we had a valid API table returned to us
-                if current_data and type(current_data) == "table" and current_data["questId"] then
-                    local quest_id = tonumber(current_data["questId"]) or 0
+                if api_data[j] and type(api_data[j]) == "table" and api_data[j].questId then
+                    local quest_id = tonumber(api_data[j].questId) or 0
 
                     -- Check if we have quest data
-                    if quest_id > 0 and _G.HaveQuestData(quest_id) and QuestUtils_IsQuestWorldQuest(quest_id) and current_data["mapID"] == bounty_maps[i] then
+                    if quest_id > 0 and _G.HaveQuestData(quest_id) and QuestUtils_IsQuestWorldQuest(quest_id) and api_data[j].mapID == bounty_maps[i] then
                         _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
-                        RecordWorldQuestData(quest_id, continent_ui_map_id, bounty_maps[i], current_data)
+                        RecordWorldQuestData(quest_id, api_data[j])
                     end
                 end
             end
