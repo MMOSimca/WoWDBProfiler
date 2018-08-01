@@ -33,7 +33,7 @@ local DatamineTT = _G.CreateFrame("GameTooltip", "WDPDatamineTT", _G.UIParent, "
 DatamineTT:SetOwner(_G.WorldFrame, "ANCHOR_NONE")
 
 
--- CONSTANTS ----------------------------------------------------------
+-- SIMPLE CONSTANTS ----------------------------------------------------------
 
 local AF = private.ACTION_TYPE_FLAGS
 local CLIENT_LOCALE = _G.GetLocale()
@@ -43,7 +43,7 @@ local EVENT_DEBUG = false
 
 -- Timer durations in seconds
 local DELAY_PROCESS_ITEMS = 30
-local DELAY_PROCESS_WORLD_QUESTS = 60
+local DELAY_PROCESS_WORLD_QUESTS = 90
 local DELAY_UPDATE_TARGET_LOCATION = 0.5
 
 local ITEM_ID_TIMBER = 114781
@@ -68,6 +68,8 @@ local PLAYER_NAME = _G.UnitName("player")
 local PLAYER_RACE = _G.select(2, _G.UnitRace("player"))
 
 local SPELL_ID_UPDATE_INTERACTIONS = 161006
+
+local UI_MAP_COSMIC = 946
 
 local ALLOWED_LOCALES = {
     enUS = true,
@@ -1012,28 +1014,36 @@ function WDP:ProcessWorldQuests()
     -- Ignore if player is low level (there are some world quests before max level now, but we can collect enough data from 110s alone still)
     if _G.UnitLevel("player") < 110 then return end
 
-    local current_ui_map_id = C_Map.GetBestMapForUnit("player")
-    local bounty_maps = MapUtil.GetRelatedBountyZoneMaps(current_ui_map_id)
+    -- Check all first-order continents
+    local continents = C_Map.GetMapChildrenInfo(UI_MAP_COSMIC, Enum.UIMapType.Continent, true);
+    for i, continentInfo in ipairs(continents) do
+        
+        -- Get continent data for World Quests
+        local continent_api_data = C_TaskQuest.GetQuestsForPlayerByMapID(continentInfo.mapID)
 
-    -- Iterate over zones in continent
-    for i = 1, #bounty_maps do
-    
-        -- Get data for World Quests
-        local api_data = C_TaskQuest.GetQuestsForPlayerByMapID(bounty_maps[i]);
-        local continent_ui_map_id = MapUtil.GetMapParentInfo(bounty_maps[i], _G.Enum.UIMapType.Continent)
+        -- If the continent has WQ data, continue
+        if continent_api_data and type(continent_api_data) == "table" and #continent_api_data > 0 then
+            -- Iterate over zones on continents
+            local zones = C_Map.GetMapChildrenInfo(continentInfo.mapID, Enum.UIMapType.Zone)
+            for j, zoneInfo in ipairs(zones) do
 
-        -- Iterate over the questIDs for each map, doing preload reward requests and creating SavedVariables entries
-        if api_data and type(api_data) == "table" and #api_data > 0 then
-            for j = 1, #api_data do
+                -- Get zone data for World Quests
+                local zone_api_data = C_TaskQuest.GetQuestsForPlayerByMapID(zoneInfo.mapID);
 
-                -- Check if we had a valid API table returned to us
-                if api_data[j] and type(api_data[j]) == "table" and api_data[j].questId then
-                    local quest_id = tonumber(api_data[j].questId) or 0
+                -- Iterate over the questIDs for each zone, doing preload reward requests and creating SavedVariables entries
+                if zone_api_data and type(zone_api_data) == "table" and #zone_api_data > 0 then
+                    for k = 1, #zone_api_data do
 
-                    -- Check if we have quest data
-                    if quest_id > 0 and _G.HaveQuestData(quest_id) and QuestUtils_IsQuestWorldQuest(quest_id) and api_data[j].mapID == bounty_maps[i] then
-                        _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
-                        RecordWorldQuestData(quest_id, api_data[j])
+                        -- Check if we had a valid API table returned to us
+                        if zone_api_data[k] and type(zone_api_data[k]) == "table" and zone_api_data[k].questId then
+                            local quest_id = tonumber(zone_api_data[k].questId) or 0
+
+                            -- Check if we have quest data and the quest is within this zone directly
+                            if quest_id > 0 and _G.HaveQuestData(quest_id) and QuestUtils_IsQuestWorldQuest(quest_id) and zone_api_data[k].mapID == zoneInfo.mapID then
+                                _G.C_TaskQuest.RequestPreloadRewardData(quest_id)
+                                RecordWorldQuestData(quest_id, zone_api_data[k])
+                            end
+                        end
                     end
                 end
             end
