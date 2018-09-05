@@ -44,6 +44,7 @@ private.BLACKLISTED_SPELLS = {
     [195810] = true, -- Feeling Moonkin (applied by Moonfeather Statue; third stage buff)
     [195816] = true, -- Owlvercome wth the Fever (applied by Moonfeather Statue; final stage buff)
     [213738] = true, -- Taste of Blood (applied by Fate and Fortune, Combat Rogue artifacts)
+    [213872] = true, -- Unison (applied by a Mistweaver Monk legendary)
     [213877] = true, -- Vampiric Aura (used by Nathrezim Invasion bosses and transformed players)
     [215377] = true, -- The Maw Must Feed (applied by Maw of the Damned, Blood Death Knight artifact)
     [218136] = true, -- Arcane Invigoration (cast by Duskwatch Rune Scribes in The Arcway)
@@ -967,6 +968,14 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [254441] = 124514, -- 7.3 Raid World Boss - Bonus Roll Prompt (Matron Folnuna)
     [254443] = 124492, -- 7.3 Raid World Boss - Bonus Roll Prompt (Occularus)
     [254446] = 124555, -- 7.3 Raid World Boss - Bonus Roll Prompt (Sotanathor)
+    --[275407] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    [275408] = 140163, -- 8.0 Raid World Boss - Bonus Roll Prompt (Warbringer Yenajz)
+    --[275409] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    --[275411] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    --[275413] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    --[275414] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    [275415] = 138122, -- 8.0 Raid World Boss - Bonus Roll Prompt (Doom's Howl)
+    --[275416] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
 
     -----------------------------------------------------------------------
     -- Uldir
