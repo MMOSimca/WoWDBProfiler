@@ -2691,7 +2691,7 @@ function WDP:TRAINER_SHOW(event_name)
             DatamineTT:ClearLines()
             DatamineTT:SetTrainerService(index)
 
-            local _, _, spell_id = DatamineTT:GetSpell()
+            local _, spell_id = DatamineTT:GetSpell()
 
             if spell_id then
                 local class_professions = trainer.teaches[PLAYER_CLASS]

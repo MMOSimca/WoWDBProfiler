@@ -971,11 +971,11 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     --[275407] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
     [275408] = 140163, -- 8.0 Raid World Boss - Bonus Roll Prompt (Warbringer Yenajz)
     --[275409] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
-    --[275411] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
-    --[275413] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    [275411] = 136385, -- 8.0 Raid World Boss - Bonus Roll Prompt (Azurethos)
+    [275413] = 138794, -- 8.0 Raid World Boss - Bonus Roll Prompt (Dunegorger Kraulok)
     --[275414] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
     [275415] = 138122, -- 8.0 Raid World Boss - Bonus Roll Prompt (Doom's Howl)
-    --[275416] = , -- 8.0 Raid World Boss - Bonus Roll Prompt ()
+    [275416] = 137374, -- 8.0 Raid World Boss - Bonus Roll Prompt (Lion's Roar)
 
     -----------------------------------------------------------------------
     -- Uldir
