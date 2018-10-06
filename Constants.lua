@@ -79,6 +79,12 @@ private.GARRISON_CACHE_OBJECT_NAME_TO_OBJECT_ID_MAP = {
     ["Hefty Garrison Cache"] = 237723,
 }
 
+private.IGNORED_ISLAND_REWARDS = {
+    [163611] = true,
+    [163612] = true,
+    [163613] = true,
+}
+
 -- Mapping of items that, when right-clicked, fire a spell (which can fail, so we have to check success).
 -- They reward loot via loot toast popups upon completion of that spell.
 -- SHOW_LOOT_TOAST can be used to track loot.

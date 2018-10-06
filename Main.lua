@@ -122,6 +122,8 @@ local EVENT_MAPPING = {
     GROUP_ROSTER_UPDATE = true,
     GUILDBANKFRAME_CLOSED = "ResumeChatLootRecording",
     GUILDBANKFRAME_OPENED = true, -- also triggers StopChatLootRecording
+    ISLAND_AZERITE_GAIN = true,
+    ISLAND_COMPLETED = true,
     ITEM_TEXT_BEGIN = true,
     ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
@@ -193,6 +195,8 @@ local chat_loot_data = {}
 local chat_loot_timer_handle
 local world_quest_timer_handle
 local world_quest_event_timestamp = 0
+local killed_npcs_in_island = {}
+local island_difficulty_token
 local current_target_id
 local current_loot
 
@@ -584,6 +588,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
             ClearChatLootData()
             Debug("HandleItemUse: Beginning chat-based loot timer for item with ID %d.", item_id)
             chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
+            chat_loot_data.category = AF.ITEM
             chat_loot_data.identifier = item_id
         -- For normal item containers
         else
@@ -827,9 +832,10 @@ function ClearChatLootData()
     Debug("ClearChatLootData: Ending chat-based loot timer.")
     chat_loot_timer_handle:Cancel()
     chat_loot_timer_handle = nil
-
-    if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) and chat_loot_data.loot then
-        -- A slimmed down (and more importantly, separate) version of GenericLootUpdate, specifically for AF.ITEM and chat_loot_data
+    
+    -- Slimmed down (and more importantly, separate) versions of GenericLootUpdate, specifically for chat_loot_data
+    -- First version is for special item containers that 'push' loot without using a loot window
+    if chat_loot_data.identifier and chat_loot_data.loot and chat_loot_data.category == AF.ITEM and private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil then
         local entry = DBEntry("items", chat_loot_data.identifier)
 
         if entry then
@@ -852,7 +858,34 @@ function ClearChatLootData()
                 end
             end
         end
+    -- Second version is for Island Expeditions. This code is flawed (by design).
+    elseif chat_loot_data.loot and chat_loot_data.category == AF.NPC then
+        -- Iterate over all NPCs killed in an island expedition (at least by your team)
+        for island_npc_id, kill_count in pairs(killed_npcs_in_island) do
+            local npc = NPCEntry(island_npc_id)
+            if npc then
+                -- Create needed npc fields if required
+                local loot_label = "drops"
+                local encounter_data = npc:EncounterData(InstanceDifficultyToken())
+                encounter_data[loot_label] = encounter_data[loot_label] or {}
+                encounter_data.loot_counts = encounter_data.loot_counts or {}
+                encounter_data.loot_counts[loot_label] = (encounter_data.loot_counts[loot_label] or 0) + kill_count
+
+                for loot_token, quantity in pairs(chat_loot_data.loot) do
+                    local label, currency_id = (":"):split(loot_token)
+
+                    -- Only support items
+                    if (label ~= "currency" or not currency_id) and (loot_token ~= "money") then
+                        -- Ignore certain items (dubloon bags)
+                        if not private.IGNORED_ISLAND_REWARDS[tonumber(loot_token)] then
+                            table.insert(encounter_data[loot_label], ("%d:%d"):format(loot_token, quantity))
+                        end
+                    end
+                end
+            end
+        end
     end
+    table.wipe(killed_npcs_in_island)
     table.wipe(chat_loot_data)
 end
 
@@ -1281,6 +1314,35 @@ function WDP:BONUS_ROLL_RESULT(event_name)
 end
 
 
+-- Store all known killed NPCs during an island in a table
+function WDP:ISLAND_AZERITE_GAIN(event_name, amount, gained_by_player, faction_index, gained_by, gained_from)
+    -- Exit now if GUID is not for an NPC
+    local unit_type, unit_id = ParseGUID(gained_from)
+    if not UnitTypeIsNPC(unit_type) then
+        return
+    end
+    
+    -- Otherwise, store the NPC ID in the island kill table (if it already exists there, increment its count by 1)
+    Debug("%s: Recording killed island NPC with ID #%d.", event_name, unit_id)
+    if killed_npcs_in_island[unit_id] then
+        killed_npcs_in_island[unit_id] = killed_npcs_in_island[unit_id] + 1
+    else
+        killed_npcs_in_island[unit_id] = 1
+    end
+end
+
+
+-- Start chat loot timer for NPCs (and store general island information)
+function WDP:ISLAND_COMPLETED(event_name)
+    island_difficulty_token = InstanceDifficultyToken()
+
+    Debug("%s: Beginning chat-based loot timer for Island Expedition rewards.", event_name, item_id)
+    chat_loot_timer_handle = C_Timer.NewTimer(1.5, ClearChatLootData)
+    chat_loot_data.category = AF.NPC
+    chat_loot_data.identifier = 0
+end
+
+
 function WDP:BLACK_MARKET_ITEM_UPDATE(event_name)
     if not ALLOWED_LOCALES[CLIENT_LOCALE] then
         return
@@ -1449,13 +1511,13 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         GenericLootUpdate("items")
         current_loot = nil
         container_loot_toasting = true -- Do not count further loots until timer expires or another container is opened
-    elseif loot_source and chat_loot_timer_handle then
+    elseif loot_source and chat_loot_timer_handle and chat_loot_data.category == AF.ITEM then
         -- Handle currency loot toasts for chat-based loot (we do this instead of reading currency chat messages because the chat messages are very delayed)
         if loot_type == "currency" then
             local currency_id = CurrencyLinkToID(item_link)
             if currency_id and currency_id ~= 0 then
                 -- Verify that we're still assigning data to the right items
-                if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
+                if chat_loot_data.category == AF.ITEM and chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
                     Debug("%s: Captured currency for chat-based loot recording. %d X %d", event_name, currency_id, quantity)
                     local currency_token = ("currency:%d"):format(currency_id)
                     chat_loot_data.loot = chat_loot_data.loot or {}
@@ -1470,7 +1532,7 @@ function WDP:SHOW_LOOT_TOAST(event_name, loot_type, item_link, quantity, spec_ID
         -- Handle money loot toasts for chat-based loot (we do this instead of reading money chat messages because the chat messages are very delayed)
         elseif loot_type == "money" then
             -- Verify that we're still assigning data to the right items
-            if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
+            if chat_loot_data.category == AF.ITEM and chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
                 Debug("%s: Captured money for chat-based loot recording. money X %d", event_name, quantity)
                 chat_loot_data.loot = chat_loot_data.loot or {}
                 chat_loot_data.loot["money"] = (chat_loot_data.loot["money"] or 0) + quantity
@@ -1540,6 +1602,7 @@ do
 
 
     local CHAT_MSG_LOOT_UPDATE_FUNCS = {
+        -- Handle chat loot data from item containers
         [AF.ITEM] = function(item_id, quantity)
             -- Verify that we're still assigning data to the right items
             if chat_loot_data.identifier and (private.CONTAINER_ITEM_ID_LIST[chat_loot_data.identifier] ~= nil) then
@@ -1551,9 +1614,13 @@ do
                 ClearChatLootData()
             end
         end,
+        -- Handle chat loot data from island expedition rewards
         [AF.NPC] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.NPC %d (%d)", item_id, quantity)
+            chat_loot_data.loot = chat_loot_data.loot or {}
+            chat_loot_data.loot[item_id] = (chat_loot_data.loot[item_id] or 0) + quantity
         end,
+        -- Handle logging spells for objects
         [AF.OBJECT] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.OBJECT %d (%d)", item_id, quantity)
             -- Check for top level object data
@@ -1570,6 +1637,7 @@ do
                 Debug("CHAT_MSG_LOOT: When handling timber, the top level data was missing for objectID %s.", private.LOGGING_SPELL_ID_TO_OBJECT_ID_MAP[last_timber_spell_id])
             end
         end,
+        -- Handle fishing loot table population
         [AF.ZONE] = function(item_id, quantity)
             Debug("CHAT_MSG_LOOT: AF.ZONE %d (%d)", item_id, quantity)
             InitializeCurrentLoot()
@@ -1596,12 +1664,12 @@ do
         -- Set update category
         if last_timber_spell_id and item_id == ITEM_ID_TIMBER then
             category = AF.OBJECT
-        -- Recently changed from ~= "EXTRACT_GAS" because of some occassional bad data, and, as far as I know, no benefit.
+        -- Changed from ~= "EXTRACT_GAS" because of some occassional bad data, and, as far as I know, no benefit.
         elseif current_action.spell_label == "FISHING" then
             category = AF.ZONE
-        elseif raid_boss_id then
+        elseif not raid_boss_id and chat_loot_timer_handle and chat_loot_data.category == AF.NPC then
             category = AF.NPC
-        elseif chat_loot_timer_handle then
+        elseif not raid_boss_id and chat_loot_timer_handle and chat_loot_data.category == AF.ITEM then
             category = AF.ITEM
         end
 
