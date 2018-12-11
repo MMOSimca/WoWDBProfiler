@@ -982,6 +982,8 @@ private.RAID_BOSS_BONUS_SPELL_ID_TO_NPC_ID_MAP = {
     [275414] = 140252, -- 8.0 Raid World Boss - Bonus Roll Prompt (Hailstone Construct)
     [275415] = 138122, -- 8.0 Raid World Boss - Bonus Roll Prompt (Doom's Howl)
     [275416] = 137374, -- 8.0 Raid World Boss - Bonus Roll Prompt (Lion's Roar)
+    [289528] = 144946, -- 8.1 Raid World Boss - Bonus Roll Prompt (Ivus the Forest Lord)
+    [289530] = 148295, -- 8.1 Raid World Boss - Bonus Roll Prompt (Ivus the Decayed)
 
     -----------------------------------------------------------------------
     -- Uldir
