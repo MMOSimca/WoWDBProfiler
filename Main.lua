@@ -987,10 +987,12 @@ end
 -- Record data for a specific quest ID; reward data must be available or nothing will be recorded
 -- When we reach this point, we've already checked for a valid mapID, questID, quest data, and worldQuestType
 local function RecordWorldQuestData(quest_id, api_data_table)
+    local xp, _ = _G.GetQuestLogRewardXP(quest_id)
+
     -- Ensure we have location data and rewards (barely readable so putting it on multiple lines)
     -- (Honor is built in to the quest; it is not a sign rewards have been loaded)
     if not api_data_table or not api_data_table.x or not api_data_table.y or not api_data_table.mapID or not
-      (_G.GetQuestLogRewardXP(quest_id) > 0 or _G.GetNumQuestLogRewardCurrencies(quest_id) > 0
+      (xp > 0 or _G.GetNumQuestLogRewardCurrencies(quest_id) > 0
       or _G.GetNumQuestLogRewards(quest_id) > 0 or _G.GetQuestLogRewardMoney(quest_id) > 0) then
     --or _G.GetQuestLogRewardArtifactXP(quest_id) > 0)
         return
@@ -1007,7 +1009,7 @@ local function RecordWorldQuestData(quest_id, api_data_table)
 
         -- Record simple rewards (XP, money, artifact XP, honor)
         entry["rewards"] = {}
-        entry["rewards"]["xp"] = tonumber(_G.GetQuestLogRewardXP(quest_id)) or 0
+        entry["rewards"]["xp"] = tonumber(xp) or 0
         entry["rewards"]["money"] = tonumber(_G.GetQuestLogRewardMoney(quest_id)) or 0
         --local actualXP, scaling = _G.GetQuestLogRewardArtifactXP(quest_id)
         --entry["rewards"]["artifact_xp"] = ("%d:%d"):format(tonumber(actualXP) or 0, tonumber(scaling) or 0)
