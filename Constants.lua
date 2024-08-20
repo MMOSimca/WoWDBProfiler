@@ -1,10 +1,12 @@
 -----------------------------------------------------------------------
--- Upvalued Lua API.
+-- Upvalued API.
 -----------------------------------------------------------------------
 local _G = getfenv(0)
 
 local bit = _G.bit
-
+local unpack = _G.unpack
+local GetSpellInfo = _G.C_Spell.GetSpellInfo
+local GetFactionDataByID = _G.C_Reputation.GetFactionDataByID
 
 -----------------------------------------------------------------------
 -- AddOn namespace.
@@ -1208,19 +1210,19 @@ for name, bit in _G.pairs(private.ACTION_TYPE_FLAGS) do
 end
 
 private.SPELL_LABELS_BY_NAME = {
-    [_G.GetSpellInfo(13262)] = "DISENCHANT",
-    [_G.GetSpellInfo(4036)] = "ENGINEERING",
-    [_G.GetSpellInfo(30427)] = "EXTRACT_GAS",
-    [_G.GetSpellInfo(131476)] = "FISHING",
-    [_G.GetSpellInfo(2366)] = "HERB_GATHERING",
-    [_G.GetSpellInfo(51005)] = "MILLING",
-    [_G.GetSpellInfo(605)] = "MIND_CONTROL",
-    [_G.GetSpellInfo(2575)] = "MINING",
-    [_G.GetSpellInfo(3365)] = "OPENING",
-    [_G.GetSpellInfo(921)] = "PICK_POCKET",
-    [_G.GetSpellInfo(31252)] = "PROSPECTING",
-    [_G.GetSpellInfo(73979)] = "SEARCHING_FOR_ARTIFACTS",
-    [_G.GetSpellInfo(8613)] = "SKINNING",
+    [GetSpellInfo(13262)] = "DISENCHANT",
+    [GetSpellInfo(4036)] = "ENGINEERING",
+    [GetSpellInfo(30427)] = "EXTRACT_GAS",
+    [GetSpellInfo(131476)] = "FISHING",
+    [GetSpellInfo(2366)] = "HERB_GATHERING",
+    [GetSpellInfo(51005)] = "MILLING",
+    [GetSpellInfo(605)] = "MIND_CONTROL",
+    [GetSpellInfo(2575)] = "MINING",
+    [GetSpellInfo(3365)] = "OPENING",
+    [GetSpellInfo(921)] = "PICK_POCKET",
+    [GetSpellInfo(31252)] = "PROSPECTING",
+    [GetSpellInfo(73979)] = "SEARCHING_FOR_ARTIFACTS",
+    [GetSpellInfo(8613)] = "SKINNING",
 }
 
 private.NON_LOOT_SPELL_LABELS = {
@@ -1250,253 +1252,254 @@ private.SPELL_FLAGS_BY_LABEL = {
 -- Faction/Reputation Data Constants.
 -----------------------------------------------------------------------
 
--- Table has: factionID, isBlacklisted, and then the returns from GetFactionInfoByID
+-- Table has: factionID, isBlacklisted, and then the table of returns from C_Reputation.GetFactionDataByID
 private.FACTION_DATA = {
-    -- Used only for private.REP_BUFFS
-    ARGENT_CRUSADE = { 1106, false, _G.GetFactionInfoByID(1106) },
-    BILGEWATER_CARTEL = { 1133, false, _G.GetFactionInfoByID(1133) },
-    CENARION_CIRCLE = { 609, false, _G.GetFactionInfoByID(609) },
-    DARKSPEAR = { 530, false, _G.GetFactionInfoByID(530) },
-    DARNASSUS = { 69, false, _G.GetFactionInfoByID(69) },
-    DRAGONMAW_CLAN = { 1172, false, _G.GetFactionInfoByID(1172) },
-    EARTHEN_RING = { 1135, false, _G.GetFactionInfoByID(1135) },
-    EBON_BLADE = { 1098, false, _G.GetFactionInfoByID(1098) },
-    EXODAR = { 930, false, _G.GetFactionInfoByID(930) },
-    GILNEAS = { 1134, false, _G.GetFactionInfoByID(1134) },
-    GNOMEREGAN = { 54, false, _G.GetFactionInfoByID(54) },
-    GUARDIANS_OF_HYJAL = { 1158, false, _G.GetFactionInfoByID(1158) },
-    GUILD = { 1168, false, _G.GetFactionInfoByID(1168) },
-    HONOR_HOLD = { 946, false, _G.GetFactionInfoByID(946) },
-    HUOJIN = { 1352, false, _G.GetFactionInfoByID(1352) },
-    IRONFORGE = { 47, false, _G.GetFactionInfoByID(47) },
-    KIRIN_TOR = { 1090, false, _G.GetFactionInfoByID(1090) },
-    ORGRIMMAR = { 76, false, _G.GetFactionInfoByID(76) },
-    RAMKAHEN = { 1173, false, _G.GetFactionInfoByID(1173) },
-    SHATAR = { 935, false, _G.GetFactionInfoByID(935) },
-    SILVERMOON = { 911, false, _G.GetFactionInfoByID(911) },
-    STORMWIND = { 72, false, _G.GetFactionInfoByID(72) },
-    THERAZANE = { 1171, false, _G.GetFactionInfoByID(1171) },
-    THRALLMAR = { 947, false, _G.GetFactionInfoByID(947) },
-    THUNDER_BLUFF = { 81, false, _G.GetFactionInfoByID(81) },
-    TUSHUI = { 1353, false, _G.GetFactionInfoByID(1353) },
-    UNDERCITY = { 68, false, _G.GetFactionInfoByID(68) },
-    WILDHAMMER_CLAN = { 1174, false, _G.GetFactionInfoByID(1174) },
-    WYRMREST_ACCORD = { 1091, false, _G.GetFactionInfoByID(1091) },
+    -- Used to determine which factions to record rep gains for and for private.REP_BUFFS
+	-- If a faction isn't in this list, the reputation gains on mob kill will not be recorded.
+    ARGENT_CRUSADE = { 1106, false, GetFactionDataByID(1106) },
+    BILGEWATER_CARTEL = { 1133, false, GetFactionDataByID(1133) },
+    CENARION_CIRCLE = { 609, false, GetFactionDataByID(609) },
+    DARKSPEAR = { 530, false, GetFactionDataByID(530) },
+    DARNASSUS = { 69, false, GetFactionDataByID(69) },
+    DRAGONMAW_CLAN = { 1172, false, GetFactionDataByID(1172) },
+    EARTHEN_RING = { 1135, false, GetFactionDataByID(1135) },
+    EBON_BLADE = { 1098, false, GetFactionDataByID(1098) },
+    EXODAR = { 930, false, GetFactionDataByID(930) },
+    GILNEAS = { 1134, false, GetFactionDataByID(1134) },
+    GNOMEREGAN = { 54, false, GetFactionDataByID(54) },
+    GUARDIANS_OF_HYJAL = { 1158, false, GetFactionDataByID(1158) },
+    GUILD = { 1168, false, GetFactionDataByID(1168) },
+    HONOR_HOLD = { 946, false, GetFactionDataByID(946) },
+    HUOJIN = { 1352, false, GetFactionDataByID(1352) },
+    IRONFORGE = { 47, false, GetFactionDataByID(47) },
+    KIRIN_TOR = { 1090, false, GetFactionDataByID(1090) },
+    ORGRIMMAR = { 76, false, GetFactionDataByID(76) },
+    RAMKAHEN = { 1173, false, GetFactionDataByID(1173) },
+    SHATAR = { 935, false, GetFactionDataByID(935) },
+    SILVERMOON = { 911, false, GetFactionDataByID(911) },
+    STORMWIND = { 72, false, GetFactionDataByID(72) },
+    THERAZANE = { 1171, false, GetFactionDataByID(1171) },
+    THRALLMAR = { 947, false, GetFactionDataByID(947) },
+    THUNDER_BLUFF = { 81, false, GetFactionDataByID(81) },
+    TUSHUI = { 1353, false, GetFactionDataByID(1353) },
+    UNDERCITY = { 68, false, GetFactionDataByID(68) },
+    WILDHAMMER_CLAN = { 1174, false, GetFactionDataByID(1174) },
+    WYRMREST_ACCORD = { 1091, false, GetFactionDataByID(1091) },
     -- Commendation Factions
-    ANGLERS = { 1302, false, _G.GetFactionInfoByID(1302) },
-    AUGUST_CELESTIALS = { 1341, false, _G.GetFactionInfoByID(1341) },
-    DOMINANCE_OFFENSIVE = { 1375, false, _G.GetFactionInfoByID(1375) },
-    GOLDEN_LOTUS = { 1269, false, _G.GetFactionInfoByID(1269) },
-    KIRIN_TOR_OFFENSIVE = { 1387, false, _G.GetFactionInfoByID(1387) },
-    KLAXXI = { 1337, false, _G.GetFactionInfoByID(1337) },
-    LOREWALKERS = { 1345, false, _G.GetFactionInfoByID(1345) },
-    OPERATION_SHIELDWALL = { 1376, false, _G.GetFactionInfoByID(1376) },
-    ORDER_OF_THE_CLOUD_SERPENTS = { 1271, false, _G.GetFactionInfoByID(1271) },
-    SHADO_PAN = { 1270, false, _G.GetFactionInfoByID(1270) },
-    SHADO_PAN_ASSAULT = { 1435, false, _G.GetFactionInfoByID(1435) },
-    SUNREAVER_ONSLAUGHT = { 1388, false, _G.GetFactionInfoByID(1388) },
-    TILLERS = { 1272, false, _G.GetFactionInfoByID(1272) },
+    ANGLERS = { 1302, false, GetFactionDataByID(1302) },
+    AUGUST_CELESTIALS = { 1341, false, GetFactionDataByID(1341) },
+    DOMINANCE_OFFENSIVE = { 1375, false, GetFactionDataByID(1375) },
+    GOLDEN_LOTUS = { 1269, false, GetFactionDataByID(1269) },
+    KIRIN_TOR_OFFENSIVE = { 1387, false, GetFactionDataByID(1387) },
+    KLAXXI = { 1337, false, GetFactionDataByID(1337) },
+    LOREWALKERS = { 1345, false, GetFactionDataByID(1345) },
+    OPERATION_SHIELDWALL = { 1376, false, GetFactionDataByID(1376) },
+    ORDER_OF_THE_CLOUD_SERPENTS = { 1271, false, GetFactionDataByID(1271) },
+    SHADO_PAN = { 1270, false, GetFactionDataByID(1270) },
+    SHADO_PAN_ASSAULT = { 1435, false, GetFactionDataByID(1435) },
+    SUNREAVER_ONSLAUGHT = { 1388, false, GetFactionDataByID(1388) },
+    TILLERS = { 1272, false, GetFactionDataByID(1272) },
     -- Bodyguards (blacklisted)
-    DELVAR_IRONFIST = { 1733, true, _G.GetFactionInfoByID(1733) },
-    TORMMOK = { 1736, true, _G.GetFactionInfoByID(1736) },
-    TALONPRIEST_ISHAAL = { 1737, true, _G.GetFactionInfoByID(1737) },
-    DEFENDER_ILLONA = { 1738, true, _G.GetFactionInfoByID(1738) },
-    VIVIANNE = { 1739, true, _G.GetFactionInfoByID(1739) },
-    AEDA_BRIGHTDAWN = { 1740, true, _G.GetFactionInfoByID(1740) },
-    LEORAJH = { 1741, true, _G.GetFactionInfoByID(1741) },
+    DELVAR_IRONFIST = { 1733, true, GetFactionDataByID(1733) },
+    TORMMOK = { 1736, true, GetFactionDataByID(1736) },
+    TALONPRIEST_ISHAAL = { 1737, true, GetFactionDataByID(1737) },
+    DEFENDER_ILLONA = { 1738, true, GetFactionDataByID(1738) },
+    VIVIANNE = { 1739, true, GetFactionDataByID(1739) },
+    AEDA_BRIGHTDAWN = { 1740, true, GetFactionDataByID(1740) },
+    LEORAJH = { 1741, true, GetFactionDataByID(1741) },
     -- Legion reps (blacklisted because of world quests)
-    COURT_OF_FARONDIS = { 1900, true, _G.GetFactionInfoByID(1900) },
-    DREAMWEAVERS = { 1883, true, _G.GetFactionInfoByID(1883) },
-    HIGHMOUNTAIN_TRIBE = { 1828, true, _G.GetFactionInfoByID(1828) },
-    NIGHTFALLEN = { 1859, true, _G.GetFactionInfoByID(1859) },
-    VALARJAR = { 1948, true, _G.GetFactionInfoByID(1948) },
-    WARDENS = { 1894, true, _G.GetFactionInfoByID(1894) },
-    ARMIES_OF_LEGIONFALL = { 2045, true, _G.GetFactionInfoByID(2045) },
-    ARMY_OF_THE_LIGHT = { 2165, true, _G.GetFactionInfoByID(2165) },
-    ARGUSSIAN_REACH = { 2170, true, _G.GetFactionInfoByID(2170) },
+    COURT_OF_FARONDIS = { 1900, true, GetFactionDataByID(1900) },
+    DREAMWEAVERS = { 1883, true, GetFactionDataByID(1883) },
+    HIGHMOUNTAIN_TRIBE = { 1828, true, GetFactionDataByID(1828) },
+    NIGHTFALLEN = { 1859, true, GetFactionDataByID(1859) },
+    VALARJAR = { 1948, true, GetFactionDataByID(1948) },
+    WARDENS = { 1894, true, GetFactionDataByID(1894) },
+    ARMIES_OF_LEGIONFALL = { 2045, true, GetFactionDataByID(2045) },
+    ARMY_OF_THE_LIGHT = { 2165, true, GetFactionDataByID(2165) },
+    ARGUSSIAN_REACH = { 2170, true, GetFactionDataByID(2170) },
     -- BFA reps (blacklisted because of world quests)
-    ZANDALARI_EMPIRE = { 2103, true, _G.GetFactionInfoByID(2103) },
-    PROUDMOORE_ADMIRALITY = { 2160, true, _G.GetFactionInfoByID(2160) },
-    TALNAJIS_EXPEDITION = { 2156, true, _G.GetFactionInfoByID(2156) },
-    ORDER_OF_EMBERS = { 2161, true, _G.GetFactionInfoByID(2161) },
-    VOLDUNAI = { 2158, true, _G.GetFactionInfoByID(2158) },
-    STORMS_WAKE = { 2162, true, _G.GetFactionInfoByID(2162) },
-    THE_HONORBOUND = { 2157, true, _G.GetFactionInfoByID(2157) },
-    SEVENTH_LEGION = { 2159, true, _G.GetFactionInfoByID(2159) },
-    CHAMPIONS_OF_AZEROTH = { 2164, true, _G.GetFactionInfoByID(2164) },
-    TORTOLLAN_SEEKERS = { 2163, true, _G.GetFactionInfoByID(2163) },
+    ZANDALARI_EMPIRE = { 2103, true, GetFactionDataByID(2103) },
+    PROUDMOORE_ADMIRALITY = { 2160, true, GetFactionDataByID(2160) },
+    TALNAJIS_EXPEDITION = { 2156, true, GetFactionDataByID(2156) },
+    ORDER_OF_EMBERS = { 2161, true, GetFactionDataByID(2161) },
+    VOLDUNAI = { 2158, true, GetFactionDataByID(2158) },
+    STORMS_WAKE = { 2162, true, GetFactionDataByID(2162) },
+    THE_HONORBOUND = { 2157, true, GetFactionDataByID(2157) },
+    SEVENTH_LEGION = { 2159, true, GetFactionDataByID(2159) },
+    CHAMPIONS_OF_AZEROTH = { 2164, true, GetFactionDataByID(2164) },
+    TORTOLLAN_SEEKERS = { 2163, true, GetFactionDataByID(2163) },
 }
 
 private.REP_BUFFS = {
     -- Tabard Buffs (they screw up everything, so blacklist)
-    [_G.GetSpellInfo(93830)] = { -- BILGEWATER CARTEL TABARD
-        faction = private.FACTION_DATA.BILGEWATER_CARTEL[3],
+    [GetSpellInfo(93830)] = { -- BILGEWATER CARTEL TABARD
+        faction = private.FACTION_DATA.BILGEWATER_CARTEL[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93827)] = { -- DARKSPEAR TABARD
-        faction = private.FACTION_DATA.DARKSPEAR[3],
+    [GetSpellInfo(93827)] = { -- DARKSPEAR TABARD
+        faction = private.FACTION_DATA.DARKSPEAR[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93806)] = { -- DARNASSUS TABARD
-        faction = private.FACTION_DATA.DARNASSUS[3],
+    [GetSpellInfo(93806)] = { -- DARNASSUS TABARD
+        faction = private.FACTION_DATA.DARNASSUS[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93811)] = { -- EXODAR TABARD
-        faction = private.FACTION_DATA.EXODAR[3],
+    [GetSpellInfo(93811)] = { -- EXODAR TABARD
+        faction = private.FACTION_DATA.EXODAR[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93816)] = { -- GILNEAS TABARD
-        faction = private.FACTION_DATA.GILNEAS[3],
+    [GetSpellInfo(93816)] = { -- GILNEAS TABARD
+        faction = private.FACTION_DATA.GILNEAS[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93821)] = { -- GNOMEREGAN TABARD
-        faction = private.FACTION_DATA.GNOMEREGAN[3],
+    [GetSpellInfo(93821)] = { -- GNOMEREGAN TABARD
+        faction = private.FACTION_DATA.GNOMEREGAN[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(126436)] = { -- HUOJIN TABARD
-        faction = private.FACTION_DATA.HUOJIN[3],
+    [GetSpellInfo(126436)] = { -- HUOJIN TABARD
+        faction = private.FACTION_DATA.HUOJIN[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(97340)] = { -- ILLUSTRIOUS GUILD TABARD
-        faction = private.FACTION_DATA.GUILD[3],
+    [GetSpellInfo(97340)] = { -- ILLUSTRIOUS GUILD TABARD
+        faction = private.FACTION_DATA.GUILD[1],
         modifier = 1,
     },
-    [_G.GetSpellInfo(93805)] = { -- IRONFORGE TABARD
-        faction = private.FACTION_DATA.IRONFORGE[3],
+    [GetSpellInfo(93805)] = { -- IRONFORGE TABARD
+        faction = private.FACTION_DATA.IRONFORGE[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93825)] = { -- ORGRIMMAR TABARD
-        faction = private.FACTION_DATA.ORGRIMMAR[3],
+    [GetSpellInfo(93825)] = { -- ORGRIMMAR TABARD
+        faction = private.FACTION_DATA.ORGRIMMAR[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(97341)] = { -- RENOWNED GUILD TABARD
-        faction = private.FACTION_DATA.GUILD[3],
+    [GetSpellInfo(97341)] = { -- RENOWNED GUILD TABARD
+        faction = private.FACTION_DATA.GUILD[1],
         modifier = 0.5,
     },
-    [_G.GetSpellInfo(93828)] = { -- SILVERMOON CITY TABARD
-        faction = private.FACTION_DATA.SILVERMOON[3],
+    [GetSpellInfo(93828)] = { -- SILVERMOON CITY TABARD
+        faction = private.FACTION_DATA.SILVERMOON[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93795)] = { -- STORMWIND TABARD
-        faction = private.FACTION_DATA.STORMWIND[3],
+    [GetSpellInfo(93795)] = { -- STORMWIND TABARD
+        faction = private.FACTION_DATA.STORMWIND[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93337)] = { -- TABARD OF RAMKAHEN
-        faction = private.FACTION_DATA.RAMKAHEN[3],
+    [GetSpellInfo(93337)] = { -- TABARD OF RAMKAHEN
+        faction = private.FACTION_DATA.RAMKAHEN[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(57819)] = { -- TABARD OF THE ARGENT CRUSADE
-        faction = private.FACTION_DATA.ARGENT_CRUSADE[3],
+    [GetSpellInfo(57819)] = { -- TABARD OF THE ARGENT CRUSADE
+        faction = private.FACTION_DATA.ARGENT_CRUSADE[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(94158)] = { -- TABARD OF THE DRAGONMAW CLAN
-        faction = private.FACTION_DATA.DRAGONMAW_CLAN[3],
+    [GetSpellInfo(94158)] = { -- TABARD OF THE DRAGONMAW CLAN
+        faction = private.FACTION_DATA.DRAGONMAW_CLAN[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93339)] = { -- TABARD OF THE EARTHEN RING
-        faction = private.FACTION_DATA.EARTHEN_RING[3],
+    [GetSpellInfo(93339)] = { -- TABARD OF THE EARTHEN RING
+        faction = private.FACTION_DATA.EARTHEN_RING[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(57820)] = { -- TABARD OF THE EBON BLADE
-        faction = private.FACTION_DATA.EBON_BLADE[3],
+    [GetSpellInfo(57820)] = { -- TABARD OF THE EBON BLADE
+        faction = private.FACTION_DATA.EBON_BLADE[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93341)] = { -- TABARD OF THE GUARDIANS OF HYJAL
-        faction = private.FACTION_DATA.GUARDIANS_OF_HYJAL[3],
+    [GetSpellInfo(93341)] = { -- TABARD OF THE GUARDIANS OF HYJAL
+        faction = private.FACTION_DATA.GUARDIANS_OF_HYJAL[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(57821)] = { -- TABARD OF THE KIRIN TOR
-        faction = private.FACTION_DATA.KIRIN_TOR[3],
+    [GetSpellInfo(57821)] = { -- TABARD OF THE KIRIN TOR
+        faction = private.FACTION_DATA.KIRIN_TOR[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93368)] = { -- TABARD OF THE WILDHAMMER CLAN
-        faction = private.FACTION_DATA.WILDHAMMER_CLAN[3],
+    [GetSpellInfo(93368)] = { -- TABARD OF THE WILDHAMMER CLAN
+        faction = private.FACTION_DATA.WILDHAMMER_CLAN[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(57822)] = { -- TABARD OF THE WYRMREST ACCORD
-        faction = private.FACTION_DATA.WYRMREST_ACCORD[3],
+    [GetSpellInfo(57822)] = { -- TABARD OF THE WYRMREST ACCORD
+        faction = private.FACTION_DATA.WYRMREST_ACCORD[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(93347)] = { -- TABARD OF THERAZANE
-        faction = private.FACTION_DATA.THERAZANE[3],
+    [GetSpellInfo(93347)] = { -- TABARD OF THERAZANE
+        faction = private.FACTION_DATA.THERAZANE[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(94463)] = { -- THUNDERBLUFF TABARD
-        faction = private.FACTION_DATA.THUNDER_BLUFF[3],
+    [GetSpellInfo(94463)] = { -- THUNDERBLUFF TABARD
+        faction = private.FACTION_DATA.THUNDER_BLUFF[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(126434)] = { -- TUSHUI TABARD
-        faction = private.FACTION_DATA.TUSHUI[3],
+    [GetSpellInfo(126434)] = { -- TUSHUI TABARD
+        faction = private.FACTION_DATA.TUSHUI[1],
         ignore = true,
     },
-    [_G.GetSpellInfo(94462)] = { -- UNDERCITY TABARD
-        faction = private.FACTION_DATA.UNDERCITY[3],
+    [GetSpellInfo(94462)] = { -- UNDERCITY TABARD
+        faction = private.FACTION_DATA.UNDERCITY[1],
         ignore = true,
     },
 
     -- Banner Buffs (can't tell the different levels of them apart via ingame API, so blacklist)
-    [_G.GetSpellInfo(90216)] = { -- ALLIANCE GUILD STANDARD
+    [GetSpellInfo(90216)] = { -- ALLIANCE GUILD STANDARD
         ignore = true,
     },
-    [_G.GetSpellInfo(90708)] = { -- HORDE GUILD STANDARD
+    [GetSpellInfo(90708)] = { -- HORDE GUILD STANDARD
         ignore = true,
     },
 
     -- Holiday Buffs
-    [_G.GetSpellInfo(136583)] = { -- DARKMOON TOP HAT
+    [GetSpellInfo(136583)] = { -- DARKMOON TOP HAT
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(24705)] = { -- GRIM VISAGE
+    [GetSpellInfo(24705)] = { -- GRIM VISAGE
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(61849)] = { -- SPIRIT OF SHARING
+    [GetSpellInfo(61849)] = { -- SPIRIT OF SHARING
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(95987)] = { -- UNBURDENED
+    [GetSpellInfo(95987)] = { -- UNBURDENED
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(46668)] = { -- WHEE!
+    [GetSpellInfo(46668)] = { -- WHEE!
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(100951)] = { -- WOW 8TH ANNIVERSARY
+    [GetSpellInfo(100951)] = { -- WOW 8TH ANNIVERSARY
         modifier = 0.08,
     },
-    [_G.GetSpellInfo(132700)] = { -- WOW 9TH ANNIVERSARY
+    [GetSpellInfo(132700)] = { -- WOW 9TH ANNIVERSARY
         modifier = 0.09,
     },
-    [_G.GetSpellInfo(150986)] = { -- WOW 10TH ANNIVERSARY
+    [GetSpellInfo(150986)] = { -- WOW 10TH ANNIVERSARY
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(188454)] = { -- WOW 11TH ANNIVERSARY
+    [GetSpellInfo(188454)] = { -- WOW 11TH ANNIVERSARY
         modifier = 0.11,
     },
-    [_G.GetSpellInfo(219159)] = { -- WOW 12TH ANNIVERSARY
+    [GetSpellInfo(219159)] = { -- WOW 12TH ANNIVERSARY
         modifier = 0.12,
     },
 
     -- Situational Buffs
-    [_G.GetSpellInfo(39953)] = { -- ADALS SONG OF BATTLE
-        faction = private.FACTION_DATA.SHATAR[3],
+    [GetSpellInfo(39953)] = { -- ADALS SONG OF BATTLE
+        faction = private.FACTION_DATA.SHATAR[1],
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(30754)] = { -- CENARION FAVOR
-        faction = private.FACTION_DATA.CENARION_CIRCLE[3],
+    [GetSpellInfo(30754)] = { -- CENARION FAVOR
+        faction = private.FACTION_DATA.CENARION_CIRCLE[1],
         modifier = 0.25,
     },
-    [_G.GetSpellInfo(32098)] = { -- HONOR HOLD FAVOR
-        faction = private.FACTION_DATA.HONOR_HOLD[3],
+    [GetSpellInfo(32098)] = { -- HONOR HOLD FAVOR
+        faction = private.FACTION_DATA.HONOR_HOLD[1],
         modifier = 0.25,
     },
-    [_G.GetSpellInfo(39913)] = { -- NAZGRELS FERVOR
-        faction = private.FACTION_DATA.THRALLMAR[3],
+    [GetSpellInfo(39913)] = { -- NAZGRELS FERVOR
+        faction = private.FACTION_DATA.THRALLMAR[1],
         modifier = 0.1,
     },
-    [_G.GetSpellInfo(32096)] = { -- THRALLMARS FAVOR
-        faction = private.FACTION_DATA.THRALLMAR[3],
+    [GetSpellInfo(32096)] = { -- THRALLMARS FAVOR
+        faction = private.FACTION_DATA.THRALLMAR[1],
         modifier = 0.25,
     },
-    [_G.GetSpellInfo(39911)] = { -- TROLLBANES COMMAND
-        faction = private.FACTION_DATA.HONOR_HOLD[3],
+    [GetSpellInfo(39911)] = { -- TROLLBANES COMMAND
+        faction = private.FACTION_DATA.HONOR_HOLD[1],
         modifier = 0.1,
     },
 }

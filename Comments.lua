@@ -196,19 +196,19 @@ do
 end -- do-block
 
 local function CreateQuestComment()
-    local index = _G.GetQuestLogSelection()
+    local index = _G.C_QuestLog.GetSelectedQuest()
 
     if not index or not _G.QuestMapFrame:IsVisible() then
         WDP:Print("You must select a quest from the World Map's Quest frame.")
         return
     end
-    local title, _, _, is_header, _, _, _, idnum = _G.GetQuestLogTitle(index)
+    local info = _G.C_QuestLog.GetInfo(index)
 
-    if is_header then
+    if not info or info.isHeader then
         WDP:Print("You must select a quest from the World Map's Quest frame.")
         return
     end
-    NewComment("QUEST", title, idnum)
+    NewComment("QUEST", info.title, info.questID)
 end
 
 local function CreateAchievementComment()
@@ -360,13 +360,13 @@ do
             display:SetLineScript(line, "OnMouseUp", CreateComment, CreateItemComment)
         end
 
-        local quest_index = _G.GetQuestLogSelection()
+        local quest_index = _G.C_QuestLog.GetSelectedQuest()
 
         if quest_index and _G.QuestMapFrame:IsVisible() and not _G.QuestScrollFrame:IsVisible() then
-            local title, _, _, is_header = _G.GetQuestLogTitle(quest_index)
+            local info = _G.C_QuestLog.GetInfo(quest_index)
 
-            if not is_header then
-                line = display:AddLine(("Quest: %s"):format(title))
+            if info and not info.isHeader then
+                line = display:AddLine(("Quest: %s"):format(info.title))
                 display:SetLineScript(line, "OnMouseUp", CreateComment, CreateQuestComment)
             end
         end
@@ -500,7 +500,7 @@ function private.InitializeCommentSystem()
 
     panel.scroll_frame = scroll_frame
 
-    local edit_container = _G.CreateFrame("Frame", nil, scroll_frame)
+    local edit_container = _G.CreateFrame("Frame", nil, scroll_frame, BackdropTemplateMixin and "BackdropTemplate")
     edit_container:SetPoint("TOPLEFT", scroll_frame, -7, 7)
     edit_container:SetPoint("BOTTOMRIGHT", scroll_frame, 7, -7)
     edit_container:SetFrameLevel(scroll_frame:GetFrameLevel() - 1)
@@ -520,6 +520,7 @@ function private.InitializeCommentSystem()
 
     edit_container:SetBackdropBorderColor(_G.TOOLTIP_DEFAULT_COLOR.r, _G.TOOLTIP_DEFAULT_COLOR.g, _G.TOOLTIP_DEFAULT_COLOR.b)
     edit_container:SetBackdropColor(0, 0, 0)
+	edit_container:ApplyBackdrop()
 
     local link_button = _G.CreateFrame("Button", "$parentLinkButton", panel)
     link_button:SetSize(32, 16)
@@ -641,7 +642,7 @@ function private.InitializeCommentSystem()
     --    private.data_obj = data_obj
     --    LibStub("LibDBIcon-1.0"):Register(ADDON_NAME, data_obj, private.db.global.config.minimap_icon)
 
-    _G.GameTooltip:HookScript("OnTooltipSetItem", function(self)
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(self)
     end)
 
     _G["BINDING_HEADER_WOWDB_PROFILER"] = "WoWDB Profiler"

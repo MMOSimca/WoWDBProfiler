@@ -16,6 +16,7 @@ local type = _G.type
 local unpack = _G.unpack
 
 local C_Timer = _G.C_Timer
+local C_Spell = _G.C_Spell
 local GetCurrencyInfo = _G.GetCurrencyInfo
 
 
@@ -48,9 +49,9 @@ local DELAY_UPDATE_TARGET_LOCATION = 0.5
 
 local ITEM_ID_TIMBER = 114781
 
-local LOOT_SLOT_CURRENCY = _G.LOOT_SLOT_CURRENCY
-local LOOT_SLOT_ITEM = _G.LOOT_SLOT_ITEM
-local LOOT_SLOT_MONEY = _G.LOOT_SLOT_MONEY
+local ENUM_LOOTSLOTTYPE_CURRENCY = _G.Enum.LootSlotType.Currency
+local ENUM_LOOTSLOTTYPE_ITEM = _G.Enum.LootSlotType.Item
+local ENUM_LOOTSLOTTYPE_MONEY = _G.Enum.LootSlotType.Money
 
 --local LOOT_SOURCE_ID_UNKNOWN = 1 -- Technically unused right now, but has future use potential
 --local LOOT_SOURCE_ID_REDUNDANT = 3 -- Technically unused right now, but has future use potential
@@ -112,7 +113,7 @@ local EVENT_MAPPING = {
     CHAT_MSG_SYSTEM = true,
     COMBAT_LOG_EVENT_UNFILTERED = true,
     COMBAT_TEXT_UPDATE = true,
-    CURSOR_UPDATE = true,
+    WORLD_CURSOR_TOOLTIP_UPDATE = true,
     GARRISON_MISSION_NPC_CLOSED = "ResumeChatLootRecording",
     GARRISON_MISSION_NPC_OPENED = "StopChatLootRecording",
     GARRISON_SHIPYARD_NPC_CLOSED = "ResumeChatLootRecording",
@@ -125,7 +126,6 @@ local EVENT_MAPPING = {
     ISLAND_AZERITE_GAIN = true,
     ISLAND_COMPLETED = true,
     ITEM_TEXT_BEGIN = true,
-    ITEM_UPGRADE_MASTER_OPENED = true,
     LOOT_CLOSED = true,
     LOOT_OPENED = true,
     LOOT_SLOT_CLEARED = "HandleBadChatLootData",
@@ -148,10 +148,9 @@ local EVENT_MAPPING = {
     TAXIMAP_OPENED = true,
     TRADE_CLOSED = "ResumeChatLootRecording",
     TRADE_SHOW = "StopChatLootRecording",
-    TRADE_SKILL_SHOW = true,
-    TRAINER_CLOSED = true,
-    TRAINER_SHOW = true,
-    TRANSMOGRIFY_OPEN = true,
+    --TRADE_SKILL_SHOW = true,
+    --TRAINER_CLOSED = true,
+    --TRAINER_SHOW = true,
     UNIT_PET = true,
     UNIT_QUEST_LOG_CHANGED = true,
     UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
@@ -159,7 +158,7 @@ local EVENT_MAPPING = {
     UNIT_SPELLCAST_INTERRUPTED = "HandleSpellFailure",
     UNIT_SPELLCAST_SENT = true,
     UNIT_SPELLCAST_SUCCEEDED = true,
-    VOID_STORAGE_OPEN = true,
+    PLAYER_INTERACTION_MANAGER_FRAME_SHOW = true,
 }
 
 
@@ -556,8 +555,8 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 
     if not bag_index or not slot_index then
         for new_bag_index = 0, _G.NUM_BAG_FRAMES do
-            for new_slot_index = 1, _G.GetContainerNumSlots(new_bag_index) do
-                if item_id == ItemLinkToID(_G.GetContainerItemLink(new_bag_index, new_slot_index)) then
+            for new_slot_index = 1, _G.C_Container.GetContainerNumSlots(new_bag_index) do
+                if item_id == ItemLinkToID(_G.C_Container.GetContainerItemLink(new_bag_index, new_slot_index)) then
                     bag_index = new_bag_index
                     slot_index = new_slot_index
                     break
@@ -570,7 +569,7 @@ local function HandleItemUse(item_link, bag_index, slot_index)
 
     -- Check if Blizzard has marked this item as officially having a chance of containing loot
     if bag_index and slot_index then
-        local _, _, _, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
+        local _, _, _, _, _, is_lootable = _G.C_Container.GetContainerItemInfo(bag_index, slot_index)
         if is_lootable then
             any_loot = true
         end
@@ -637,13 +636,15 @@ do
 
     function UpdateFactionData()
         for faction_index = 1, MAX_FACTION_INDEX do
-            local faction_name, _, current_standing, _, _, _, _, _, is_header = _G.GetFactionInfo(faction_index)
+            local faction_table = _G.C_Reputation.GetFactionDataByIndex(faction_index)
 
-            if faction_name then
-                faction_standings[faction_name] = STANDING_NAMES[current_standing]
-            elseif not faction_name then
-                break
-            end
+			if faction_table then
+				if faction_table.name then
+					faction_standings[faction_table.name] = STANDING_NAMES[faction_table.currentStanding]
+				elseif not faction_table.name then
+					break
+				end
+			end
         end
     end
 end -- do-block
@@ -965,11 +966,11 @@ function WDP:OnEnable()
     target_location_timer_handle = C_Timer.NewTicker(DELAY_UPDATE_TARGET_LOCATION, WDP.UpdateTargetLocation, nil)
     world_quest_timer_handle = C_Timer.NewTicker(DELAY_PROCESS_WORLD_QUESTS, WDP.ProcessWorldQuests, nil)
 
-    _G.hooksecurefunc("UseContainerItem", function(bag_index, slot_index, target_unit)
+    _G.hooksecurefunc(C_Container, "UseContainerItem", function(bag_index, slot_index, target_unit)
         if target_unit then
             return
         end
-        HandleItemUse(_G.GetContainerItemLink(bag_index, slot_index), bag_index, slot_index)
+        HandleItemUse(_G.C_Container.GetContainerItemLink(bag_index, slot_index), bag_index, slot_index)
     end)
 
     _G.hooksecurefunc("UseItemByName", function(identifier, target_unit)
@@ -1177,12 +1178,12 @@ function WDP:ProcessItems()
     end
 
     for bag_index = 0, _G.NUM_BAG_SLOTS do
-        for slot_index = 1, _G.GetContainerNumSlots(bag_index) do
-            local item_id = _G.GetContainerItemID(bag_index, slot_index)
+        for slot_index = 1, _G.C_Container.GetContainerNumSlots(bag_index) do
+            local item_id = _G.C_Container.GetContainerItemID(bag_index, slot_index)
 
             if item_id and item_id > 0 then
-                local _, max_durability = _G.GetContainerItemDurability(bag_index, slot_index)
-                RecordItemData(item_id, _G.GetContainerItemLink(bag_index, slot_index), false, max_durability)
+                local _, max_durability = _G.C_Container.GetContainerItemDurability(bag_index, slot_index)
+                RecordItemData(item_id, _G.C_Container.GetContainerItemLink(bag_index, slot_index), false, max_durability)
             end
         end
     end
@@ -1940,7 +1941,7 @@ do
         -- Determine faction ID
         local faction_ID
         for pseudo_faction_name, faction_data_table in pairs(private.FACTION_DATA) do
-            if faction_name == faction_data_table[3] then
+            if faction_data_table[3] and faction_data_table[3].currentStanding and faction_name == faction_data_table[3].currentStanding then
                 -- Check ignore flag
                 if faction_data_table[2] then
                     return
@@ -1951,8 +1952,8 @@ do
         end
         if faction_ID and faction_ID > 0 then
             -- Check for modifiers from Commendations (applied directly to the faction, account-wide)
-            local _, _, _, _, _, _, _, _, _, _, _, _, _, _, has_bonus_rep_gain = GetFactionInfoByID(faction_ID)
-            if has_bonus_rep_gain then
+            local factionReturn = _G.C_Reputation.GetFactionDataByID(faction_ID)
+            if factionReturn and factionReturn.hasBonusRepGain then
                 modifier = modifier + 1
             end
         end
@@ -1980,7 +1981,7 @@ do
 end -- do-block
 
 
-function WDP:CURSOR_UPDATE(event_name)
+function WDP:WORLD_CURSOR_TOOLTIP_UPDATE(event_name, is_shown)
     if current_action.fishing_target or _G.Minimap:IsMouseOver() then
         return
     end
@@ -2018,11 +2019,11 @@ do
             local locked_item_id
 
             for bag_index = 0, _G.NUM_BAG_FRAMES do
-                for slot_index = 1, _G.GetContainerNumSlots(bag_index) do
-                    local _, _, is_locked, _, _, is_lootable = _G.GetContainerItemInfo(bag_index, slot_index)
+                for slot_index = 1, _G.C_Container.GetContainerNumSlots(bag_index) do
+                    local _, _, is_locked, _, _, is_lootable = _G.C_Container.GetContainerItemInfo(bag_index, slot_index)
 
                     if is_locked and is_lootable then
-                        locked_item_id = ItemLinkToID(_G.GetContainerItemLink(bag_index, slot_index))
+                        locked_item_id = ItemLinkToID(_G.C_Container.GetContainerItemLink(bag_index, slot_index))
                         break
                     end
                 end
@@ -2292,7 +2293,7 @@ do
         loot_guid_registry[current_loot.label] = loot_guid_registry[current_loot.label] or {}
 
         for loot_slot = 1, _G.GetNumLootItems() do
-            local texture_filedata_id, item_text, slot_quantity, quality, locked = _G.GetLootSlotInfo(loot_slot)
+            local texture_filedata_id, item_text, slot_quantity, _, locked = _G.GetLootSlotInfo(loot_slot)
             local slot_type = _G.GetLootSlotType(loot_slot)
             local loot_info = { _G.GetLootSourceInfo(loot_slot) }
             local loot_link = _G.GetLootSlotLink(loot_slot)
@@ -2312,7 +2313,7 @@ do
                         local source_type, source_id = ParseGUID(source_guid)
                         local source_key = ("%s:%d"):format(source_type, source_id)
 
-                        if slot_type == LOOT_SLOT_ITEM then
+                        if slot_type == ENUM_LOOTSLOTTYPE_ITEM then
                             if loot_link then
                                 local item_id = ItemLinkToID(loot_link)
                                 Debug("GUID: %s - Type:ID: %s - ItemID: %d - Amount: %d (%d)", loot_info[loot_index], source_key, item_id, loot_info[loot_index + 1], slot_quantity)
@@ -2322,7 +2323,7 @@ do
                             else
                                 Debug("%s: Loot link is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
                             end
-                        elseif slot_type == LOOT_SLOT_MONEY then
+                        elseif slot_type == ENUM_LOOTSLOTTYPE_MONEY then
                             Debug("GUID: %s - Type:ID: %s - Money - Amount: %d (%d)", loot_info[loot_index], source_key, loot_info[loot_index + 1], slot_quantity)
                             if current_loot.target_type == AF.ZONE then
                                 table.insert(current_loot.list, ("money:%d"):format(loot_quantity))
@@ -2331,7 +2332,7 @@ do
                                 current_loot.sources[source_guid]["money"] = (current_loot.sources[source_guid]["money"] or 0) + loot_quantity
                                 guids_used[source_guid] = true
                             end
-                        elseif slot_type == LOOT_SLOT_CURRENCY then
+                        elseif slot_type == ENUM_LOOTSLOTTYPE_CURRENCY then
                             -- Same bug with GetLootSlotInfo() will screw up currency when it happens, so we won't process this slot's loot.
                             if loot_link then
                                 local currency_id = CurrencyLinkToID(loot_link)
@@ -2348,6 +2349,8 @@ do
                             else
                                 Debug("%s: Loot link is nil for loot slot %d of the entity with GUID %s and Type:ID: %s.", event_name, loot_slot, loot_info[loot_index], source_key)
                             end
+						else
+                            Debug("Unknown LootSlotType %d. GUID: %s - Type:ID: %s - Loot Slot: %d - Loot Link: %s", slot_type, loot_info[loot_index], source_key, loot_slot, loot_link or "")
                         end
                     else
                         -- If this is nil, then the item's quantity could be wrong if loot_quantity is wrong, so we won't process this slot's loot.
@@ -2499,22 +2502,24 @@ do
                         -- The third return (Blizz calls "currency_link") of GetMerchantItemCostItem only returns item links as of Patch 5.3.0.
                         local texture_id, amount_required, hyperlink, name = _G.GetMerchantItemCostItem(item_index, cost_index)
 
-                        -- Try to get item ID
-                        local item_id = ItemLinkToID(hyperlink)
+						if hyperlink then 
+							-- Try to get item ID
+							local item_id = ItemLinkToID(hyperlink)
 
-                        -- FUTURE: At some point, we should make the output from these two cases (item_id vs currency_id) slightly different, so that WoWDB doesn't have to guess if it is a currency or item
-                        -- Handle cases when the additional cost is another item
-                        if item_id and item_id > 0 then
-                            currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, item_id)
-                        else
-                            -- Try to get currency ID
-                            local currency_id = CurrencyLinkToID(hyperlink)
-                            if currency_id and currency_id > 0 then
-                                currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
-                            else
-                                Debug("UpdateMerchantItems: Failed to get item ID and failed to get currency ID for item index %d and cost index %d", item_index, cost_index)
-                            end
-                        end
+							-- FUTURE: At some point, we should make the output from these two cases (item_id vs currency_id) slightly different, so that WoWDB doesn't have to guess if it is a currency or item
+							-- Handle cases when the additional cost is another item
+							if item_id and item_id > 0 then
+								currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, item_id)
+							else
+								-- Try to get currency ID
+								local currency_id = CurrencyLinkToID(hyperlink)
+								if currency_id and currency_id > 0 then
+									currency_list[#currency_list + 1] = ("(%s:%d)"):format(amount_required, currency_id)
+								else
+									Debug("UpdateMerchantItems: Failed to get item ID and failed to get currency ID for item index %d and cost index %d with hyperlink %s", item_index, cost_index, hyperlink)
+								end
+							end
+						end
                     end
 
                     for currency_index = 1, #currency_list do
@@ -2651,26 +2656,26 @@ end -- do-block
 
 
 function WDP:QUEST_LOG_UPDATE(event_name)
-    local selected_quest = _G.GetQuestLogSelection() -- Save current selection to be restored when we're done.
+    local selected_quest = _G.C_QuestLog.GetSelectedQuest() -- Save current selection to be restored when we're done.
     local entry_index, processed_quests = 1, 0
-    local _, num_quests = _G.GetNumQuestLogEntries()
+    local _, num_quests = _G.C_QuestLog.GetNumQuestLogEntries()
 
     while processed_quests <= num_quests do
-        local _, _, _, is_header, _, _, _, quest_id = _G.GetQuestLogTitle(entry_index)
+        local info = _G.C_QuestLog.GetInfo(entry_index)
 
-        if quest_id == 0 then
+        if info.questID == 0 then
             processed_quests = processed_quests + 1
-        elseif not is_header then
-            _G.SelectQuestLogEntry(entry_index);
+        elseif not info.isHeader then
+            _G.C_QuestLog.SetSelectedQuest(entry_index);
 
-            local quest = DBEntry("quests", quest_id)
+            local quest = DBEntry("quests", info.questID)
             quest.timer = _G.GetQuestLogTimeLeft()
-            quest.can_share = _G.GetQuestLogPushable() and true or nil
+            quest.can_share = _G.C_QuestLog.IsPushableQuest(info.questID) and true or nil
             processed_quests = processed_quests + 1
         end
         entry_index = entry_index + 1
     end
-    _G.SelectQuestLogEntry(selected_quest)
+    _G.C_QuestLog.SetSelectedQuest(selected_quest)
     self:UnregisterEvent("QUEST_LOG_UPDATE")
 end
 
@@ -2691,6 +2696,8 @@ function WDP:UNIT_QUEST_LOG_CHANGED(event_name, unit_id)
 end
 
 
+-- This functionality is broken and should be rethought entirely in the wake of 10.0
+--[[
 do
     local TRADESKILL_TOOLS = {
         Anvil = anvil_spell_ids,
@@ -2788,6 +2795,7 @@ function WDP:TRAINER_SHOW(event_name)
     _G.SetTrainerServiceTypeFilter("unavailable", unavailable or 0)
     _G.SetTrainerServiceTypeFilter("used", used or 0)
 end
+]]--
 
 
 function WDP:UNIT_SPELLCAST_SENT(event_name, unit_id, spell_name, spell_rank, target_name, spell_line)
@@ -3009,6 +3017,7 @@ do
     end
 
 
+	-- manager_frame_id is 4 in case we need to merge this into that event
     function WDP:BANKFRAME_OPENED(event_name)
         WDP:StopChatLootRecording(event_name)
         SetUnitField("banker", private.UNIT_TYPES.NPC)
@@ -3022,7 +3031,7 @@ do
 
     local GOSSIP_SHOW_FUNCS = {
         [private.UNIT_TYPES.NPC] = function(unit_idnum)
-            local gossip_options = { _G.GetGossipOptions() }
+            local gossip_options = { _G.C_GossipInfo.GetOptions() }
 
             for index = 2, #gossip_options, 2 do
                 if gossip_options[index] == "binder" then
@@ -3037,6 +3046,7 @@ do
     }
 
 
+	-- manager_frame_id is 3 in case we need to merge this into that event
     function WDP:GOSSIP_SHOW(event_name)
         WDP:StopChatLootRecording(event_name)
         local unit_type, unit_idnum = ParseGUID(_G.UnitGUID("npc"))
@@ -3050,28 +3060,30 @@ do
     end
 
 
+	-- manager_frame_id is 10 in case we need to merge this into that event
     function WDP:GUILDBANKFRAME_OPENED(event_name)
         WDP:StopChatLootRecording(event_name)
         SetUnitField("guild_bank", private.UNIT_TYPES.OBJECT)
     end
 
 
-    function WDP:ITEM_UPGRADE_MASTER_OPENED(event_name)
-        SetUnitField("item_upgrade_master", private.UNIT_TYPES.NPC)
-    end
-
-
+	-- manager_frame_id is 6 in case we need to merge this into that event
     function WDP:TAXIMAP_OPENED(event_name)
         SetUnitField("flight_master", private.UNIT_TYPES.NPC)
     end
 
 
-    function WDP:TRANSMOGRIFY_OPEN(event_name)
-        SetUnitField("transmogrifier", private.UNIT_TYPES.NPC)
-    end
-
-
-    function WDP:VOID_STORAGE_OPEN(event_name)
-        SetUnitField("void_storage", private.UNIT_TYPES.NPC)
+    function WDP:PLAYER_INTERACTION_MANAGER_FRAME_SHOW(event_name, manager_frame_id)
+		if not manager_frame_id then
+			return
+		elseif manager_frame_id == 24 then
+			SetUnitField("transmogrifier", private.UNIT_TYPES.NPC)
+		elseif manager_frame_id == 26 then
+			WDP:StopChatLootRecording(event_name)
+			SetUnitField("void_storage", private.UNIT_TYPES.NPC)
+		elseif manager_frame_id == 53 then
+			WDP:StopChatLootRecording(event_name)
+			SetUnitField("item_upgrade_master", private.UNIT_TYPES.NPC)
+		end
     end
 end -- do-block
