@@ -19,6 +19,9 @@ local C_Timer = _G.C_Timer
 local C_Spell = _G.C_Spell
 local GetCurrencyInfo = _G.GetCurrencyInfo
 
+local ICL = InCombatLockdown
+local III = IsInInstance
+
 
 -- ADDON NAMESPACE ----------------------------------------------------
 
@@ -1219,15 +1222,19 @@ local function TargetedNPC()
         level_data = {}
         encounter_data[npc_level] = level_data
     end
-    level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
+    
+    -- Can't do this in instances now
+    if not III() then
+        level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
 
-    -- May not capture as much data as it could, since the API changed in Legion to report multiple types of power
-    if not level_data.power then
-        local max_power = _G.UnitPowerMax("target")
+        -- May not capture as much data as it could, since the API changed in Legion to report multiple types of power
+        if not level_data.power then
+            local max_power = _G.UnitPowerMax("target")
 
-        if max_power > 0 then
-            local power_type = _G.UnitPowerType("target")
-            level_data.power = ("%s:%d"):format(private.POWER_TYPE_NAMES[tostring(power_type)] or power_type, max_power)
+            if max_power > 0 then
+                local power_type = _G.UnitPowerType("target")
+                level_data.power = ("%s:%d"):format(private.POWER_TYPE_NAMES[tostring(power_type)] or power_type, max_power)
+            end
         end
     end
     name_to_id_map[_G.UnitName("target")] = unit_idnum
