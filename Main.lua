@@ -1203,7 +1203,7 @@ local function TargetedNPC()
     npc.class = class_token
     
     -- Can't do this in instances now, at least using the current method of putting a unit on a tooltip
-    if not III() then
+    if false then
         npc.faction = UnitFactionStanding("target")
     end
     
@@ -2226,7 +2226,7 @@ do
             end
             
             -- Can't do this in instances now, at least not by tooltip unit scanning
-            if not III() then
+            if false then
                 local _, faction_standing = UnitFactionStanding("npc")
                 merchant_standing = faction_standing
             end
