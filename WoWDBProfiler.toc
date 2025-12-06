@@ -1,8 +1,12 @@
-## Interface: 110002
+## Interface: 120000, 110207
 ## Title: WoWDB Profiler
 ## Notes: WoW datamining tool.
-## Author: James D. Callahan III (Torhal)
-## X-Email: jcallahan@curse.com
+## Author: James D. Callahan III (Torhal) and Simca
+## Version: @project-version@
+## X-Category: Data Export
+## X-Date: @project-date-iso@
+## X-Localizations: enUS
+## X-Curse-Project-ID: 43270
 ## SavedVariables: WoWDBProfilerData
 ## OptionalDeps: Ace3, HereBeDragons, LibDeformat-3.0, LibDialog-1.0, LibQTip-1.0
 
