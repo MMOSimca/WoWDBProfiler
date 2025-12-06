@@ -23,5 +23,5 @@ externals:
         url: http://hg.wowace.com/wow/libdialog-1-0/mainline
         tag: latest
     Libs/LibQTip-1.0:
-        url: svn://svn.wowace.com/wow/libqtip-1-0/mainline/trunk
+        url: git://github.com/Torhal/LibQTip-1.0.git
         tag: latest
