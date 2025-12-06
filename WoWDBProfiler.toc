@@ -10,6 +10,18 @@
 ## SavedVariables: WoWDBProfilerData
 ## OptionalDeps: Ace3, HereBeDragons, LibDeformat-3.0, LibDialog-1.0, LibQTip-1.0
 
+## Category: Other
+## Category-deDE: Anderes
+## Category-esES: Otros
+## Category-esMX: Otros
+## Category-frFR: Autre
+## Category-itIT: Altro
+## Category-koKR: 기타
+## Category-ptBR: Outro
+## Category-ruRU: Другое
+## Category-zhCN: 其它
+## Category-zhTW: 其他
+
 libs.xml
 
 Constants.lua
