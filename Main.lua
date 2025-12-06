@@ -18,9 +18,7 @@ local unpack = _G.unpack
 local C_Timer = _G.C_Timer
 local C_Spell = _G.C_Spell
 local GetCurrencyInfo = _G.GetCurrencyInfo
-
-local ICL = InCombatLockdown
-local III = IsInInstance
+local IsInInstance = _G.IsInInstance
 
 
 -- ADDON NAMESPACE ----------------------------------------------------
@@ -155,6 +153,16 @@ local EVENT_MAPPING = {
     UNIT_PET = true,
     UNIT_QUEST_LOG_CHANGED = true,
     PLAYER_INTERACTION_MANAGER_FRAME_SHOW = true,
+}
+
+local TWW_ONLY_EVENT_MAPPING = {
+    COMBAT_LOG_EVENT_UNFILTERED = true,
+    COMBAT_TEXT_UPDATE = true,
+    UNIT_SPELLCAST_FAILED = "HandleSpellFailure",
+    UNIT_SPELLCAST_FAILED_QUIET = "HandleSpellFailure",
+    UNIT_SPELLCAST_INTERRUPTED = "HandleSpellFailure",
+    UNIT_SPELLCAST_SENT = true,
+    UNIT_SPELLCAST_SUCCEEDED = true,
 }
 
 
@@ -933,6 +941,10 @@ function WDP:EventDispatcher(...)
     end
     local func = EVENT_MAPPING[event_name]
 
+    if not func and LE_EXPANSION_LEVEL_CURRENT == LE_EXPANSION_WAR_WITHIN then
+        func = TWW_ONLY_EVENT_MAPPING[event_name]
+    end
+
     if type(func) == "boolean" then
         self[event_name](self, ...)
     elseif type(func) == "function" then
@@ -949,6 +961,16 @@ function WDP:OnEnable()
             self:RegisterEvent(event_name, "EventDispatcher")
         else
             self:RegisterEvent(event_name, (type(mapping) ~= "boolean") and mapping or nil)
+        end
+    end
+
+    if LE_EXPANSION_LEVEL_CURRENT == LE_EXPANSION_WAR_WITHIN then
+        for event_name, mapping in pairs(TWW_ONLY_EVENT_MAPPING) do
+            if EVENT_DEBUG then
+                self:RegisterEvent(event_name, "EventDispatcher")
+            else
+                self:RegisterEvent(event_name, (type(mapping) ~= "boolean") and mapping or nil)
+            end
         end
     end
 
@@ -1202,8 +1224,8 @@ local function TargetedNPC()
     local _, class_token = _G.UnitClass("target")
     npc.class = class_token
     
-    -- Can't do this in instances now, at least using the current method of putting a unit on a tooltip
-    if false then
+    -- Can't do this in instances in Midnight, at least using the current method of putting a unit on a tooltip
+    if LE_EXPANSION_LEVEL_CURRENT == LE_EXPANSION_WAR_WITHIN or not IsInInstance() then
         npc.faction = UnitFactionStanding("target")
     end
     
@@ -1221,8 +1243,8 @@ local function TargetedNPC()
         encounter_data[npc_level] = level_data
     end
     
-    -- Can't do this in instances now
-    if not III() then
+    -- Can't do this in instances in Midnight
+    if LE_EXPANSION_LEVEL_CURRENT == LE_EXPANSION_WAR_WITHIN or not IsInInstance() then
         level_data.max_health = level_data.max_health or _G.UnitHealthMax("target")
 
         -- May not capture as much data as it could, since the API changed in Legion to report multiple types of power
@@ -1795,6 +1817,206 @@ do
 end
 
 
+do
+    -- Enum removed in Midnight
+    local FLAGS_NPC = 0
+    if _G.COMBATLOG_OBJECT_TYPE_GUARDIAN and _G.COMBATLOG_OBJECT_CONTROL_NPC then
+        FLAGS_NPC = bit.bor(_G.COMBATLOG_OBJECT_TYPE_GUARDIAN, _G.COMBATLOG_OBJECT_CONTROL_NPC)
+    end
+
+    -- Enum removed in Midnight
+    local FLAGS_NPC_CONTROL = 0
+    if _G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER and _G.COMBATLOG_OBJECT_CONTROL_NPC then
+        FLAGS_NPC_CONTROL = bit.bor(_G.COMBATLOG_OBJECT_AFFILIATION_OUTSIDER, _G.COMBATLOG_OBJECT_CONTROL_NPC)
+    end
+
+    local function RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
+        if not spell_id or private.BLACKLISTED_SPELLS[spell_id] then
+            return
+        end
+        local source_type, source_id = ParseGUID(source_guid)
+
+        if not source_id or not UnitTypeIsNPC(source_type) then
+            return
+        end
+
+        if bit.band(FLAGS_NPC_CONTROL, source_flags) == FLAGS_NPC_CONTROL and bit.band(FLAGS_NPC, source_flags) ~= 0 then
+            local encounter_data = NPCEntry(source_id):EncounterData(InstanceDifficultyToken())
+            encounter_data.spells = encounter_data.spells or {}
+            encounter_data.spells[spell_id] = (encounter_data.spells[spell_id] or 0) + 1
+        end
+    end
+
+    local HEAL_BATTLE_PETS_SPELL_ID = 125801
+
+    local previous_combat_event = {}
+
+    local COMBAT_LOG_FUNCS = {
+        SPELL_AURA_APPLIED = RecordNPCSpell,
+        SPELL_CAST_START = RecordNPCSpell,
+        SPELL_CAST_SUCCESS = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
+            if spell_id == HEAL_BATTLE_PETS_SPELL_ID then
+                local unit_type, unit_idnum = ParseGUID(source_guid)
+
+                if unit_idnum and UnitTypeIsNPC(unit_type) then
+                    NPCEntry(unit_idnum).stable_master = true
+                end
+            end
+            RecordNPCSpell(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
+        end,
+        UNIT_DIED = function(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
+            local unit_type, unit_idnum = ParseGUID(dest_guid)
+
+            if not unit_idnum or not UnitTypeIsNPC(unit_type) then
+                --Debug("%s: %s is not an NPC, or has no ID.", sub_event, dest_name or _G.UNKNOWN) -- we really don't need to know this
+                ClearKilledNPC()
+                private.harvesting = nil
+                return
+            end
+
+            if source_guid == "" then
+                source_guid = nil
+            end
+            local killer_guid = source_guid or previous_combat_event.source_guid
+            local killer_name = source_name or previous_combat_event.source_name
+
+            if not previous_combat_event.party_damage then
+                --Debug("%s: %s was killed by %s (not group member or pet).", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN) -- broken in Patch 5.4
+                table.wipe(previous_combat_event)
+                ClearKilledNPC()
+            else
+                --Debug("%s: %s was killed by %s.", sub_event, dest_name or _G.UNKNOWN, killer_name or _G.UNKNOWN) -- broken in Patch 5.4
+            end
+            killed_npc_id = unit_idnum
+            C_Timer.After(0.1, ClearKilledNPC)
+        end,
+    }
+
+
+    local NON_DAMAGE_EVENTS = {
+        SPELL_AURA_APPLIED = true,
+        SPELL_AURA_REMOVED = true,
+        SPELL_AURA_REMOVED_DOSE = true,
+        SPELL_CAST_FAILED = true,
+        SWING_MISSED = true,
+    }
+
+    local DAMAGE_EVENTS = {
+        RANGE_DAMAGE = true,
+        SPELL_BUILDING_DAMAGE = true,
+        SPELL_DAMAGE = true,
+        SPELL_PERIODIC_DAMAGE = true,
+        SWING_DAMAGE = true,
+    }
+
+
+    function WDP:COMBAT_LOG_EVENT_UNFILTERED(event_name, time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id, ...)
+        time_stamp, sub_event, hide_caster, source_guid, source_name, source_flags, source_raid_flags, dest_guid, dest_name, dest_flags, dest_raid_flags, spell_id = CombatLogGetCurrentEventInfo()
+
+        local combat_log_func = COMBAT_LOG_FUNCS[sub_event]
+
+        if not combat_log_func then
+            if DAMAGE_EVENTS[sub_event] then
+                table.wipe(previous_combat_event)
+                previous_combat_event.source_name = source_name
+
+                if source_guid ~= dest_guid and (in_instance or group_member_guids[source_guid] or group_pet_guids[source_guid]) then
+                    previous_combat_event.party_damage = true
+                end
+            end
+            return
+        end
+        combat_log_func(sub_event, source_guid, source_name, source_flags, dest_guid, dest_name, dest_flags, spell_id)
+
+        if NON_DAMAGE_EVENTS[sub_event] then
+            table.wipe(previous_combat_event)
+        end
+    end
+
+
+    local DIPLOMACY_SPELL_ID = 20599
+    local MR_POP_RANK1_SPELL_ID = 78634
+    local MR_POP_RANK2_SPELL_ID = 78635
+    local TRADING_PACT_SPELL_ID = 170200
+
+
+    function WDP:COMBAT_TEXT_UPDATE(event_name, message_type, faction_name, amount)
+        if message_type ~= "FACTION" or not killed_npc_id then
+            return
+        end
+        UpdateFactionData()
+
+        if not faction_name or not faction_standings[faction_name] then
+            return
+        end
+        local npc = NPCEntry(killed_npc_id)
+        ClearKilledNPC()
+
+        if not npc then
+            private.harvesting = nil
+            return
+        end
+        npc.harvested = private.harvesting
+        private.harvesting = nil
+
+        local modifier = 1
+
+        -- Check for modifiers from known spells
+        if _G.IsSpellKnown(DIPLOMACY_SPELL_ID) then
+            modifier = modifier + 0.1
+        end
+        if _G.IsSpellKnown(MR_POP_RANK2_SPELL_ID) then
+            modifier = modifier + 0.1
+        elseif _G.IsSpellKnown(MR_POP_RANK1_SPELL_ID) then
+            modifier = modifier + 0.05
+        end
+        if _G.IsSpellKnown(TRADING_PACT_SPELL_ID) then
+            modifier = modifier + 0.2
+        end
+
+        -- Determine faction ID
+        local faction_ID
+        for pseudo_faction_name, faction_data_table in pairs(private.FACTION_DATA) do
+            if faction_data_table[3] and faction_data_table[3].currentStanding and faction_name == faction_data_table[3].currentStanding then
+                -- Check ignore flag
+                if faction_data_table[2] then
+                    return
+                end
+                faction_ID = faction_data_table[1]
+                break
+            end
+        end
+        if faction_ID and faction_ID > 0 then
+            -- Check for modifiers from Commendations (applied directly to the faction, account-wide)
+            local factionReturn = _G.C_Reputation.GetFactionDataByID(faction_ID)
+            if factionReturn and factionReturn.hasBonusRepGain then
+                modifier = modifier + 1
+            end
+        end
+
+        -- Check for modifiers from buffs
+        for buff_name, buff_data_table in pairs(private.REP_BUFFS) do
+            if _G.UnitBuff("player", buff_name) then
+                local modded_faction = buff_data_table.faction
+
+                if not modded_faction or faction_name == modded_faction then
+                    if buff_data_table.ignore then
+                        -- Some buffs from tabards convert all rep of other factions into rep for a specific faction.
+                        -- We can't know what faction the rep was orginally from, so we must ignore the data entirely in these cases.
+                        return
+                    else
+                        modifier = modifier + buff_data_table.modifier
+                    end
+                end
+            end
+        end
+
+        npc.reputations = npc.reputations or {}
+        npc.reputations[("%s:%s"):format(faction_name, faction_standings[faction_name])] = math.floor(amount / modifier)
+    end
+end -- do-block
+
+
 function WDP:WORLD_CURSOR_TOOLTIP_UPDATE(event_name, is_shown)
     if current_action.fishing_target or _G.Minimap:IsMouseOver() then
         return
@@ -2225,8 +2447,8 @@ do
                 return
             end
             
-            -- Can't do this in instances now, at least not by tooltip unit scanning
-            if false then
+            -- Can't do this in instances in Midnight, at least not by tooltip unit scanning
+            if LE_EXPANSION_LEVEL_CURRENT == LE_EXPANSION_WAR_WITHIN or not IsInInstance then
                 local _, faction_standing = UnitFactionStanding("npc")
                 merchant_standing = faction_standing
             end
@@ -2241,7 +2463,6 @@ do
         local num_items = _G.GetMerchantNumItems()
 
         for item_index = 1, num_items do
-            local _, _, copper_price, stack_size, num_available, _, extended_cost = _G.C_MerchantFrame.GetItemInfo(item_index)
             local itemInfoTable = _G.C_MerchantFrame.GetItemInfo(item_index)
             local item_id = ItemLinkToID(_G.GetMerchantItemLink(item_index))
 
