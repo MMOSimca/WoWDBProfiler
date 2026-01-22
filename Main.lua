@@ -1240,7 +1240,7 @@ do
     local COORD_MAX = 5
 
     function WDP:UpdateTargetLocation()
-        if currently_drunk or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapDenied("target") and not _G.UnitIsDead("target")) then
+        if _G.InCombatLockdown() or not _G.UnitExists("target") or _G.UnitPlayerControlled("target") or (_G.UnitIsTapDenied("target") and not _G.UnitIsDead("target")) or currently_drunk then
             return
         end
 
@@ -1776,7 +1776,7 @@ function WDP:WORLD_CURSOR_TOOLTIP_UPDATE(event_name, is_shown)
         return
     end
     local text = _G["GameTooltipTextLeft1"]:GetText()
-    if issecurevalue(text) then
+    if issecretvalue(text) then
         return
     end
 
