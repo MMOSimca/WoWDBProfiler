@@ -504,7 +504,7 @@ do
 
 
     function ParseGUID(guid)
-        if not guid then
+        if not guid or issecretvalue(guid) then
             return
         end
 
@@ -1577,6 +1577,10 @@ do
 
 
     function WDP:CHAT_MSG_CURRENCY(event_name, message)
+        if not message or issecretvalue(message) then
+            return
+        end
+
         local category
 
         local currency_link, quantity = deformat(message, _G.CURRENCY_GAINED_MULTIPLE)
@@ -1691,7 +1695,8 @@ end
 
 
 function WDP:RecordQuote(event_name, message, source_name, language_name)
-    if not ALLOWED_LOCALES[CLIENT_LOCALE] or not source_name or not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
+    if not message or issecretvalue(message) or not ALLOWED_LOCALES[CLIENT_LOCALE] or not source_name or 
+      not name_to_id_map[source_name] or (language_name ~= "" and not languages_known[language_name]) then
         return
     end
     local npc = NPCEntry(name_to_id_map[source_name])
@@ -1738,6 +1743,10 @@ do
 
 
     function WDP:CHAT_MSG_SYSTEM(event_name, message)
+        if not message or issecretvalue(message) then
+            return
+        end
+
         if not private.trainer_shown then
             local recipe_name = message:match(RECIPE_MATCH)
 
