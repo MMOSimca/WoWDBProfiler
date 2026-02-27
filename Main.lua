@@ -1364,6 +1364,10 @@ end
 
 
 local function UpdateUnitPet(unit_guid, unit_id)
+    if not unit_id or not unit_guid or issecretvalue(unit_guid) then
+        return
+    end
+
     local current_pet_guid = group_owner_guids_to_pet_guids[unit_guid]
 
     if current_pet_guid then
@@ -1398,6 +1402,10 @@ end
 
 
 function WDP:UNIT_PET(event_name, unit_id)
+    if not unit_id then
+        return
+    end
+
     UpdateUnitPet(_G.UnitGUID(unit_id), unit_id)
 end
 
@@ -1657,6 +1665,10 @@ do
 
 
     function WDP:CHAT_MSG_LOOT(event_name, message)
+        if not message or issecretvalue(message) then
+            return
+        end
+
         local category
 
         local item_link, quantity = deformat(message, _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE)
@@ -2464,23 +2476,18 @@ end -- do-block
 
 function WDP:QUEST_LOG_UPDATE(event_name)
     local selected_quest = _G.C_QuestLog.GetSelectedQuest() -- Save current selection to be restored when we're done.
-    local entry_index, processed_quests = 1, 0
     local _, num_quests = _G.C_QuestLog.GetNumQuestLogEntries()
 
-    while processed_quests <= num_quests do
-        local info = _G.C_QuestLog.GetInfo(entry_index)
+    for index = 1, num_quests do
+        local info = _G.C_QuestLog.GetInfo(index)
 
-        if info.questID == 0 then
-            processed_quests = processed_quests + 1
-        elseif not info.isHeader then
-            _G.C_QuestLog.SetSelectedQuest(entry_index);
+        if info and info.questID ~= 0 and not info.isHeader then
+            _G.C_QuestLog.SetSelectedQuest(index)
 
             local quest = DBEntry("quests", info.questID)
             quest.timer = _G.GetQuestLogTimeLeft()
             quest.can_share = _G.C_QuestLog.IsPushableQuest(info.questID) and true or nil
-            processed_quests = processed_quests + 1
         end
-        entry_index = entry_index + 1
     end
     _G.C_QuestLog.SetSelectedQuest(selected_quest)
     self:UnregisterEvent("QUEST_LOG_UPDATE")
