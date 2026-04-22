@@ -1364,19 +1364,21 @@ end
 
 
 local function UpdateUnitPet(unit_guid, unit_id)
-    if not unit_id or not unit_guid or issecretvalue(unit_guid) then
+    if not unit_guid or not unit_id or issecretvalue(unit_guid) or issecretvalue(unit_id) then
         return
     end
 
     local current_pet_guid = group_owner_guids_to_pet_guids[unit_guid]
 
-    if current_pet_guid then
+    if current_pet_guid and not issecretvalue(current_pet_guid) then
         group_owner_guids_to_pet_guids[unit_guid] = nil
         group_pet_guids[current_pet_guid] = nil
     end
-    local pet_guid = _G.UnitGUID(unit_id .. "pet")
+    local success, pet_guid = pcall(function(unit_id)
+        return _G.UnitGUID(unit_id .. "pet")
+    end, unit_id)
 
-    if pet_guid then
+    if success and pet_guid and not issecretvalue(pet_guid) then
         group_owner_guids_to_pet_guids[unit_guid] = pet_guid
         group_pet_guids[pet_guid] = true
     end
@@ -2426,12 +2428,12 @@ end
 
 do
     local function UpdateQuestJuncture(point)
-        local unit_name = _G.UnitName("questnpc")
+        local unit_type, unit_id = ParseGUID(_G.UnitGUID("questnpc"))
 
-        if not unit_name then
+        if not unit_type or not unit_id or issecretvalue(unit_type) or issecretvalue(unit_id) then
             return
         end
-        local unit_type, unit_id = ParseGUID(_G.UnitGUID("questnpc"))
+
         Debug("UpdateQuestJuncture: Updating quest juncture for %s.", ("%s:%d"):format(private.UNIT_TYPE_NAMES[unit_type], unit_id))
         if unit_type == private.UNIT_TYPES.OBJECT then
             UpdateDBEntryLocation("objects", unit_id)
