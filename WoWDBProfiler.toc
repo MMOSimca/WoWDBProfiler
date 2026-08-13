@@ -1,4 +1,4 @@
-## Interface: 120007
+## Interface: 120100
 ## Title: WoWDB Profiler
 ## Notes: WoW datamining tool.
 ## Author: James D. Callahan III (Torhal) and Simca
