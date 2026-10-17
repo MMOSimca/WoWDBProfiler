@@ -970,7 +970,7 @@ function WDP:OnEnable()
         if target_unit then
             return
         end
-        local _, item_link = _G.GetItemInfo(identifier)
+        local _, item_link = _G.C_Item.GetItemInfo(identifier)
         HandleItemUse(item_link)
     end)
 
